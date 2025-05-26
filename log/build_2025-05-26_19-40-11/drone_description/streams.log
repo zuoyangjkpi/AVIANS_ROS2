@@ -1,0 +1,59 @@
+[0.012s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.060s] [100%] Built target waypoint_controller
+[0.069s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.077s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description
+[0.083s] -- Install configuration: ""
+[0.083s] -- Up-to-date: /home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller
+[0.083s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models
+[0.083s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/models/x3
+[0.083s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails
+[0.083s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails/5.jpg
+[0.083s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails/1.jpg
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails/3.jpg
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails/4.jpg
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/thumbnails/2.jpg
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/model.sdf
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo9_propeller_ccw.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/hummingbird.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/x3.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo9.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/x3.jpg
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/ardrone.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/propeller_cw.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/vi_sensor.dae
+[0.084s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo9_propeller_cw.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo11.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/vi_camera.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo11_propeller_cw.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/vi_sensor.jpg
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/vi_camera.jpg
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/pelican.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/neo11_propeller_ccw.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/iris.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/firefly.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/meshes/propeller_ccw.dae
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/x3/model.config
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds
+[0.085s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds/test_world.sdf
+[0.086s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/worlds/drone_world.sdf
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch/gz.launch.py
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config/bridge.yaml
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/package_run_dependencies/drone_description
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/parent_prefix_path/drone_description
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.sh
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.dsv
+[0.086s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.sh
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.dsv
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.bash
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.sh
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.zsh
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.dsv
+[0.087s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/package.dsv
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/packages/drone_description
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig.cmake
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig-version.cmake
+[0.087s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/package.xml
+[0.088s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description
