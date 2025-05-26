@@ -1,0 +1,25 @@
+[0.009s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.052s] [ 50%] [32mBuilding CXX object CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o[0m
+[7.131s] [100%] [32m[1mLinking CXX executable waypoint_controller[0m
+[7.384s] [100%] Built target waypoint_controller
+[7.393s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[7.402s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description
+[7.409s] -- Install configuration: ""
+[7.409s] -- Installing: /home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller
+[7.413s] -- Set non-toolchain portion of runtime path of "/home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller" to ""
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/package_run_dependencies/drone_description
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/parent_prefix_path/drone_description
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.sh
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.dsv
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.sh
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.dsv
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.bash
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.sh
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.zsh
+[7.413s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.dsv
+[7.414s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/package.dsv
+[7.414s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/packages/drone_description
+[7.414s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig.cmake
+[7.414s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig-version.cmake
+[7.414s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/package.xml
+[7.415s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description

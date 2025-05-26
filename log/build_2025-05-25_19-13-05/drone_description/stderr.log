@@ -1,0 +1,6 @@
+[31mCMake Error at CMakeLists.txt:19 (install):
+  install TARGETS given target "waypoint_controller.cpp" which does not
+  exist.
+
+[0m
+gmake: *** [Makefile:226: cmake_check_build_system] Error 1

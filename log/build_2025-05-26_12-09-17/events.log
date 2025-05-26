@@ -1,0 +1,178 @@
+[0.000000] (-) TimerEvent: {}
+[0.000201] (drone_description) JobQueued: {'identifier': 'drone_description', 'dependencies': OrderedDict()}
+[0.000400] (drone_description) JobStarted: {'identifier': 'drone_description'}
+[0.006545] (drone_description) JobProgress: {'identifier': 'drone_description', 'progress': 'cmake'}
+[0.006972] (drone_description) JobProgress: {'identifier': 'drone_description', 'progress': 'build'}
+[0.007464] (drone_description) Command: {'cmd': ['/usr/bin/cmake', '--build', '/home/dell/drone/build/drone_description', '--', '-j16', '-l16'], 'cwd': '/home/dell/drone/build/drone_description', 'env': OrderedDict({'GJS_DEBUG_TOPICS': 'JS ERROR;JS LOG', 'XDG_ACTIVATION_TOKEN': 'gnome-shell/Terminator/2802-1-Abdelmawgoud_TIME1492592', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'GZ_SIM_RESOURCE_PATH': '/home/dell/drone/src/drone_description/models::/usr/share/gz/sim/media', 'USER': 'dell', 'GZ_CONFIG_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor/share/gz:/opt/ros/jazzy/opt/gz_sim_vendor/share/gz:/opt/ros/jazzy/opt/sdformat_vendor/share/gz:/opt/ros/jazzy/opt/gz_gui_vendor/share/gz:/opt/ros/jazzy/opt/gz_transport_vendor/share/gz:/opt/ros/jazzy/opt/gz_rendering_vendor/share/gz:/opt/ros/jazzy/opt/gz_plugin_vendor/share/gz:/opt/ros/jazzy/opt/gz_fuel_tools_vendor/share/gz:/opt/ros/jazzy/opt/gz_msgs_vendor/share/gz:/opt/ros/jazzy/opt/gz_common_vendor/share/gz', 'XDG_SESSION_TYPE': 'x11', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor/lib:/opt/ros/jazzy/opt/gz_sim_vendor/lib:/opt/ros/jazzy/opt/gz_sensors_vendor/lib:/opt/ros/jazzy/opt/gz_physics_vendor/lib:/opt/ros/jazzy/opt/sdformat_vendor/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_gui_vendor/lib:/opt/ros/jazzy/opt/gz_transport_vendor/lib:/opt/ros/jazzy/opt/gz_rendering_vendor/lib:/opt/ros/jazzy/opt/gz_plugin_vendor/lib:/opt/ros/jazzy/opt/gz_fuel_tools_vendor/lib:/opt/ros/jazzy/opt/gz_msgs_vendor/lib:/opt/ros/jazzy/opt/gz_common_vendor/lib:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_tools_vendor/lib:/opt/ros/jazzy/opt/gz_ogre_next_vendor/lib:/opt/ros/jazzy/opt/gz_dartsim_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/dell', 'OLDPWD': '/home/dell', 'DESKTOP_SESSION': 'ubuntu', 'GIO_LAUNCHED_DESKTOP_FILE': '/usr/share/applications/terminator.desktop', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'MANAGERPID': '1762', 'SYSTEMD_EXEC_PID': '2802', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'TERMINATOR_DBUS_NAME': 'net.tenshu.Terminator21a9d5db22c73a993ff0b42f64b396873', 'GIO_LAUNCHED_DESKTOP_FILE_PID': '7007', '_colcon_cd_root': '/opt/ros/jazzy/', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'dell', 'JOURNAL_STREAM': '9:24738', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'dell', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'WINDOWPATH': '2', 'PATH': '/opt/ros/jazzy/opt/gz_msgs_vendor/bin:/opt/ros/jazzy/opt/gz_tools_vendor/bin:/opt/ros/jazzy/opt/gz_ogre_next_vendor/bin:/opt/ros/jazzy/bin:/home/dell/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/Abdelmawgoud:@/tmp/.ICE-unix/2773,unix/Abdelmawgoud:/tmp/.ICE-unix/2773', 'INVOCATION_ID': '85dc23afce5048d5ae20df149a386c2d', 'XDG_MENU_PREFIX': 'gnome-', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'TERMINATOR_DBUS_PATH': '/net/tenshu/Terminator2', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/gdm/Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/opt/ros/jazzy', 'SHELL': '/bin/bash', 'TERMINATOR_UUID': 'urn:uuid:9c3266d9-596f-45bc-8d66-d3c81925c46c', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'IGN_GAZEBO_RESOURCE_PATH': '/opt/ros/jazzy/share', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'GJS_DEBUG_OUTPUT': 'stderr', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/dell/drone/build/drone_description', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor:/opt/ros/jazzy/opt/gz_sim_vendor:/opt/ros/jazzy/opt/gz_sensors_vendor:/opt/ros/jazzy/opt/gz_physics_vendor:/opt/ros/jazzy/opt/sdformat_vendor:/opt/ros/jazzy/opt/gz_gui_vendor:/opt/ros/jazzy/opt/gz_transport_vendor:/opt/ros/jazzy/opt/gz_rendering_vendor:/opt/ros/jazzy/opt/gz_plugin_vendor:/opt/ros/jazzy/opt/gz_fuel_tools_vendor:/opt/ros/jazzy/opt/gz_msgs_vendor:/opt/ros/jazzy/opt/gz_common_vendor:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_tools_vendor:/opt/ros/jazzy/opt/gz_ogre_next_vendor:/opt/ros/jazzy/opt/gz_dartsim_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[0.058003] (drone_description) StdoutLine: {'line': b'[ 50%] \x1b[32mBuilding CXX object CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o\x1b[0m\n'}
+[0.099921] (-) TimerEvent: {}
+[0.200264] (-) TimerEvent: {}
+[0.300508] (-) TimerEvent: {}
+[0.400766] (-) TimerEvent: {}
+[0.501014] (-) TimerEvent: {}
+[0.601276] (-) TimerEvent: {}
+[0.701552] (-) TimerEvent: {}
+[0.801783] (-) TimerEvent: {}
+[0.902016] (-) TimerEvent: {}
+[1.002253] (-) TimerEvent: {}
+[1.102511] (-) TimerEvent: {}
+[1.202741] (-) TimerEvent: {}
+[1.302973] (-) TimerEvent: {}
+[1.403222] (-) TimerEvent: {}
+[1.503458] (-) TimerEvent: {}
+[1.603689] (-) TimerEvent: {}
+[1.703923] (-) TimerEvent: {}
+[1.804154] (-) TimerEvent: {}
+[1.904399] (-) TimerEvent: {}
+[2.004706] (-) TimerEvent: {}
+[2.104934] (-) TimerEvent: {}
+[2.205169] (-) TimerEvent: {}
+[2.305420] (-) TimerEvent: {}
+[2.405668] (-) TimerEvent: {}
+[2.505883] (-) TimerEvent: {}
+[2.606114] (-) TimerEvent: {}
+[2.706330] (-) TimerEvent: {}
+[2.806567] (-) TimerEvent: {}
+[2.906801] (-) TimerEvent: {}
+[3.007028] (-) TimerEvent: {}
+[3.107260] (-) TimerEvent: {}
+[3.207525] (-) TimerEvent: {}
+[3.307769] (-) TimerEvent: {}
+[3.408044] (-) TimerEvent: {}
+[3.508280] (-) TimerEvent: {}
+[3.608484] (-) TimerEvent: {}
+[3.708685] (-) TimerEvent: {}
+[3.808919] (-) TimerEvent: {}
+[3.909146] (-) TimerEvent: {}
+[4.009369] (-) TimerEvent: {}
+[4.109603] (-) TimerEvent: {}
+[4.209802] (-) TimerEvent: {}
+[4.310039] (-) TimerEvent: {}
+[4.410270] (-) TimerEvent: {}
+[4.510504] (-) TimerEvent: {}
+[4.610740] (-) TimerEvent: {}
+[4.710975] (-) TimerEvent: {}
+[4.811252] (-) TimerEvent: {}
+[4.911474] (-) TimerEvent: {}
+[5.011696] (-) TimerEvent: {}
+[5.111911] (-) TimerEvent: {}
+[5.212175] (-) TimerEvent: {}
+[5.312439] (-) TimerEvent: {}
+[5.412698] (-) TimerEvent: {}
+[5.512954] (-) TimerEvent: {}
+[5.613238] (-) TimerEvent: {}
+[5.713463] (-) TimerEvent: {}
+[5.813653] (-) TimerEvent: {}
+[5.913851] (-) TimerEvent: {}
+[6.014075] (-) TimerEvent: {}
+[6.114319] (-) TimerEvent: {}
+[6.214548] (-) TimerEvent: {}
+[6.314745] (-) TimerEvent: {}
+[6.414933] (-) TimerEvent: {}
+[6.515124] (-) TimerEvent: {}
+[6.615290] (-) TimerEvent: {}
+[6.715514] (-) TimerEvent: {}
+[6.815741] (-) TimerEvent: {}
+[6.915972] (-) TimerEvent: {}
+[7.016196] (-) TimerEvent: {}
+[7.116395] (-) TimerEvent: {}
+[7.216620] (-) TimerEvent: {}
+[7.316846] (-) TimerEvent: {}
+[7.417085] (-) TimerEvent: {}
+[7.517364] (-) TimerEvent: {}
+[7.617601] (-) TimerEvent: {}
+[7.717815] (-) TimerEvent: {}
+[7.818038] (-) TimerEvent: {}
+[7.918231] (-) TimerEvent: {}
+[8.018422] (-) TimerEvent: {}
+[8.118623] (-) TimerEvent: {}
+[8.218817] (-) TimerEvent: {}
+[8.319015] (-) TimerEvent: {}
+[8.419276] (-) TimerEvent: {}
+[8.519460] (-) TimerEvent: {}
+[8.619650] (-) TimerEvent: {}
+[8.719841] (-) TimerEvent: {}
+[8.820064] (-) TimerEvent: {}
+[8.920247] (-) TimerEvent: {}
+[9.020442] (-) TimerEvent: {}
+[9.120685] (-) TimerEvent: {}
+[9.220910] (-) TimerEvent: {}
+[9.321100] (-) TimerEvent: {}
+[9.421247] (-) TimerEvent: {}
+[9.521475] (-) TimerEvent: {}
+[9.621706] (-) TimerEvent: {}
+[9.721928] (-) TimerEvent: {}
+[9.822178] (-) TimerEvent: {}
+[9.922459] (-) TimerEvent: {}
+[10.022770] (-) TimerEvent: {}
+[10.123039] (-) TimerEvent: {}
+[10.223290] (-) TimerEvent: {}
+[10.323552] (-) TimerEvent: {}
+[10.333519] (drone_description) StdoutLine: {'line': b'[100%] \x1b[32m\x1b[1mLinking CXX executable waypoint_controller\x1b[0m\n'}
+[10.423638] (-) TimerEvent: {}
+[10.523924] (-) TimerEvent: {}
+[10.624173] (-) TimerEvent: {}
+[10.681769] (drone_description) StdoutLine: {'line': b'[100%] Built target waypoint_controller\n'}
+[10.689789] (drone_description) CommandEnded: {'returncode': 0}
+[10.690282] (drone_description) JobProgress: {'identifier': 'drone_description', 'progress': 'install'}
+[10.696675] (drone_description) Command: {'cmd': ['/usr/bin/cmake', '--install', '/home/dell/drone/build/drone_description'], 'cwd': '/home/dell/drone/build/drone_description', 'env': OrderedDict({'GJS_DEBUG_TOPICS': 'JS ERROR;JS LOG', 'XDG_ACTIVATION_TOKEN': 'gnome-shell/Terminator/2802-1-Abdelmawgoud_TIME1492592', 'LESSOPEN': '| /usr/bin/lesspipe %s', 'GZ_SIM_RESOURCE_PATH': '/home/dell/drone/src/drone_description/models::/usr/share/gz/sim/media', 'USER': 'dell', 'GZ_CONFIG_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor/share/gz:/opt/ros/jazzy/opt/gz_sim_vendor/share/gz:/opt/ros/jazzy/opt/sdformat_vendor/share/gz:/opt/ros/jazzy/opt/gz_gui_vendor/share/gz:/opt/ros/jazzy/opt/gz_transport_vendor/share/gz:/opt/ros/jazzy/opt/gz_rendering_vendor/share/gz:/opt/ros/jazzy/opt/gz_plugin_vendor/share/gz:/opt/ros/jazzy/opt/gz_fuel_tools_vendor/share/gz:/opt/ros/jazzy/opt/gz_msgs_vendor/share/gz:/opt/ros/jazzy/opt/gz_common_vendor/share/gz', 'XDG_SESSION_TYPE': 'x11', 'CLUTTER_DISABLE_MIPMAPPED_TEXT': '1', 'SHLVL': '1', 'LD_LIBRARY_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor/lib:/opt/ros/jazzy/opt/gz_sim_vendor/lib:/opt/ros/jazzy/opt/gz_sensors_vendor/lib:/opt/ros/jazzy/opt/gz_physics_vendor/lib:/opt/ros/jazzy/opt/sdformat_vendor/lib:/opt/ros/jazzy/opt/rviz_ogre_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/opt/gz_gui_vendor/lib:/opt/ros/jazzy/opt/gz_transport_vendor/lib:/opt/ros/jazzy/opt/gz_rendering_vendor/lib:/opt/ros/jazzy/opt/gz_plugin_vendor/lib:/opt/ros/jazzy/opt/gz_fuel_tools_vendor/lib:/opt/ros/jazzy/opt/gz_msgs_vendor/lib:/opt/ros/jazzy/opt/gz_common_vendor/lib:/opt/ros/jazzy/opt/gz_math_vendor/lib:/opt/ros/jazzy/opt/gz_utils_vendor/lib:/opt/ros/jazzy/opt/gz_tools_vendor/lib:/opt/ros/jazzy/opt/gz_ogre_next_vendor/lib:/opt/ros/jazzy/opt/gz_dartsim_vendor/lib:/opt/ros/jazzy/opt/gz_cmake_vendor/lib:/opt/ros/jazzy/lib', 'HOME': '/home/dell', 'OLDPWD': '/home/dell', 'DESKTOP_SESSION': 'ubuntu', 'GIO_LAUNCHED_DESKTOP_FILE': '/usr/share/applications/terminator.desktop', 'ROS_PYTHON_VERSION': '3', 'GNOME_SHELL_SESSION_MODE': 'ubuntu', 'GTK_MODULES': 'gail:atk-bridge', 'MANAGERPID': '1762', 'SYSTEMD_EXEC_PID': '2802', 'GSM_SKIP_SSH_AGENT_WORKAROUND': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'unix:path=/run/user/1000/bus', 'COLORTERM': 'truecolor', 'TERMINATOR_DBUS_NAME': 'net.tenshu.Terminator21a9d5db22c73a993ff0b42f64b396873', 'GIO_LAUNCHED_DESKTOP_FILE_PID': '7007', '_colcon_cd_root': '/opt/ros/jazzy/', 'DEBUGINFOD_URLS': 'https://debuginfod.ubuntu.com', 'ROS_DISTRO': 'jazzy', 'LOGNAME': 'dell', 'JOURNAL_STREAM': '9:24738', '_': '/usr/bin/colcon', 'ROS_VERSION': '2', 'MEMORY_PRESSURE_WATCH': '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service/session.slice/org.gnome.Shell@x11.service/memory.pressure', 'XDG_SESSION_CLASS': 'user', 'USERNAME': 'dell', 'TERM': 'xterm-256color', 'GNOME_DESKTOP_SESSION_ID': 'this-is-deprecated', 'WINDOWPATH': '2', 'PATH': '/opt/ros/jazzy/opt/gz_msgs_vendor/bin:/opt/ros/jazzy/opt/gz_tools_vendor/bin:/opt/ros/jazzy/opt/gz_ogre_next_vendor/bin:/opt/ros/jazzy/bin:/home/dell/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/snap/bin', 'SESSION_MANAGER': 'local/Abdelmawgoud:@/tmp/.ICE-unix/2773,unix/Abdelmawgoud:/tmp/.ICE-unix/2773', 'INVOCATION_ID': '85dc23afce5048d5ae20df149a386c2d', 'XDG_MENU_PREFIX': 'gnome-', 'XDG_RUNTIME_DIR': '/run/user/1000', 'DISPLAY': ':0', 'TERMINATOR_DBUS_PATH': '/net/tenshu/Terminator2', 'LANG': 'en_US.UTF-8', 'XDG_CURRENT_DESKTOP': 'ubuntu:GNOME', 'XMODIFIERS': '@im=ibus', 'XDG_SESSION_DESKTOP': 'ubuntu', 'XAUTHORITY': '/run/user/1000/gdm/Xauthority', 'LS_COLORS': 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:', 'SSH_AUTH_SOCK': '/run/user/1000/keyring/ssh', 'AMENT_PREFIX_PATH': '/opt/ros/jazzy', 'SHELL': '/bin/bash', 'TERMINATOR_UUID': 'urn:uuid:9c3266d9-596f-45bc-8d66-d3c81925c46c', 'QT_ACCESSIBILITY': '1', 'GDMSESSION': 'ubuntu', 'LESSCLOSE': '/usr/bin/lesspipe %s %s', 'IGN_GAZEBO_RESOURCE_PATH': '/opt/ros/jazzy/share', 'GPG_AGENT_INFO': '/run/user/1000/gnupg/S.gpg-agent:0:1', 'GJS_DEBUG_OUTPUT': 'stderr', 'ROS_AUTOMATIC_DISCOVERY_RANGE': 'SUBNET', 'QT_IM_MODULE': 'ibus', 'PWD': '/home/dell/drone/build/drone_description', 'LC_ALL': 'en_US.UTF-8', 'XDG_CONFIG_DIRS': '/etc/xdg/xdg-ubuntu:/etc/xdg', 'XDG_DATA_DIRS': '/usr/share/ubuntu:/usr/share/gnome:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop', 'PYTHONPATH': '/opt/ros/jazzy/lib/python3.12/site-packages', 'COLCON': '1', 'MEMORY_PRESSURE_WRITE': 'c29tZSAyMDAwMDAgMjAwMDAwMAA=', 'VTE_VERSION': '7600', 'CMAKE_PREFIX_PATH': '/opt/ros/jazzy/opt/gz_launch_vendor:/opt/ros/jazzy/opt/gz_sim_vendor:/opt/ros/jazzy/opt/gz_sensors_vendor:/opt/ros/jazzy/opt/gz_physics_vendor:/opt/ros/jazzy/opt/sdformat_vendor:/opt/ros/jazzy/opt/gz_gui_vendor:/opt/ros/jazzy/opt/gz_transport_vendor:/opt/ros/jazzy/opt/gz_rendering_vendor:/opt/ros/jazzy/opt/gz_plugin_vendor:/opt/ros/jazzy/opt/gz_fuel_tools_vendor:/opt/ros/jazzy/opt/gz_msgs_vendor:/opt/ros/jazzy/opt/gz_common_vendor:/opt/ros/jazzy/opt/gz_math_vendor:/opt/ros/jazzy/opt/gz_utils_vendor:/opt/ros/jazzy/opt/gz_tools_vendor:/opt/ros/jazzy/opt/gz_ogre_next_vendor:/opt/ros/jazzy/opt/gz_dartsim_vendor:/opt/ros/jazzy/opt/gz_cmake_vendor:/opt/ros/jazzy'}), 'shell': False}
+[10.702502] (drone_description) StdoutLine: {'line': b'-- Install configuration: ""\n'}
+[10.702702] (drone_description) StdoutLine: {'line': b'-- Installing: /home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller\n'}
+[10.708980] (drone_description) StdoutLine: {'line': b'-- Set non-toolchain portion of runtime path of "/home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller" to ""\n'}
+[10.709291] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models\n'}
+[10.709475] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1\n'}
+[10.709598] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/metadata.pbtxt\n'}
+[10.709735] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials\n'}
+[10.709874] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures\n'}
+[10.710007] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/led.png\n'}
+[10.710122] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/spotlight.png\n'}
+[10.710268] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/vi_camera.png\n'}
+[10.710400] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/x4.png\n'}
+[10.710498] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/vi_sensor.png\n'}
+[10.710601] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails\n'}
+[10.710697] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/1.png\n'}
+[10.710792] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/4.png\n'}
+[10.710887] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/2.png\n'}
+[10.711033] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/3.png\n'}
+[10.711332] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/model.sdf\n'}
+[10.711673] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes\n'}
+[10.711863] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/qav500.stl\n'}
+[10.712367] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/spotlight.dae\n'}
+[10.712559] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/propeller_cw.dae\n'}
+[10.712737] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/led.dae\n'}
+[10.712895] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/vi_sensor.dae\n'}
+[10.713136] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/x4.dae\n'}
+[10.713488] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/led_lamp.dae\n'}
+[10.713639] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/vi_camera.dae\n'}
+[10.713752] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/neo11_propeller_cw.dae\n'}
+[10.714150] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/qav500.dae\n'}
+[10.714425] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/pelican.dae\n'}
+[10.714658] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/neo11_propeller_ccw.dae\n'}
+[10.714909] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/propeller_ccw.dae\n'}
+[10.715056] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/model.config\n'}
+[10.715248] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds\n'}
+[10.715439] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds/test_world.sdf\n'}
+[10.715553] (drone_description) StdoutLine: {'line': b'-- Installing: /home/dell/drone/install/drone_description/share/drone_description/worlds/drone_world.sdf\n'}
+[10.715695] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch\n'}
+[10.715793] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch/gz.launch.py\n'}
+[10.715894] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config\n'}
+[10.716030] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config/bridge.yaml\n'}
+[10.716649] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/package_run_dependencies/drone_description\n'}
+[10.716786] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/parent_prefix_path/drone_description\n'}
+[10.717069] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.sh\n'}
+[10.717170] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.dsv\n'}
+[10.717425] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.sh\n'}
+[10.717589] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.dsv\n'}
+[10.717720] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.bash\n'}
+[10.717844] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.sh\n'}
+[10.717945] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.zsh\n'}
+[10.718056] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.dsv\n'}
+[10.718182] (drone_description) StdoutLine: {'line': b'-- Installing: /home/dell/drone/install/drone_description/share/drone_description/package.dsv\n'}
+[10.718379] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/packages/drone_description\n'}
+[10.718539] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig.cmake\n'}
+[10.718657] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig-version.cmake\n'}
+[10.718785] (drone_description) StdoutLine: {'line': b'-- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/package.xml\n'}
+[10.718931] (drone_description) CommandEnded: {'returncode': 0}
+[10.724240] (-) TimerEvent: {}
+[10.729399] (drone_description) JobEnded: {'identifier': 'drone_description', 'rc': 0}
+[10.730036] (-) EventReactorShutdown: {}

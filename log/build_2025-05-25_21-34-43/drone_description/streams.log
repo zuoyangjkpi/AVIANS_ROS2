@@ -1,0 +1,34 @@
+[0.010s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.030s] -- Found ament_cmake: 2.5.4 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.210s] -- Found rclcpp: 28.1.9 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.247s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.256s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.267s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.280s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.342s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.343s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.401s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.472s] -- Found geometry_msgs: 5.3.6 (/opt/ros/jazzy/share/geometry_msgs/cmake)
+[0.504s] -- Found ament_lint_auto: 0.17.2 (/opt/ros/jazzy/share/ament_lint_auto/cmake)
+[0.574s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[0.574s] -- Configured cppcheck include dirs: 
+[0.574s] -- Configured cppcheck exclude dirs and/or files: 
+[0.575s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.575s] -- Configured 'flake8' exclude dirs and/or files: 
+[0.575s] -- Added test 'lint_cmake' to check CMake code style
+[0.576s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.577s] -- Added test 'uncrustify' to check C / C++ code style
+[0.577s] -- Configured uncrustify additional arguments: 
+[0.577s] -- Added test 'xmllint' to check XML markup files
+[0.578s] -- Configuring done (0.6s)
+[0.586s] -- Generating done (0.0s)
+[0.589s] -- Build files have been written to: /home/dell/drone/build/drone_description
+[0.622s] [ 50%] [32mBuilding CXX object CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o[0m
+[0.806s] [01m[K/home/dell/drone/src/drone_description/src/waypoint_controller.cpp:5:10:[m[K [01;31m[Kfatal error: [m[Knav_msgs/msg/odometry.hpp: No such file or directory
+[0.806s]     5 | #include [01;31m[K"nav_msgs/msg/odometry.hpp"[m[K  // For Gazebo's odometry data
+[0.806s]       |          [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[0.806s] compilation terminated.
+[0.809s] gmake[2]: *** [CMakeFiles/waypoint_controller.dir/build.make:76: CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o] Error 1
+[0.809s] gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/waypoint_controller.dir/all] Error 2
+[0.809s] gmake: *** [Makefile:146: all] Error 2
+[0.811s] Invoked command in '/home/dell/drone/build/drone_description' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16

@@ -1,0 +1,21 @@
+model {
+  file: "model.sdf"
+  file_format {
+    version {
+      major: 1
+      minor: 6
+    }
+    name: "sdf"
+  }
+}
+name: "barcs_qav500_sensor_config_1"
+description: "QAV500 UAV with sensor configuration #1: 3D medium range lidar, IMU, pressure sensor, magnetometer, HD front camera, 2x pico flexx tof cameras."
+authors {
+  name: "Derek Vasquez"
+  email: "dvasquez@ssci.com"
+}
+authors {
+  name: "Neil Johnson"
+  email: "neil.johnson@ssci.com"
+}
+

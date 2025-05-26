@@ -1,0 +1,68 @@
+[0.010s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.061s] [ 50%] [32mBuilding CXX object CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o[0m
+[4.163s] [01m[K/home/dell/drone/src/drone_description/src/waypoint_controller.cpp:[m[K In function ‘[01m[Kint[01;32m[K main[m[K(int, char**)[m[K’:
+[4.163s] [01m[K/home/dell/drone/src/drone_description/src/waypoint_controller.cpp:64:35:[m[K [01;35m[Kwarning: [m[Kignoring return value of ‘[01m[Krcutils_ret_t[01;32m[K rcutils_logging_set_logger_level[m[K(const char*, int)[m[K’ declared with attribute ‘[01m[Kwarn_unused_result[m[K’ [[01;35m[K]8;;https://gcc.gnu.org/onlinedocs/gcc/Warning-Options.html#index-Wunused-result-Wunused-result]8;;[m[K]
+[4.163s]    64 | [01;35m[Kng_set_logger_level("waypoint_controller", RCUTILS_LOG_SEVERITY_DEBUG)[m[K;
+[4.163s]       | [01;35m[K~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+[4.163s] 
+[7.985s] [100%] [32m[1mLinking CXX executable waypoint_controller[0m
+[8.273s] [100%] Built target waypoint_controller
+[8.284s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[8.294s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description
+[8.303s] -- Install configuration: ""
+[8.303s] -- Installing: /home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller
+[8.308s] -- Set non-toolchain portion of runtime path of "/home/dell/drone/install/drone_description/lib/drone_description/waypoint_controller" to ""
+[8.308s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/metadata.pbtxt
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/led.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/spotlight.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/vi_camera.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/x4.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/materials/textures/vi_sensor.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/1.png
+[8.309s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/4.png
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/2.png
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/thumbnails/3.png
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/model.sdf
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/qav500.stl
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/spotlight.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/propeller_cw.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/led.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/vi_sensor.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/x4.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/led_lamp.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/vi_camera.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/neo11_propeller_cw.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/qav500.dae
+[8.310s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/pelican.dae
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/neo11_propeller_ccw.dae
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/meshes/propeller_ccw.dae
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/models/barcs_qav500_sensor_config_1/model.config
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/worlds/test_world.sdf
+[8.311s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/worlds/drone_world.sdf
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/launch/gz.launch.py
+[8.311s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/config/bridge.yaml
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/package_run_dependencies/drone_description
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/parent_prefix_path/drone_description
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.sh
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/ament_prefix_path.dsv
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.sh
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/environment/path.dsv
+[8.312s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.bash
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.sh
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.zsh
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/local_setup.dsv
+[8.313s] -- Installing: /home/dell/drone/install/drone_description/share/drone_description/package.dsv
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/ament_index/resource_index/packages/drone_description
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig.cmake
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/cmake/drone_descriptionConfig-version.cmake
+[8.313s] -- Up-to-date: /home/dell/drone/install/drone_description/share/drone_description/package.xml
+[8.313s] Invoked command in '/home/dell/drone/build/drone_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --install /home/dell/drone/build/drone_description

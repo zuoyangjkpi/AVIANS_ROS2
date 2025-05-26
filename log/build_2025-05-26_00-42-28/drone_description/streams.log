@@ -1,0 +1,36 @@
+[0.009s] Invoking command in '/home/dell/drone/build/drone_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
+[0.037s] -- Found ament_cmake: 2.5.4 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[0.245s] -- Found rclcpp: 28.1.9 (/opt/ros/jazzy/share/rclcpp/cmake)
+[0.278s] -- Found rosidl_generator_c: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_c/cmake)
+[0.288s] -- Found rosidl_generator_cpp: 4.6.5 (/opt/ros/jazzy/share/rosidl_generator_cpp/cmake)
+[0.304s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.322s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.390s] -- Found rmw_implementation_cmake: 7.3.2 (/opt/ros/jazzy/share/rmw_implementation_cmake/cmake)
+[0.392s] -- Found rmw_fastrtps_cpp: 8.4.2 (/opt/ros/jazzy/share/rmw_fastrtps_cpp/cmake)
+[0.457s] -- Using RMW implementation 'rmw_fastrtps_cpp' as default
+[0.528s] -- Found geometry_msgs: 5.3.6 (/opt/ros/jazzy/share/geometry_msgs/cmake)
+[0.561s] -- Found nav_msgs: 5.3.6 (/opt/ros/jazzy/share/nav_msgs/cmake)
+[0.588s] -- Found tf2: 0.36.11 (/opt/ros/jazzy/share/tf2/cmake)
+[0.592s] -- Found tf2_geometry_msgs: 0.36.11 (/opt/ros/jazzy/share/tf2_geometry_msgs/cmake)
+[0.596s] -- Found eigen3_cmake_module: 0.3.0 (/opt/ros/jazzy/share/eigen3_cmake_module/cmake)
+[0.597s] -- Ensuring Eigen3 include directory is part of orocos-kdl CMake target
+[0.725s] [31mCMake Error at CMakeLists.txt:15 (find_package):
+[0.725s]   By not providing "Findeigen.cmake" in CMAKE_MODULE_PATH this project has
+[0.725s]   asked CMake to find a package configuration file provided by "eigen", but
+[0.725s]   CMake did not find one.
+[0.726s] 
+[0.726s]   Could not find a package configuration file provided by "eigen" with any of
+[0.726s]   the following names:
+[0.726s] 
+[0.726s]     eigenConfig.cmake
+[0.726s]     eigen-config.cmake
+[0.726s] 
+[0.726s]   Add the installation prefix of "eigen" to CMAKE_PREFIX_PATH or set
+[0.726s]   "eigen_DIR" to a directory containing one of the above files.  If "eigen"
+[0.726s]   provides a separate development package or SDK, be sure it has been
+[0.726s]   installed.
+[0.726s] 
+[0.726s] [0m
+[0.727s] -- Configuring incomplete, errors occurred!
+[0.731s] gmake: *** [Makefile:267: cmake_check_build_system] Error 1
+[0.733s] Invoked command in '/home/dell/drone/build/drone_description' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy DEBUGINFOD_URLS=https://debuginfod.ubuntu.com /usr/bin/cmake --build /home/dell/drone/build/drone_description -- -j16 -l16
