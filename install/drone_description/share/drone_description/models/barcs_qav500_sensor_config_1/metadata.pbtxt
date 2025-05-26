@@ -8,7 +8,7 @@ model {
     name: "sdf"
   }
 }
-name: "barcs_qav500_sensor_config_1"
+name: "X3"
 description: "QAV500 UAV with sensor configuration #1: 3D medium range lidar, IMU, pressure sensor, magnetometer, HD front camera, 2x pico flexx tof cameras."
 authors {
   name: "Derek Vasquez"
