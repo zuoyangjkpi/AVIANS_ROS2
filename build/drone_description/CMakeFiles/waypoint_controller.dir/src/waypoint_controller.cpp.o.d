@@ -712,9 +712,11 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: \
  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist_with_covariance__traits.hpp \
  /opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/detail/odometry__type_support.hpp \
  /opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/rosidl_generator_cpp__visibility_control.hpp \
- /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/point.hpp \
- /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__builder.hpp \
- /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__type_support.hpp \
+ /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/pose_stamped.hpp \
+ /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__struct.hpp \
+ /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__builder.hpp \
+ /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__traits.hpp \
+ /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__type_support.hpp \
  /opt/ros/jazzy/include/std_msgs/std_msgs/msg/bool.hpp \
  /opt/ros/jazzy/include/std_msgs/std_msgs/msg/detail/bool__struct.hpp \
  /opt/ros/jazzy/include/std_msgs/std_msgs/msg/detail/bool__builder.hpp \

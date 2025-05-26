@@ -1,0 +1,8 @@
+[ 50%] [32mBuilding CXX object CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o[0m
+[01m[K/home/dell/drone/src/drone_description/src/waypoint_controller.cpp:[m[K In member function ‘[01m[Kvoid waypoint_controller::[01;32m[Kcompute_body_frame_velocity[m[K()[m[K’:
+[01m[K/home/dell/drone/src/drone_description/src/waypoint_controller.cpp:144:46:[m[K [01;31m[Kerror: [m[Kconversion from ‘[01m[KEigen::AngleAxisd[m[K’ {aka ‘[01m[KEigen::AngleAxis<double>[m[K’} to non-scalar type ‘[01m[KEigen::Matrix3d[m[K’ {aka ‘[01m[KEigen::Matrix<double, 3, 3>[m[K’} requested
+  144 |       Eigen::Matrix3d world_to_body = Eigen::[01;31m[KAngleAxisd(-current_yaw, Eigen::Vector3d::UnitZ())[m[K;
+      |                                              [01;31m[K^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[m[K
+gmake[2]: *** [CMakeFiles/waypoint_controller.dir/build.make:76: CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o] Error 1
+gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/waypoint_controller.dir/all] Error 2
+gmake: *** [Makefile:146: all] Error 2

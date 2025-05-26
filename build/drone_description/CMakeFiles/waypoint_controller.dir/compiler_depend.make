@@ -14,12 +14,14 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
   /opt/ros/jazzy/include/builtin_interfaces/builtin_interfaces/msg/duration.hpp \
   /opt/ros/jazzy/include/builtin_interfaces/builtin_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp \
   /opt/ros/jazzy/include/builtin_interfaces/builtin_interfaces/msg/time.hpp \
-  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__builder.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__struct.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__traits.hpp \
-  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__type_support.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose__struct.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose__traits.hpp \
+  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__builder.hpp \
+  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__struct.hpp \
+  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__traits.hpp \
+  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__type_support.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_with_covariance__struct.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_with_covariance__traits.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/quaternion__struct.hpp \
@@ -32,7 +34,7 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist_with_covariance__traits.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/vector3__struct.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/vector3__traits.hpp \
-  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/point.hpp \
+  /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/pose_stamped.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/rosidl_generator_cpp__visibility_control.hpp \
   /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/twist.hpp \
   /opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/collector/collector.hpp \
@@ -1244,6 +1246,8 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /usr/include/eigen3/Eigen/src/Core/products/TriangularSolverVector.h:
 
+/usr/include/eigen3/Eigen/src/Core/products/TriangularSolverMatrix.h:
+
 /usr/include/x86_64-linux-gnu/c++/13/bits/time_members.h:
 
 /usr/include/eigen3/Eigen/src/misc/RealSvd2x2.h:
@@ -1303,6 +1307,8 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /usr/include/eigen3/Eigen/src/Core/ProductEvaluators.h:
 
 /usr/include/eigen3/Eigen/src/Core/PermutationMatrix.h:
+
+/usr/include/eigen3/Eigen/src/Core/NoAlias.h:
 
 /usr/include/eigen3/Eigen/src/Core/NestByValue.h:
 
@@ -1435,8 +1441,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /usr/include/c++/13/pstl/glue_numeric_defs.h:
 
 /usr/include/c++/13/pstl/glue_algorithm_defs.h:
-
-/usr/include/c++/13/optional:
 
 /usr/include/x86_64-linux-gnu/bits/types/struct_sched_param.h:
 
@@ -1576,6 +1580,8 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /usr/include/c++/13/bits/stl_pair.h:
 
+/usr/include/c++/13/bits/stl_numeric.h:
+
 /opt/ros/jazzy/include/rclcpp/rclcpp/detail/rmw_implementation_specific_subscription_payload.hpp:
 
 /usr/include/x86_64-linux-gnu/bits/types/sig_atomic_t.h:
@@ -1638,12 +1644,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /usr/include/c++/13/bits/stl_deque.h:
 
-/usr/include/c++/13/codecvt:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/parameter_client.hpp:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/describe_parameters__type_support.hpp:
-
 /opt/ros/jazzy/include/rclcpp/rclcpp/node_interfaces/get_node_base_interface.hpp:
 
 /usr/include/c++/13/bits/istream.tcc:
@@ -1659,12 +1659,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /opt/ros/jazzy/include/rclcpp/rclcpp/message_memory_strategy.hpp:
 
 /usr/include/c++/13/bits/locale_facets_nonio.tcc:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/memory_strategy.hpp:
-
-/usr/include/eigen3/Eigen/src/Core/util/Meta.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/allocator/allocator_common.hpp:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/macros.hpp:
 
@@ -1826,6 +1820,10 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/set_parameters__type_support.hpp:
 
+/usr/include/c++/13/bits/stl_multiset.h:
+
+/opt/ros/jazzy/include/rmw/rmw/init_options.h:
+
 /usr/include/c++/13/iosfwd:
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/set_parameters__struct.hpp:
@@ -1840,12 +1838,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/detail/cpp_callback_trampoline.hpp:
 
-/usr/include/c++/13/tr1/gamma.tcc:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__type_support.hpp:
-
-/opt/ros/jazzy/include/std_msgs/std_msgs/msg/bool.hpp:
-
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__traits.hpp:
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/set_parameters__traits.hpp:
@@ -1855,12 +1847,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /opt/ros/jazzy/include/rcpputils/rcpputils/visibility_control.hpp:
 
 /opt/ros/jazzy/include/rosidl_dynamic_typesupport/rosidl_dynamic_typesupport/visibility_control.h:
-
-/opt/ros/jazzy/include/rcl/rcl/graph.h:
-
-/usr/include/x86_64-linux-gnu/c++/13/bits/c++locale.h:
-
-/usr/include/c++/13/bits/ostream.tcc:
 
 /opt/ros/jazzy/include/rcl/rcl/domain_id.h:
 
@@ -1910,18 +1896,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcl/rcl/wait.h:
 
-/opt/ros/jazzy/include/rclcpp/rclcpp/executors/static_single_threaded_executor.hpp:
-
-/opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/detail/odometry__builder.hpp:
-
-/usr/include/eigen3/Eigen/src/Core/Visitor.h:
-
-/usr/include/c++/13/bits/std_thread.h:
-
-/opt/ros/jazzy/include/rcl/rcl/event.h:
-
-/usr/include/c++/13/bits/shared_ptr_atomic.h:
-
 /usr/include/eigen3/Eigen/src/Core/arch/Default/TypeCasting.h:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/message_info.hpp:
@@ -1946,25 +1920,19 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcutils/rcutils/visibility_control.h:
 
-/opt/ros/jazzy/include/rclcpp/rclcpp/logger.hpp:
-
-/usr/include/eigen3/Eigen/src/Core/util/MKL_support.h:
-
-/opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/collector/metric_details_interface.hpp:
-
-/opt/ros/jazzy/include/rmw/rmw/events_statuses/offered_deadline_missed.h:
-
 /usr/include/c++/13/bits/locale_facets_nonio.h:
 
-/opt/ros/jazzy/include/rclcpp/rclcpp/get_message_type_support_handle.hpp:
+/usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
 
-/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
+/opt/ros/jazzy/include/rclcpp/rclcpp/experimental/subscription_intra_process_buffer.hpp:
 
-/opt/ros/jazzy/include/statistics_msgs/statistics_msgs/msg/detail/statistic_data_point__struct.hpp:
+/usr/include/c++/13/bits/stl_tree.h:
 
-/opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/detail/odometry__struct.hpp:
+/opt/ros/jazzy/include/rcl/rcl/publisher.h:
 
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__struct.hpp:
+/opt/ros/jazzy/include/rmw/rmw/events_statuses/liveliness_changed.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/network_flow_endpoint.hpp:
 
 /usr/include/eigen3/Eigen/src/QR/HouseholderQR.h:
 
@@ -2000,25 +1968,15 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_with_covariance__struct.hpp:
 
-/usr/include/x86_64-linux-gnu/bits/libc-header-start.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/experimental/subscription_intra_process_buffer.hpp:
-
-/usr/include/c++/13/bits/stl_tree.h:
-
-/opt/ros/jazzy/include/rcl/rcl/publisher.h:
-
-/opt/ros/jazzy/include/rmw/rmw/events_statuses/liveliness_changed.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/network_flow_endpoint.hpp:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/experimental/ros_message_intra_process_buffer.hpp:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/describe_parameters__struct.hpp:
-
 /opt/ros/jazzy/include/builtin_interfaces/builtin_interfaces/msg/detail/time__traits.hpp:
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/set_parameters_result__builder.hpp:
+
+/usr/include/eigen3/Eigen/src/Core/util/Meta.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/allocator/allocator_common.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/memory_strategy.hpp:
 
 /opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/topic_statistics_collector/received_message_age.hpp:
 
@@ -2032,6 +1990,24 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcpputils/rcpputils/shared_library.hpp:
 
+/usr/include/c++/13/tr1/gamma.tcc:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__type_support.hpp:
+
+/opt/ros/jazzy/include/std_msgs/std_msgs/msg/bool.hpp:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__struct.hpp:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/describe_parameters__struct.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/experimental/ros_message_intra_process_buffer.hpp:
+
+/opt/ros/jazzy/include/rcl/rcl/graph.h:
+
+/usr/include/x86_64-linux-gnu/c++/13/bits/c++locale.h:
+
+/usr/include/c++/13/bits/ostream.tcc:
+
 /usr/include/x86_64-linux-gnu/bits/long-double.h:
 
 /opt/ros/jazzy/include/rmw/rmw/incompatible_qos_events_statuses.h:
@@ -2040,17 +2016,13 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/type_description_interfaces/type_description_interfaces/msg/rosidl_generator_c__visibility_control.h:
 
-/usr/include/eigen3/Eigen/src/Core/NoAlias.h:
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__builder.hpp:
 
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__builder.hpp:
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/set_parameters_atomically__builder.hpp:
 
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/parameter_event__builder.hpp:
+/usr/include/eigen3/Eigen/src/Geometry/ParametrizedLine.h:
 
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp:
-
-/opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/collector/generate_statistics_message.hpp:
-
-/opt/ros/jazzy/include/rosidl_runtime_c/rosidl_runtime_c/service_type_support_struct.h:
+/usr/include/c++/13/bits/range_access.h:
 
 /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/twist.hpp:
 
@@ -2064,13 +2036,47 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/publisher_options.hpp:
 
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__type_support.hpp:
+/usr/include/eigen3/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h:
 
-/usr/include/eigen3/Eigen/src/Core/GeneralProduct.h:
+/opt/ros/jazzy/include/rclcpp/rclcpp/loaned_message.hpp:
 
-/opt/ros/jazzy/include/rclcpp/rclcpp/dynamic_typesupport/dynamic_message.hpp:
+/opt/ros/jazzy/include/rcl/rcl/visibility_control.h:
 
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist__traits.hpp:
+/opt/ros/jazzy/include/rclcpp/rclcpp/executors/static_single_threaded_executor.hpp:
+
+/opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/detail/odometry__builder.hpp:
+
+/usr/include/eigen3/Eigen/src/Core/Visitor.h:
+
+/usr/include/c++/13/bits/std_thread.h:
+
+/opt/ros/jazzy/include/rcl/rcl/event.h:
+
+/usr/include/c++/13/bits/shared_ptr_atomic.h:
+
+/usr/include/c++/13/optional:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__builder.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/get_message_type_support_handle.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/struct_rwlock.h:
+
+/opt/ros/jazzy/include/statistics_msgs/statistics_msgs/msg/detail/statistic_data_point__struct.hpp:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/point__struct.hpp:
+
+/opt/ros/jazzy/include/nav_msgs/nav_msgs/msg/detail/odometry__struct.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/timer.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/logger.hpp:
+
+/usr/include/eigen3/Eigen/src/Core/util/MKL_support.h:
+
+/opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/collector/metric_details_interface.hpp:
+
+/opt/ros/jazzy/include/rmw/rmw/events_statuses/offered_deadline_missed.h:
 
 /usr/include/c++/13/pstl/execution_defs.h:
 
@@ -2096,23 +2102,27 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/rate.hpp:
 
-/usr/include/c++/13/bits/requires_hosted.h:
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__type_support.hpp:
 
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist__type_support.hpp:
+/usr/include/eigen3/Eigen/src/Core/GeneralProduct.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/dynamic_typesupport/dynamic_message.hpp:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist__traits.hpp:
 
 /usr/include/c++/13/unordered_set:
 
 /opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist__struct.hpp:
 
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/pose_stamped.hpp:
+
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/parameter_descriptor.hpp:
 
+/usr/include/c++/13/bits/requires_hosted.h:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/twist__type_support.hpp:
+
 /opt/ros/jazzy/include/rcl/rcl/guard_condition.h:
-
-/usr/include/eigen3/Eigen/src/Core/products/GeneralMatrixMatrixTriangular.h:
-
-/opt/ros/jazzy/include/rcl/rcl/visibility_control.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/loaned_message.hpp:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/node_interfaces/node_clock_interface_traits.hpp:
 
@@ -2131,10 +2141,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /opt/ros/jazzy/include/rmw/rmw/impl/config.h:
 
 /usr/include/c++/13/bits/ios_base.h:
-
-/usr/include/eigen3/Eigen/src/Core/products/TriangularSolverMatrix.h:
-
-/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/point.hpp:
 
 /usr/include/x86_64-linux-gnu/asm/errno.h:
 
@@ -2161,14 +2167,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /usr/include/c++/13/system_error:
 
 /usr/include/c++/13/bits/ostream_insert.h:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__builder.hpp:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/set_parameters_atomically__builder.hpp:
-
-/usr/include/eigen3/Eigen/src/Geometry/ParametrizedLine.h:
-
-/usr/include/c++/13/bits/range_access.h:
 
 /opt/ros/jazzy/include/builtin_interfaces/builtin_interfaces/msg/time.hpp:
 
@@ -2232,6 +2230,42 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/list_parameters_result__builder.hpp:
 
+/usr/include/eigen3/Eigen/src/LU/Determinant.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/node_interfaces/node_timers_interface.hpp:
+
+/opt/ros/jazzy/include/rmw/rmw/visibility_control.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/wait_set_policies/sequential_synchronization.hpp:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__struct.hpp:
+
+/usr/include/c++/13/iostream:
+
+/usr/include/asm-generic/errno.h:
+
+/usr/include/eigen3/Eigen/src/Geometry/arch/Geometry_SIMD.h:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/future_return_code.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/clock.hpp:
+
+/opt/ros/jazzy/include/rcutils/rcutils/types.h:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameter_types__builder.hpp:
+
+/usr/include/x86_64-linux-gnu/sys/ucontext.h:
+
+/opt/ros/jazzy/include/rosidl_runtime_cpp/rosidl_runtime_cpp/service_type_support_decl.hpp:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/logging.hpp:
+
+/opt/ros/jazzy/include/rcl/rcl/macros.h:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/parameter_descriptor__struct.hpp:
+
+/opt/ros/jazzy/include/rosidl_runtime_c/rosidl_runtime_c/action_type_support_struct.h:
+
 /opt/ros/jazzy/include/rosidl_runtime_c/rosidl_runtime_c/type_description/type_description__struct.h:
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/parameter_descriptor__builder.hpp:
@@ -2241,6 +2275,14 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /usr/include/eigen3/Eigen/src/Core/products/TriangularMatrixMatrix.h:
 
 /usr/include/c++/13/bits/basic_string.h:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/parameter_event__builder.hpp:
+
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/rosidl_generator_cpp__visibility_control.hpp:
+
+/opt/ros/jazzy/include/libstatistics_collector/libstatistics_collector/collector/generate_statistics_message.hpp:
+
+/opt/ros/jazzy/include/rosidl_runtime_c/rosidl_runtime_c/service_type_support_struct.h:
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/set_parameters_result__traits.hpp:
 
@@ -2300,6 +2342,12 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/describe_parameters.hpp:
 
+/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/describe_parameters__type_support.hpp:
+
+/usr/include/c++/13/codecvt:
+
+/opt/ros/jazzy/include/rclcpp/rclcpp/parameter_client.hpp:
+
 /usr/include/eigen3/Eigen/src/Core/util/ForwardDeclarations.h:
 
 /usr/include/c++/13/bits/unordered_map.h:
@@ -2326,43 +2374,9 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 
 /opt/ros/jazzy/include/tf2/tf2/LinearMath/Vector3.hpp:
 
-/usr/include/eigen3/Eigen/src/LU/Determinant.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/node_interfaces/node_timers_interface.hpp:
-
-/opt/ros/jazzy/include/rmw/rmw/visibility_control.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/logging.hpp:
-
-/opt/ros/jazzy/include/rcl/rcl/macros.h:
-
-/usr/include/eigen3/Eigen/src/Geometry/arch/Geometry_SIMD.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/future_return_code.hpp:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/clock.hpp:
-
-/opt/ros/jazzy/include/rcutils/rcutils/types.h:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameter_types__builder.hpp:
-
-/usr/include/x86_64-linux-gnu/sys/ucontext.h:
-
-/opt/ros/jazzy/include/rosidl_runtime_cpp/rosidl_runtime_cpp/service_type_support_decl.hpp:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/msg/detail/parameter_descriptor__struct.hpp:
-
-/opt/ros/jazzy/include/rosidl_runtime_c/rosidl_runtime_c/action_type_support_struct.h:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/wait_set_policies/sequential_synchronization.hpp:
-
-/opt/ros/jazzy/include/rcl_interfaces/rcl_interfaces/srv/detail/get_parameters__struct.hpp:
-
-/usr/include/c++/13/iostream:
-
-/usr/include/asm-generic/errno.h:
-
 /usr/include/eigen3/Eigen/src/Core/VectorBlock.h:
+
+/opt/ros/jazzy/include/geometry_msgs/geometry_msgs/msg/detail/pose_stamped__traits.hpp:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/parameter_event_handler.hpp:
 
@@ -2441,8 +2455,6 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /opt/ros/jazzy/include/rclcpp/rclcpp/experimental/create_intra_process_buffer.hpp:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/time.hpp:
-
-/opt/ros/jazzy/include/rclcpp/rclcpp/timer.hpp:
 
 /opt/ros/jazzy/include/rclcpp/rclcpp/client.hpp:
 
@@ -2993,9 +3005,3 @@ CMakeFiles/waypoint_controller.dir/src/waypoint_controller.cpp.o: /home/dell/dro
 /opt/ros/jazzy/include/type_description_interfaces/type_description_interfaces/srv/detail/get_type_description__struct.h:
 
 /usr/include/c++/13/bits/stl_map.h:
-
-/opt/ros/jazzy/include/rmw/rmw/init_options.h:
-
-/usr/include/c++/13/bits/stl_multiset.h:
-
-/usr/include/c++/13/bits/stl_numeric.h:
