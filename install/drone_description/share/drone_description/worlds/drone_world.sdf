@@ -102,7 +102,7 @@ You can use the velocity controller and command linear velocity and yaw angular 
 
     <include>
       <uri>
-        https://fuel.gazebosim.org/1.0/OpenRobotics/models/X3 UAV/4
+        model://X3
       </uri>
       <plugin
         filename="gz-sim-multicopter-motor-model-system"
