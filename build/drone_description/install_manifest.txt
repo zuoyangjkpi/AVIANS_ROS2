@@ -28,6 +28,7 @@
 /home/dell/drone/install/drone_description/share/drone_description/worlds/test_world.sdf
 /home/dell/drone/install/drone_description/share/drone_description/worlds/drone_world.sdf
 /home/dell/drone/install/drone_description/share/drone_description/launch/gz.launch.py
+/home/dell/drone/install/drone_description/share/drone_description/config/drone.rviz
 /home/dell/drone/install/drone_description/share/drone_description/config/bridge.yaml
 /home/dell/drone/install/drone_description/share/ament_index/resource_index/package_run_dependencies/drone_description
 /home/dell/drone/install/drone_description/share/ament_index/resource_index/parent_prefix_path/drone_description
