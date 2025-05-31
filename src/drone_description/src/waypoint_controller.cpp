@@ -14,7 +14,7 @@ public:
     declare_parameter("max_horizontal_speed", 2.0);
     declare_parameter("max_vertical_speed", 1.0);
     declare_parameter("max_yaw_rate", 1.0);
-    declare_parameter("waypoint_tolerance", 0.2);
+    declare_parameter("waypoint_tolerance", 0.5);
     declare_parameter("yaw_p_gain", 0.5);
     declare_parameter("enable_debug", true);
 
@@ -110,85 +110,92 @@ private:
   }
 
   void compute_body_frame_velocity() {
-    if (!current_odom_ || !target_received_ || !odom_received_) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, 
-                          "Missing data - odom: %s, target: %s", 
-                          odom_received_ ? "OK" : "MISSING",
-                          target_received_ ? "OK" : "MISSING");
+  if (!current_odom_ || !target_received_ || !odom_received_) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, 
+                        "Missing data - odom: %s, target: %s", 
+                        odom_received_ ? "OK" : "MISSING",
+                        target_received_ ? "OK" : "MISSING");
+    return;
+  }
+
+  // Get current yaw from odometry
+  tf2::Quaternion q(
+    current_odom_->pose.pose.orientation.x,
+    current_odom_->pose.pose.orientation.y,
+    current_odom_->pose.pose.orientation.z,
+    current_odom_->pose.pose.orientation.w);
+  tf2::Matrix3x3 rot_matrix(q);
+  double roll, pitch, current_yaw;
+  rot_matrix.getRPY(roll, pitch, current_yaw);
+
+  // Calculate position error
+  Eigen::Vector3d world_error(
+    current_target_position_[0] - current_odom_->pose.pose.position.x,
+    current_target_position_[1] - current_odom_->pose.pose.position.y,
+    current_target_position_[2] - current_odom_->pose.pose.position.z);
+  
+  double distance = world_error.norm();
+  auto tolerance = get_parameter("waypoint_tolerance").as_double();
+  
+  geometry_msgs::msg::Twist cmd;
+
+  if (distance > tolerance) {
+    if (distance < 1e-6) {
+      RCLCPP_WARN(get_logger(), "Distance to target too small (%.6f) - skipping velocity computation", distance);
       return;
     }
 
-    // Get current yaw from odometry
-    tf2::Quaternion q(
-      current_odom_->pose.pose.orientation.x,
-      current_odom_->pose.pose.orientation.y,
-      current_odom_->pose.pose.orientation.z,
-      current_odom_->pose.pose.orientation.w);
-    tf2::Matrix3x3 rot_matrix(q);
-    double roll, pitch, current_yaw;
-    rot_matrix.getRPY(roll, pitch, current_yaw);
+    // Convert error to body frame
+    Eigen::Matrix3d world_to_body;
+    world_to_body = Eigen::AngleAxisd(-current_yaw, Eigen::Vector3d::UnitZ());
+    Eigen::Vector3d body_error = world_to_body * world_error;
 
-    // Calculate position error
-    Eigen::Vector3d world_error(
-      current_target_position_[0] - current_odom_->pose.pose.position.x,
-      current_target_position_[1] - current_odom_->pose.pose.position.y,
-      current_target_position_[2] - current_odom_->pose.pose.position.z);
-    
-    double distance = world_error.norm();
-    auto tolerance = get_parameter("waypoint_tolerance").as_double();
-    
-    geometry_msgs::msg::Twist cmd;
-
-    if (distance > tolerance) {
-      // Convert error to body frame
-      Eigen::Matrix3d world_to_body;
-      world_to_body = Eigen::AngleAxisd(-current_yaw, Eigen::Vector3d::UnitZ());
-      Eigen::Vector3d body_error = world_to_body * world_error;
-      Eigen::Vector3d body_direction = body_error.normalized();
-
-      // Position control
-      double speed_factor = std::min(1.0, distance / 2.0);
-      cmd.linear.x = std::clamp(
-        body_direction.x() * get_parameter("max_horizontal_speed").as_double() * speed_factor,
-        -get_parameter("max_horizontal_speed").as_double(),
-        get_parameter("max_horizontal_speed").as_double());
-      cmd.linear.y = std::clamp(
-        body_direction.y() * get_parameter("max_horizontal_speed").as_double() * speed_factor,
-        -get_parameter("max_horizontal_speed").as_double(),
-        get_parameter("max_horizontal_speed").as_double());
-      cmd.linear.z = std::clamp(
-        body_direction.z() * get_parameter("max_vertical_speed").as_double() * speed_factor,
-        -get_parameter("max_vertical_speed").as_double(),
-        get_parameter("max_vertical_speed").as_double());
-
-      // Yaw control - face toward target during approach
-      double desired_yaw = atan2(world_error.y(), world_error.x());
-      double yaw_error = desired_yaw - current_yaw;
-      
-      // Normalize yaw error
-      while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
-      while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
-      
-      cmd.angular.z = std::clamp(
-        yaw_error * get_parameter("yaw_p_gain").as_double(),
-        -get_parameter("max_yaw_rate").as_double(),
-        get_parameter("max_yaw_rate").as_double());
-    } else {
-      // At target position - hold position and face target yaw
-      double yaw_error = current_target_yaw_ - current_yaw;
-      
-      // Normalize yaw error
-      while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
-      while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
-      
-      cmd.angular.z = std::clamp(
-        yaw_error * get_parameter("yaw_p_gain").as_double(),
-        -get_parameter("max_yaw_rate").as_double(),
-        get_parameter("max_yaw_rate").as_double());
+    if (body_error.norm() < 1e-6) {
+      RCLCPP_WARN(get_logger(), "Body error too small (%.6f) - skipping velocity computation", body_error.norm());
+      return;
     }
 
-    cmd_vel_pub_->publish(cmd);
+    Eigen::Vector3d body_direction = body_error.normalized();
+
+    // Position control
+    double speed_factor = std::min(1.0, distance / 2.0);
+    double max_h = get_parameter("max_horizontal_speed").as_double();
+    double max_v = get_parameter("max_vertical_speed").as_double();
+
+    cmd.linear.x = std::clamp(body_direction.x() * max_h * speed_factor, -max_h, max_h);
+    cmd.linear.y = std::clamp(body_direction.y() * max_h * speed_factor, -max_h, max_h);
+    cmd.linear.z = std::clamp(body_direction.z() * max_v * speed_factor, -max_v, max_v);
+
+    // Yaw control
+    double desired_yaw = atan2(world_error.y(), world_error.x());
+    double yaw_error = desired_yaw - current_yaw;
+
+    while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+    while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
+
+    double max_yaw = get_parameter("max_yaw_rate").as_double();
+    double p_gain = get_parameter("yaw_p_gain").as_double();
+    cmd.angular.z = std::clamp(yaw_error * p_gain, -max_yaw, max_yaw);
+  } else {
+    // Hold position, align yaw
+    double yaw_error = current_target_yaw_ - current_yaw;
+    while (yaw_error > M_PI) yaw_error -= 2.0 * M_PI;
+    while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
+
+    double max_yaw = get_parameter("max_yaw_rate").as_double();
+    double p_gain = get_parameter("yaw_p_gain").as_double();
+    cmd.angular.z = std::clamp(yaw_error * p_gain, -max_yaw, max_yaw);
   }
+
+  // Final safety check
+  if (std::isnan(cmd.linear.x) || std::isnan(cmd.linear.y) || std::isnan(cmd.linear.z) ||
+      std::isnan(cmd.angular.z)) {
+    RCLCPP_ERROR(get_logger(), "NaN detected in velocity command! Skipping publish.");
+    return;
+  }
+
+  cmd_vel_pub_->publish(cmd);
+}
 
   // Member variables
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr enable_pub_;
