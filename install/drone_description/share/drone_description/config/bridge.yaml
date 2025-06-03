@@ -30,7 +30,7 @@
   gz_type_name: "gz.msgs.Boolean"
   direction: BIDIRECTIONAL  # Allows both ROS->Gazebo and Gazebo->ROS
 
-  # Add these lines to your existing bridge.yaml
+#   # Add these lines to your existing bridge.yaml
 - ros_topic_name: "/camera/image_raw"
   gz_topic_name: "/camera/image_raw"
   ros_type_name: "sensor_msgs/msg/Image"

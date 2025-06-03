@@ -14,7 +14,7 @@ public:
     declare_parameter("max_horizontal_speed", 2.0);
     declare_parameter("max_vertical_speed", 1.0);
     declare_parameter("max_yaw_rate", 1.0);
-    declare_parameter("waypoint_tolerance", 0.5);
+    declare_parameter("waypoint_tolerance", 0.1);
     declare_parameter("yaw_p_gain", 0.5);
     declare_parameter("enable_debug", true);
 

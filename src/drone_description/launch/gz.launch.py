@@ -85,9 +85,11 @@ def generate_launch_description():
         output="screen"
     )
 
-    delayed_rviz = TimerAction(
-        period=3.0,
-        actions=[rviz_node]
+    yolo_node = Node(
+        package="person_tracker",
+        executable="yolo_detector",
+        name="yolo_detector",
+        output="screen"
     )
 
     return LaunchDescription([
@@ -95,10 +97,17 @@ def generate_launch_description():
         gallium_env,
         gazebo_resource_path,
         set_gazebo_model_path,
+        yolo_node,
         gz_plugin_path,
         gazebo,
         gz_ros2_bridge,
-        static_tf,
-        controller,
-        delayed_rviz
+        TimerAction(
+            period=10.0,
+            actions=[ 
+                      static_tf,
+                      controller,
+                      rviz_node
+                    ]
+        )
+       
     ])

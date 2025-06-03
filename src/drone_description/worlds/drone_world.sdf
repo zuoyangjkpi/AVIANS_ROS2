@@ -100,11 +100,65 @@ You can use the velocity controller and command linear velocity and yaw angular 
       </link>
     </model>
 
+    <actor name="walking_person">
+      <skin>
+        <filename>model://actor/meshes/walk.dae</filename>
+        <scale>1.0</scale>
+      </skin>
+      <animation name="walking">
+        <filename>model://actor/meshes/walk.dae</filename>
+        <interpolate_x>true</interpolate_x>
+      </animation>
+      <script>
+        <loop>true</loop>
+        <delay_start>10.000000</delay_start>
+        <auto_start>true</auto_start>
+        <trajectory id="0" type="walking" tension="0.6">
+            <waypoint>
+                <time>0</time>
+                <pose>0 0 1.0 0 0 0</pose>
+            </waypoint>
+            <waypoint>
+                <time>5</time>
+                <pose>2.0 0 1.0 0 0 0</pose>
+            </waypoint>
+            <waypoint>
+                <time>5.5</time>
+                <pose>2 0 1.0 0 0 1.57</pose>
+            </waypoint>
+            <waypoint>
+                <time>10</time>
+                <pose>2 2 1.0 0 0 1.57</pose>
+            </waypoint>
+            <waypoint>
+                <time>10.5</time>
+                <pose>2 2 1.0 0 0 3.142</pose>
+            </waypoint>
+            <waypoint>
+                <time>15</time>
+                <pose>0 2 1 0 0 3.142</pose>
+            </waypoint>
+            <waypoint>
+                <time>15.5</time>
+                <pose>0 2 1 0 0 -1.57</pose>
+            </waypoint>
+            <waypoint>
+                <time>20</time>
+                <pose>0 0 1.0 0 0 -1.57</pose>
+            </waypoint>
+            <waypoint>
+                <time>20.5</time>
+                <pose>0 0 1.0 0 0 0</pose>
+            </waypoint>
+        </trajectory>
+      </script>
+    </actor>
+
     <include>
       <uri>
         model://x3
       </uri>
-      <pose>5 5 0 0 0 1.57</pose>  <!-- x y z roll pitch yaw -->
+      <pose>5 5 3 0 0 0.7854</pose>  
       <plugin
         filename="gz-sim-multicopter-motor-model-system"
         name="gz::sim::systems::MulticopterMotorModel">
