@@ -1,0 +1,16 @@
+desired_resolution:
+  x: 300 
+  y: 300 
+
+score_threshhold: 0.3
+desired_class: 1 
+aspect_ratio: 1.333333333
+
+variance:
+  x:
+    min: 0.00387
+    max: 0.00347
+
+  y: 
+    min: 0.00144
+    max: 0.00452

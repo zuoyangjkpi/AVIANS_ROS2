@@ -8,7 +8,10 @@
             "includePath": [
                 "/opt/ros/jazzy/include/**",
                 "/home/dell/drone/src/drone_description/include/**",
-                "/usr/include/**"
+                "/usr/include/**",
+                "${workspaceFolder}/src/pose_cov_ops_interface/include",
+                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/include",
+                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",

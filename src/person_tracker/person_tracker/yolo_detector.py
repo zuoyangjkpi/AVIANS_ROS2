@@ -6,7 +6,6 @@ from geometry_msgs.msg import PoseStamped
 from cv_bridge import CvBridge
 import cv2
 from ultralytics import YOLO
-import numpy as np
 from tf_transformations import quaternion_from_euler
 import math
 
@@ -16,7 +15,7 @@ class YOLODetectorNode(Node):
         
         # Initialize YOLO model
         self.get_logger().info("Loading YOLO model...")
-        self.model = YOLO('yolo11n.pt')
+        self.model = YOLO('yolo12n.pt')
         self.get_logger().info("YOLO model loaded successfully!")
         
         # CV Bridge for image conversion
@@ -48,11 +47,11 @@ class YOLODetectorNode(Node):
         
         self.pose_publisher = self.create_publisher(
             PoseStamped,
-            '/target_waypoint',  # Your control node should subscribe to this
+            '/target_waypoint',  
             10
         )
         
-        # Optional: Publisher for debug images
+        # Publisher for debug images
         self.debug_image_publisher = self.create_publisher(
             Image,
             '/yolo_debug_image',
@@ -145,7 +144,7 @@ class YOLODetectorNode(Node):
         """Convert 2D detection to 3D target pose for drone"""
         pose_msg = PoseStamped()
         pose_msg.header = header
-        pose_msg.header.frame_id = "world"  # or "odom" - adjust to your frame
+        pose_msg.header.frame_id = "world"  
         
         # Get detection center in image coordinates
         center_x, center_y = detection['center']
@@ -195,7 +194,7 @@ class YOLODetectorNode(Node):
             conf = person['confidence']
             
             # Color: green for target, blue for others
-            color = (0, 255, 0) if person == target else (255, 0, 0)
+            color = (255, 0, 0) if person == target else (0, 0, 255)
             
             # Draw bounding box
             cv2.rectangle(debug_image, 
