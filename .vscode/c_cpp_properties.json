@@ -7,17 +7,24 @@
             },
             "includePath": [
                 "/opt/ros/jazzy/include/**",
+                "/opt/ros/jazzy/include/cv_bridge/**",
+                "/opt/ros/jazzy/include/sensor_msgs/**",
                 "/home/dell/drone/src/drone_description/include/**",
                 "/usr/include/**",
-                "${workspaceFolder}/src/pose_cov_ops_interface/include",
+                "${workspaceFolder}/src/pose_cov_ops_interface/include/**",
                 "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/include",
-                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include"
+                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include",
+                "${workspaceFolder}/src/neural_network_detector/msg",
+                "${workspaceFolder}/src/neural_network_detector/include",
+                "${workspaceFolder}/**",
+                "/usr/include/opencv4/**"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "gnu11",
-            "cppStandard": "c++20"
+            "cppStandard": "c++20",
+            "defines": []
         }
     ],
     "version": 4

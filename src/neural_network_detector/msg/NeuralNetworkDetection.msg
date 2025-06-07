@@ -1,4 +1,4 @@
-Header Header
+std_msgs/Header header
 
 int16 object_class
 float32 detection_score

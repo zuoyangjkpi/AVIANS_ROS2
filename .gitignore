@@ -1,4 +1,4 @@
-# Build directories
-build/
-install/
-log/
+build
+install
+log
+yolo12n.pt

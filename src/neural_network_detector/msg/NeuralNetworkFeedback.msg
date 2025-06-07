@@ -1,4 +1,4 @@
-Header header
+std_msgs/Header header
 int16 ymin
 int16 ymax
 int16 xcenter
