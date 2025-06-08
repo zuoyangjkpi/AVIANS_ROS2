@@ -10,6 +10,7 @@
 
 // Include the YOLO12 detector header
 #include "det/YOLO12.hpp"
+#include "cv/extensions/projection.h"
 
 // Include custom message types (assuming they're in a package called 'neural_network_msgs')
 #include "neural_network_detector/msg/neural_network_detection.hpp"
@@ -70,6 +71,11 @@ private:
     float var_const_y_min_;
     float var_const_y_max_;
 
+    // Buffer management (like ROS1 version)
+    size_t length_final_img_;
+    std::unique_ptr<uint8_t[]> buffer_final_img_;
+    std::unique_ptr<uint8_t[]> buffer_results_;
+
     // Feedback handling
     neural_network_detector::msg::NeuralNetworkFeedback latest_feedback_;
     bool feedback_received_;
@@ -108,20 +114,24 @@ private:
      * @param feedback Latest feedback information
      * @return cv::Rect representing the crop area
      */
-    cv::Rect getCropArea(const cv::Size& original_resolution, 
-                        const neural_network_detector::msg::NeuralNetworkFeedback& feedback);
+    cv::Rect getCropArea(
+    const cv::Size& original_resolution,
+    const neural_network_detector::msg::NeuralNetworkFeedback& feedback,
+    const cv::Size& desired_resolution,
+    cv::projection2i& proj_crop,
+    bool timed_out);
 
-    /**
-     * @brief Convert YOLO12 detections to ROS2 detection messages
-     * @param detections Vector of YOLO12 detections
-     * @param header Message header
-     * @param crop_offset Offset applied due to cropping
-     * @return ROS2 detection array message
-     */
-    neural_network_detector::msg::NeuralNetworkDetectionArray convertDetectionsToROS(
-        const std::vector<Detection>& detections,
-        const std_msgs::msg::Header& header,
-        const cv::Point& crop_offset = cv::Point(0, 0));
+    // /**
+    //  * @brief Convert YOLO12 detections to ROS2 detection messages
+    //  * @param detections Vector of YOLO12 detections
+    //  * @param header Message header
+    //  * @param crop_offset Offset applied due to cropping
+    //  * @return ROS2 detection array message
+    //  */
+    // neural_network_detector::msg::NeuralNetworkDetectionArray convertDetectionsToROS(
+    // const std::vector<Detection>& detections,
+    // const std_msgs::msg::Header& header,
+    //  const cv::projection2i& proj_crop);
 
     /**
      * @brief Check if feedback has timed out
@@ -141,6 +151,9 @@ private:
      * @return Filtered detections
      */
     std::vector<Detection> filterDetections(const std::vector<Detection>& detections) const;
+
+    bool validateDetection(const neural_network_detector::msg::NeuralNetworkDetection& detection,
+    const cv::Size& image_size) const;
 };
 
 } // namespace yolo12_detector_node

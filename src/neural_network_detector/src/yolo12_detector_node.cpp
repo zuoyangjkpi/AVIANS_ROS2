@@ -3,6 +3,8 @@
 namespace yolo12_detector_node
 {
 
+static const int color_channels = 3;
+
 YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
 : Node("yolo12_detector_node", options),
   feedback_received_(false),
@@ -14,6 +16,14 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     // Initialize the YOLO12 detector
     initializeDetector();
+    
+    // Pre-allocate buffers for performance (like in ROS1 version)
+    length_final_img_ = static_cast<size_t>(desired_resolution_.width * desired_resolution_.height * color_channels);
+    buffer_final_img_ = std::make_unique<uint8_t[]>(length_final_img_);
+    buffer_results_ = std::make_unique<uint8_t[]>(length_final_img_);
+    
+    RCLCPP_INFO(this->get_logger(), "Allocated buffers: final_img=%zu bytes, results=%zu bytes", 
+                length_final_img_, length_final_img_);
     
     // Create subscribers
     image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
@@ -51,8 +61,8 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
 void YOLO12DetectorNode::initializeParameters()
 {
     // Declare and get parameters
-    this->declare_parameter<std::string>("model_path", "../third_party/YOLOs-CPP/models/yolo12n.onnx");
-    this->declare_parameter<std::string>("labels_path", "../third_party/YOLOs-CPP/models/coco.names");
+    this->declare_parameter<std::string>("model_path", "../YOLOs-CPP/models/yolo12n.onnx");
+    this->declare_parameter<std::string>("labels_path", "../YOLOs-CPP/models/coco.names");
     this->declare_parameter<bool>("use_gpu", false);
     this->declare_parameter<float>("confidence_threshold", 0.5f);
     this->declare_parameter<float>("iou_threshold", 0.45f);
@@ -130,76 +140,252 @@ void YOLO12DetectorNode::initializeDetector()
 
 void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr msg)
 {
+    if (!msg) {
+        RCLCPP_WARN(this->get_logger(), "Invalid ImageConstPtr received, not handled.");
+        return;
+    }
+
     // Check rate limiting
     if (shouldSkipDetection()) {
         return;
     }
-    
+
     try {
         // Convert ROS image to OpenCV Mat
         cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8);
-        cv::Mat image = cv_ptr->image;
-        
-        if (image.empty()) {
+        cv::Mat mat_img = cv_ptr->image;
+
+        if (mat_img.empty()) {
             RCLCPP_WARN(this->get_logger(), "Received empty image");
             return;
         }
+
+#ifdef DEBUG_ROTATE_IMAGE_90_CW
+        cv::transpose(mat_img, mat_img);
+        cv::flip(mat_img, mat_img, 1); // transpose+flip(1) = Rotate 90 CW
+#endif
+
+        const cv::Size2i original_resolution(mat_img.cols, mat_img.rows);
         
-        cv::Mat processing_image = image.clone();
-        cv::Point crop_offset(0, 0);
+        // Check if feedback is timed out
+        bool timed_out = isFeedbackTimedOut();
+        if (timed_out) {
+            auto current_time = this->get_clock()->now();
+            auto time_diff = current_time - last_feedback_time_;
+            RCLCPP_INFO_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 500,
+                "Using whole image because no tracker feedback for " << time_diff.seconds() << " seconds");
+        }
+
+        // Create projection object for coordinate transformations
+        cv::projection2i proj_crop(cv::Point2f(1.0f, 1.0f), cv::Point2i(0, 0));
         
-        // Apply cropping if feedback is available and valid
-        if (feedback_received_ && !isFeedbackTimedOut()) {
-            cv::Rect crop_area = getCropArea(image.size(), latest_feedback_);
-            if (crop_area.width > 0 && crop_area.height > 0 && 
-                crop_area.x >= 0 && crop_area.y >= 0 && 
-                crop_area.x + crop_area.width <= image.cols && 
-                crop_area.y + crop_area.height <= image.rows) {
+        // Get crop area based on feedback
+        const cv::Rect crop_area = getCropArea(original_resolution, latest_feedback_, 
+                                             desired_resolution_, proj_crop, timed_out);
+
+        // Crop the image
+        cv::Mat cropped = mat_img(crop_area);
+
+        // Resize to desired resolution using pre-allocated buffer (like ROS1)
+        const int sizes[2] = {desired_resolution_.height, desired_resolution_.width}; // y comes first
+        cv::Mat resized(2, sizes, CV_8UC3, buffer_final_img_.get());
+        cv::resize(cropped, resized, resized.size(), 0, 0, cv::INTER_LINEAR);
+
+        // Calculate scaling projection
+        cv::projection2i proj_scale(
+            cv::Point2f(desired_resolution_.width / static_cast<float>(cropped.cols), 
+                       desired_resolution_.height / static_cast<float>(cropped.rows)),
+            cv::Point2i(0, 0));
+
+        // Run YOLO detection on resized image
+        std::vector<Detection> detections = yolo_detector_->detect(
+            resized, confidence_threshold_, iou_threshold_);
+
+        // Create detection array message
+        neural_network_detector::msg::NeuralNetworkDetectionArray detection_array_msg;
+        detection_array_msg.header.frame_id = msg->header.frame_id;
+        detection_array_msg.header.stamp = msg->header.stamp;
+
+        for (const auto& det : detections) {
+            // Skip if below threshold or not desired class
+            if (det.conf < confidence_threshold_ || 
+                (desired_class_ >= 0 && det.classId != desired_class_)) {
+                continue;
+            }
+
+            // Convert YOLO detection format (center + size) to min/max format
+            float x_center = det.box.x;
+            float y_center = det.box.y;
+            float half_width = det.box.width / 2.0f;
+            float half_height = det.box.height / 2.0f;
+
+            // Calculate bounds in the resized image space (floating point for precision)
+            float xmin_f = x_center - half_width;
+            float ymin_f = y_center - half_height;
+            float xmax_f = x_center + half_width;
+            float ymax_f = y_center + half_height;
+
+            // Clamp to resized image bounds first
+            xmin_f = std::max(0.0f, std::min(xmin_f, static_cast<float>(desired_resolution_.width - 1)));
+            ymin_f = std::max(0.0f, std::min(ymin_f, static_cast<float>(desired_resolution_.height - 1)));
+            xmax_f = std::max(xmin_f + 1.0f, std::min(xmax_f, static_cast<float>(desired_resolution_.width)));
+            ymax_f = std::max(ymin_f + 1.0f, std::min(ymax_f, static_cast<float>(desired_resolution_.height)));
+
+            // Convert to integer coordinates in resized image space
+            int xmin = static_cast<int>(std::round(xmin_f));
+            int ymin = static_cast<int>(std::round(ymin_f));
+            int xmax = static_cast<int>(std::round(xmax_f));
+            int ymax = static_cast<int>(std::round(ymax_f));
+
+            // Transform back to original image coordinates
+            cv::Point2i detection_min = proj_crop << (proj_scale << cv::Point2i(xmin, ymin));
+            cv::Point2i detection_max = proj_crop << (proj_scale << cv::Point2i(xmax, ymax));
+
+            // Debug logging for problematic transformations
+            if (detection_min.y < 0 || detection_max.y < 0) {
+                RCLCPP_WARN(this->get_logger(), 
+                        "Negative Y after transformation: resized[%d,%d,%d,%d] -> original[%d,%d,%d,%d]",
+                        xmin, ymin, xmax, ymax,
+                        detection_min.x, detection_min.y, detection_max.x, detection_max.y);
                 
-                processing_image = image(crop_area);
-                crop_offset = cv::Point(crop_area.x, crop_area.y);
+                // Log transformation details for debugging
+                RCLCPP_WARN(this->get_logger(), 
+                        "Crop offset: (%d,%d), Scale: (%.3f,%.3f)",
+                        proj_crop.offset.x, proj_crop.offset.y,
+                        proj_scale.scale.x, proj_scale.scale.y);
+            }
+
+            // Final validation - ensure bounds are within original image
+            const cv::Size2i original_resolution(mat_img.cols, mat_img.rows);
+            
+            // Clamp coordinates to valid image bounds
+            detection_min.x = std::max(0, std::min(detection_min.x, original_resolution.width - 1));
+            detection_min.y = std::max(0, std::min(detection_min.y, original_resolution.height - 1));
+            detection_max.x = std::max(detection_min.x + 1, std::min(detection_max.x, original_resolution.width));
+            detection_max.y = std::max(detection_min.y + 1, std::min(detection_max.y, original_resolution.height));
+            
+            // Additional check: if detection is mostly outside image bounds, skip it
+            int detection_width = detection_max.x - detection_min.x;
+            int detection_height = detection_max.y - detection_min.y;
+            
+            // Skip detections that are too small after clamping (likely edge artifacts)
+            if (detection_width < 10 || detection_height < 10) {
+                RCLCPP_DEBUG(this->get_logger(), 
+                            "Skipping detection too small after clamping: %dx%d", 
+                            detection_width, detection_height);
+                continue;
+            }
+
+            // Create detection message
+            neural_network_detector::msg::NeuralNetworkDetection detection_msg;
+            detection_msg.header.frame_id = msg->header.frame_id;
+            detection_msg.header.stamp = msg->header.stamp;
+            detection_msg.detection_score = det.conf;
+            detection_msg.object_class = static_cast<int16_t>(det.classId);
+
+            detection_msg.xmin = static_cast<int16_t>(detection_min.x);
+            detection_msg.ymin = static_cast<int16_t>(detection_min.y);
+            detection_msg.xmax = static_cast<int16_t>(detection_max.x);
+            detection_msg.ymax = static_cast<int16_t>(detection_max.y);
+
+            // Final validation check
+            if (detection_msg.xmin >= detection_msg.xmax || detection_msg.ymin >= detection_msg.ymax) {
+                RCLCPP_WARN(this->get_logger(), 
+                        "Invalid detection bounds after processing: xmin=%d, xmax=%d, ymin=%d, ymax=%d", 
+                        detection_msg.xmin, detection_msg.xmax, detection_msg.ymin, detection_msg.ymax);
+                continue; // Skip this detection
+            }
+
+            // Rest of your variance calculation code remains the same...
+            detection_msg.variance_xmin = var_const_x_min_ * crop_area.width * crop_area.width;
+            detection_msg.variance_xmax = var_const_x_max_ * crop_area.width * crop_area.width;
+            detection_msg.variance_ymin = var_const_y_min_ * crop_area.height * crop_area.height;
+            detection_msg.variance_ymax = var_const_y_max_ * crop_area.height * crop_area.height;
+
+            // Apply border dropoff variance adjustments
+            if (xmin < (border_dropoff_ * desired_resolution_.width)) {
+                detection_msg.variance_xmin = (crop_area.width * crop_area.width / 4);
+            }
+            if (xmax > ((1.0 - border_dropoff_) * desired_resolution_.width)) {
+                detection_msg.variance_xmax = (crop_area.width * crop_area.width / 4);
+            }
+            if (ymin < (border_dropoff_ * desired_resolution_.height)) {
+                detection_msg.variance_ymin = (crop_area.height * crop_area.height / 4);
+            }
+            if (ymax > ((1.0 - border_dropoff_) * desired_resolution_.height)) {
+                detection_msg.variance_ymax = (crop_area.height * crop_area.height / 4);
+            }
+
+            // Add to detection array
+            detection_array_msg.detections.push_back(detection_msg);
+
+            // Debug drawing code...
+            if (publish_debug_image_ && debug_image_pub_ && debug_image_pub_->get_subscription_count() > 0) {
+                cv::Point2i debug_min(std::max(detection_min.x, 0), std::max(detection_min.y, 0));
+                cv::Point2i debug_max(std::min(detection_max.x, original_resolution.width), 
+                                    std::min(detection_max.y, original_resolution.height));
                 
-                RCLCPP_DEBUG(this->get_logger(), "Applied crop: (%d,%d) %dx%d", 
-                           crop_area.x, crop_area.y, crop_area.width, crop_area.height);
+                // Rectangle on the original image - detection in red
+                cv::rectangle(mat_img, debug_min, debug_max, cv::Scalar(50, 50, 255), 3);
             }
         }
-        
-        // Run YOLO12 detection
-        std::vector<Detection> detections = yolo_detector_->detect(
-            processing_image, confidence_threshold_, iou_threshold_);
-        
-        // Filter detections
-        std::vector<Detection> filtered_detections = filterDetections(detections);
-        
-        // Convert to ROS message
-        auto detection_msg = convertDetectionsToROS(filtered_detections, msg->header, crop_offset);
-        
-        // Publish detection results
-        detection_pub_->publish(detection_msg);
-        
+
+        // Publish detection array if not empty (like ROS1)
+        if (!detection_array_msg.detections.empty()) {
+            detection_pub_->publish(detection_array_msg);
+        }
+
         // Publish detection count
         auto count_msg = neural_network_detector::msg::NeuralNetworkNumberOfDetections();
         count_msg.header = msg->header;
-        count_msg.data = static_cast<uint16_t>(filtered_detections.size());
+        count_msg.data = static_cast<uint16_t>(detection_array_msg.detections.size());
         detection_count_pub_->publish(count_msg);
-        
-        // Publish debug image if enabled
-        if (publish_debug_image_ && debug_image_pub_) {
-            cv::Mat debug_image = processing_image.clone();
-            yolo_detector_->drawBoundingBox(debug_image, filtered_detections);
-            
-            sensor_msgs::msg::Image::SharedPtr debug_msg = cv_bridge::CvImage(
-                msg->header, "bgr8", debug_image).toImageMsg();
+
+        // Publish debug image if enabled and has subscribers
+        if (publish_debug_image_ && debug_image_pub_ && debug_image_pub_->get_subscription_count() > 0) {
+            // Rectangle on the original image - zoom level in green (like ROS1)
+            cv::rectangle(mat_img, crop_area, cv::Scalar(50, 255, 50), 5);
+
+            // Draw feedback debug info if available (like ROS1)
+            if (latest_feedback_.xcenter > 0 && latest_feedback_.xcenter < original_resolution.width
+                && latest_feedback_.debug_included
+                && latest_feedback_.ycenter > 0 && latest_feedback_.ycenter < original_resolution.height) {
+
+                // Lines for the raw coordinates, without uncertainty, for debugging
+                cv::line(mat_img, cv::Point2i(crop_area.x, latest_feedback_.head_raw), 
+                        cv::Point2i(crop_area.x + crop_area.width, latest_feedback_.head_raw), 
+                        cv::Scalar(0, 128, 255), 5);
+                cv::line(mat_img, cv::Point2i(crop_area.x, latest_feedback_.feet_raw), 
+                        cv::Point2i(crop_area.x + crop_area.width, latest_feedback_.feet_raw), 
+                        cv::Scalar(0, 128, 255), 5);
+
+                // Lines crossing the center that cover the whole image
+                cv::line(mat_img, cv::Point2i(latest_feedback_.xcenter, 0), 
+                        cv::Point2i(latest_feedback_.xcenter, original_resolution.height), 
+                        cv::Scalar(255, 100, 100), 8);
+                cv::line(mat_img, cv::Point2i(0, latest_feedback_.ycenter), 
+                        cv::Point2i(original_resolution.width, latest_feedback_.ycenter), 
+                        cv::Scalar(255, 100, 100), 8);
+            }
+
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
+                                "Debug information on topic %s is active due to having at least 1 subscriber",
+                                debug_image_pub_->get_topic_name());
+
+            // Resize debug image for performance (like ROS1)
+            cv::Mat small_img;
+            cv::resize(mat_img, small_img, cv::Size(mat_img.cols / 4, mat_img.rows / 4));
+            auto debug_msg = cv_bridge::CvImage(msg->header, "bgr8", small_img).toImageMsg();
             debug_image_pub_->publish(*debug_msg);
         }
-        
-        // Update timing
+
+        // Update detection time
         last_detection_time_ = this->get_clock()->now();
-        
-        RCLCPP_DEBUG(this->get_logger(), "Processed image with %zu detections", 
-                    filtered_detections.size());
-        
-    } catch (const std::exception& e) {
+
+        RCLCPP_DEBUG(this->get_logger(), "Processed image with %zu detections",
+                     detection_array_msg.detections.size());
+
+    } catch (const std::exception &e) {
         RCLCPP_ERROR(this->get_logger(), "Error processing image: %s", e.what());
     }
 }
@@ -216,73 +402,99 @@ void YOLO12DetectorNode::feedbackCallback(
 }
 
 cv::Rect YOLO12DetectorNode::getCropArea(
-    const cv::Size& original_resolution, 
-    const neural_network_detector::msg::NeuralNetworkFeedback& feedback)
+    const cv::Size& original_resolution,
+    const neural_network_detector::msg::NeuralNetworkFeedback& feedback,
+    const cv::Size& desired_resolution,
+    cv::projection2i& proj_crop,
+    bool timed_out)
 {
-    // Calculate crop area based on feedback information
-    // This is a simplified version - you may need to adapt based on your specific requirements
-    
-    int center_x = feedback.xcenter;
-    int y_min = feedback.ymin;
-    int y_max = feedback.ymax;
-    
-    // Calculate crop dimensions
-    int crop_height = std::max(1, y_max - y_min);
-    int crop_width = static_cast<int>(crop_height * aspect_ratio_);
-    
-    // Calculate crop position
-    int crop_x = std::max(0, center_x - crop_width / 2);
-    int crop_y = std::max(0, y_min);
-    
-    // Ensure crop area is within image bounds
-    crop_x = std::min(crop_x, original_resolution.width - crop_width);
-    crop_y = std::min(crop_y, original_resolution.height - crop_height);
-    crop_width = std::min(crop_width, original_resolution.width - crop_x);
-    crop_height = std::min(crop_height, original_resolution.height - crop_y);
-    
-    // Apply border dropoff
-    int border_x = static_cast<int>(crop_width * border_dropoff_);
-    int border_y = static_cast<int>(crop_height * border_dropoff_);
-    
-    crop_x = std::max(0, crop_x - border_x);
-    crop_y = std::max(0, crop_y - border_y);
-    crop_width = std::min(original_resolution.width - crop_x, crop_width + 2 * border_x);
-    crop_height = std::min(original_resolution.height - crop_y, crop_height + 2 * border_y);
-    
-    return cv::Rect(crop_x, crop_y, crop_width, crop_height);
+    if (timed_out || feedback.ymin > original_resolution.height || feedback.ymax < 0) {
+        // Target not visible — full image crop (same logic as ROS1)
+        bool landscape_origin = original_resolution.height <= original_resolution.width;
+        bool landscape_target = aspect_ratio_ >= 1.0;
+        bool same_aspect = (landscape_origin == landscape_target);
+
+        if (same_aspect) {
+            int crop_length = static_cast<int>(aspect_ratio_ * original_resolution.height);
+            crop_length = std::min(crop_length, original_resolution.width);
+            proj_crop.offset.x = (original_resolution.width - crop_length) / 2;
+            proj_crop.offset.y = 0;
+
+            return cv::Rect(
+                proj_crop << cv::Point2i(0, 0),
+                proj_crop << cv::Point2i(crop_length, original_resolution.height));
+        } else {
+            int crop_length = static_cast<int>((1.0 / aspect_ratio_) * original_resolution.width);
+            crop_length = std::min(crop_length, original_resolution.height);
+            proj_crop.offset.x = 0;
+            proj_crop.offset.y = (original_resolution.height - crop_length) / 2;
+
+            return cv::Rect(
+                proj_crop << cv::Point2i(0, 0),
+                proj_crop << cv::Point2i(original_resolution.width, crop_length));
+        }
+    } else {
+        // Target visible - crop around feedback region (same logic as ROS1)
+        // Clamp bounds
+        int16_t ymin = std::max<int16_t>(feedback.ymin, 0);
+        int16_t ymax = std::min<int16_t>(feedback.ymax, original_resolution.height);
+        int16_t delta_y = std::max<int16_t>(
+            static_cast<int16_t>(0.1 * desired_resolution.height),
+            ymax - ymin);
+        int16_t delta_x = static_cast<int16_t>(aspect_ratio_ * delta_y);
+
+        int16_t half_delta_x = delta_x / 2;
+        int16_t xcenter = std::max<int16_t>(
+            half_delta_x,
+            std::min<int16_t>(feedback.xcenter, original_resolution.width - half_delta_x));
+
+        int16_t xmin = std::max<int16_t>(xcenter - half_delta_x, 0);
+
+        proj_crop.offset.x = xmin;
+        proj_crop.offset.y = ymin;
+
+        delta_x = std::min<int16_t>(delta_x, original_resolution.width - xmin);
+        delta_y = std::min<int16_t>(delta_y, original_resolution.height - ymin);
+
+        return cv::Rect(
+            proj_crop << cv::Point2i(0, 0),
+            proj_crop << cv::Point2i(delta_x, delta_y));
+    }
 }
 
-neural_network_detector::msg::NeuralNetworkDetectionArray YOLO12DetectorNode::convertDetectionsToROS(
-    const std::vector<Detection>& detections,
-    const std_msgs::msg::Header& header,
-    const cv::Point& crop_offset)
+
+bool YOLO12DetectorNode::validateDetection(
+    const neural_network_detector::msg::NeuralNetworkDetection& detection,
+    const cv::Size& image_size) const
 {
-    auto detection_array = neural_network_detector::msg::NeuralNetworkDetectionArray();
-    detection_array.header = header;
-    
-    for (const auto& detection : detections) {
-        auto ros_detection = neural_network_detector::msg::NeuralNetworkDetection();
-        ros_detection.header = header;
-        
-        // Adjust coordinates for crop offset
-        ros_detection.xmin = static_cast<int16_t>(detection.box.x + crop_offset.x);
-        ros_detection.xmax = static_cast<int16_t>(detection.box.x + detection.box.width + crop_offset.x);
-        ros_detection.ymin = static_cast<int16_t>(detection.box.y + crop_offset.y);
-        ros_detection.ymax = static_cast<int16_t>(detection.box.y + detection.box.height + crop_offset.y);
-        
-        ros_detection.object_class = static_cast<int16_t>(detection.classId);
-        ros_detection.detection_score = detection.conf;
-        
-        // Set variance values
-        ros_detection.variance_xmin = var_const_x_min_;
-        ros_detection.variance_xmax = var_const_x_max_;
-        ros_detection.variance_ymin = var_const_y_min_;
-        ros_detection.variance_ymax = var_const_y_max_;
-        
-        detection_array.detections.push_back(ros_detection);
+    // Check if coordinates are within image bounds
+    if (detection.xmin < 0 || detection.ymin < 0 || 
+        detection.xmax >= image_size.width || detection.ymax >= image_size.height) {
+        RCLCPP_WARN(this->get_logger(), 
+                   "Detection bounds outside image: [%d,%d,%d,%d] vs image size [%d,%d]",
+                   detection.xmin, detection.ymin, detection.xmax, detection.ymax,
+                   image_size.width, image_size.height);
+        return false;
     }
     
-    return detection_array;
+    // Check if min < max
+    if (detection.xmin >= detection.xmax || detection.ymin >= detection.ymax) {
+        RCLCPP_WARN(this->get_logger(), 
+                   "Invalid detection bounds: xmin=%d >= xmax=%d or ymin=%d >= ymax=%d",
+                   detection.xmin, detection.xmax, detection.ymin, detection.ymax);
+        return false;
+    }
+    
+    // Check reasonable size (not too small)
+    int width = detection.xmax - detection.xmin;
+    int height = detection.ymax - detection.ymin;
+    if (width < 5 || height < 5) {
+        RCLCPP_WARN(this->get_logger(), 
+                   "Detection too small: %dx%d pixels", width, height);
+        return false;
+    }
+    
+    return true;
 }
 
 bool YOLO12DetectorNode::isFeedbackTimedOut() const
@@ -330,7 +542,6 @@ std::vector<Detection> YOLO12DetectorNode::filterDetections(
 }
 
 } // namespace yolo12_detector_node
-
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);

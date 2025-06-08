@@ -1,13 +1,17 @@
 #include "projection_model/person_tracker_projection_node.hpp"
 #include <rclcpp_components/register_node_macro.hpp>
 #include <tf2/exceptions.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <cmath>
 
 namespace person_tracker_projection
 {
 
 PersonTrackerProjectionNode::PersonTrackerProjectionNode(const rclcpp::NodeOptions & options)
 : Node("person_tracker_projection_node", options),
-  has_valid_waypoint_(false)
+  has_valid_waypoint_(false),
+  camera_init_timer_active_(true)
 {
     // Initialize parameters
     initializeParameters();
@@ -16,17 +20,13 @@ PersonTrackerProjectionNode::PersonTrackerProjectionNode(const rclcpp::NodeOptio
     tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
     
-    // Create subscribers
-    detections_sub_ = this->create_subscription<neural_network_detector::msg::NeuralNetworkDetectionArray>(
-        "detections", 
-        rclcpp::QoS(10),
-        std::bind(&PersonTrackerProjectionNode::detectionsCallback, this, std::placeholders::_1));
-    
+    // Create camera info subscriber first - try different QoS settings
     camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-        "/camera/camera_info",
-        rclcpp::QoS(1).transient_local(),
+        "/camera/camera_info",  // Use remapped topic name instead of hardcoded path
+        rclcpp::QoS(10).reliable(),  // Use best_effort QoS to match typical camera publishers
         std::bind(&PersonTrackerProjectionNode::cameraInfoCallback, this, std::placeholders::_1));
     
+    // Create drone odometry subscriber
     drone_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/X3/odom",
         rclcpp::QoS(10),
@@ -41,7 +41,49 @@ PersonTrackerProjectionNode::PersonTrackerProjectionNode(const rclcpp::NodeOptio
             "feedback", rclcpp::QoS(10));
     }
     
-    RCLCPP_INFO(this->get_logger(), "Person Tracking Projection Node initialized successfully");
+   // In your node constructor or initializer
+    camera_init_timer_ = this->create_wall_timer(
+        std::chrono::milliseconds(200),
+        std::bind(&PersonTrackerProjectionNode::checkCameraInitialization, this));
+    camera_init_timer_active_ = true;
+
+    
+    RCLCPP_INFO(this->get_logger(), "Person Tracking Projection Node initialized, waiting for camera info...");
+}
+
+void PersonTrackerProjectionNode::checkCameraInitialization()
+{
+    if (!camera_init_timer_active_) {
+        return;
+    }
+    
+    if (camera_model_.initialized) {
+        // Camera is initialized, now create the detections subscriber
+        RCLCPP_INFO(this->get_logger(), "Camera model initialized! Creating detection subscriber...");
+        
+        detections_sub_ = this->create_subscription<neural_network_detector::msg::NeuralNetworkDetectionArray>(
+            "detections", 
+            rclcpp::QoS(10),
+            std::bind(&PersonTrackerProjectionNode::detectionsCallback, this, std::placeholders::_1));
+        
+        // Stop the timer and shutdown camera info subscriber to save resources
+        camera_init_timer_->cancel();
+        camera_init_timer_ = nullptr;
+        camera_init_timer_active_ = false;
+        
+        // Optionally shutdown camera info subscriber since we don't need continuous updates
+        // camera_info_sub_ = nullptr;
+        
+        RCLCPP_INFO(this->get_logger(), "Node fully initialized and ready for detections!");
+    } else {
+        // Debug: Check if we're receiving the message at all
+        static int debug_counter = 0;
+        debug_counter++;
+        if (debug_counter % 5 == 0) { // Every 1 second
+            RCLCPP_INFO(this->get_logger(), "Still waiting for camera info... (attempt %d)", debug_counter);
+            RCLCPP_INFO(this->get_logger(), "Expected topic should be remapped to match: /X3/X3/base_link/camera_front");
+        }
+    }
 }
 
 void PersonTrackerProjectionNode::initializeParameters()
@@ -57,6 +99,12 @@ void PersonTrackerProjectionNode::initializeParameters()
     this->declare_parameter<double>("tracking_offset_distance", 3.0);
     this->declare_parameter<double>("tracking_offset_height", 1.0);
     this->declare_parameter<bool>("publish_feedback", true);
+    this->declare_parameter<double>("min_altitude_threshold", 5.0);
+    this->declare_parameter<double>("target_hover_altitude", 7.0);
+    this->declare_parameter<bool>("enable_yaw_search", true);
+    this->declare_parameter<double>("yaw_search_rate", 0.5);  // rad/s
+    this->declare_parameter<double>("detection_timeout", 5.0);  // seconds
+    this->declare_parameter<double>("yaw_search_step", 0.2);  // radians per step
     
     // Get parameter values
     camera_frame_ = this->get_parameter("camera_frame").as_string();
@@ -69,6 +117,18 @@ void PersonTrackerProjectionNode::initializeParameters()
     tracking_offset_distance_ = this->get_parameter("tracking_offset_distance").as_double();
     tracking_offset_height_ = this->get_parameter("tracking_offset_height").as_double();
     publish_feedback_ = this->get_parameter("publish_feedback").as_bool();
+    min_altitude_threshold_ = this->get_parameter("min_altitude_threshold").as_double();
+    target_hover_altitude_ = this->get_parameter("target_hover_altitude").as_double();
+    enable_yaw_search_ = this->get_parameter("enable_yaw_search").as_bool();
+    yaw_search_rate_ = this->get_parameter("yaw_search_rate").as_double();
+    detection_timeout_ = this->get_parameter("detection_timeout").as_double();
+    yaw_search_step_ = this->get_parameter("yaw_search_step").as_double();
+    
+    // Initialize yaw search state
+    is_searching_ = false;
+    search_start_yaw_ = 0.0;
+    current_search_yaw_ = 0.0;
+    last_detection_time_ = this->get_clock()->now();
     
     RCLCPP_INFO(this->get_logger(), "Parameters initialized:");
     RCLCPP_INFO(this->get_logger(), "  Camera frame: %s", camera_frame_.c_str());
@@ -76,6 +136,10 @@ void PersonTrackerProjectionNode::initializeParameters()
     RCLCPP_INFO(this->get_logger(), "  Assumed person height: %.2f m", assumed_person_height_);
     RCLCPP_INFO(this->get_logger(), "  Tracking offset: %.2f m distance, %.2f m height", 
                 tracking_offset_distance_, tracking_offset_height_);
+    RCLCPP_INFO(this->get_logger(), "  Altitude threshold: %.2f m, hover altitude: %.2f m", 
+                min_altitude_threshold_, target_hover_altitude_);
+    RCLCPP_INFO(this->get_logger(), "  Yaw search: %s, rate: %.2f rad/s, timeout: %.2f s", 
+                enable_yaw_search_ ? "enabled" : "disabled", yaw_search_rate_, detection_timeout_);
 }
 
 void PersonTrackerProjectionNode::cameraInfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr msg)
@@ -84,36 +148,40 @@ void PersonTrackerProjectionNode::cameraInfoCallback(const sensor_msgs::msg::Cam
         RCLCPP_ERROR(this->get_logger(), "Received null CameraInfo message");
         return;
     }
-    
+
     if (camera_model_.initialized) {
-        return; // Already initialized
+        return;
     }
-    
-    // Check if K array has expected size
+
+    RCLCPP_INFO(this->get_logger(), "Received camera info: %dx%d", msg->width, msg->height);
+
     if (msg->k.size() < 9) {
         RCLCPP_ERROR(this->get_logger(), "CameraInfo K matrix has insufficient elements: %zu", msg->k.size());
         return;
     }
-    
-    // Initialize camera model from CameraInfo message
-    camera_model_.camera_matrix = cv::Mat::zeros(3, 3, CV_64F);
-    camera_model_.camera_matrix.at<double>(0, 0) = msg->k[0]; // fx
-    camera_model_.camera_matrix.at<double>(0, 2) = msg->k[2]; // cx
-    camera_model_.camera_matrix.at<double>(1, 1) = msg->k[4]; // fy
-    camera_model_.camera_matrix.at<double>(1, 2) = msg->k[5]; // cy
-    camera_model_.camera_matrix.at<double>(2, 2) = 1.0;
-    
-    camera_model_.distortion_coeffs = cv::Mat::zeros(1, 5, CV_64F);
-    for (size_t i = 0; i < 5 && i < msg->d.size(); ++i) {
-        camera_model_.distortion_coeffs.at<double>(0, i) = msg->d[i];
+
+    if (msg->width <= 0 || msg->height <= 0) {
+        RCLCPP_ERROR(this->get_logger(), "Invalid image dimensions: %dx%d", msg->width, msg->height);
+        return;
     }
-    
+
+    if (msg->k[0] <= 0 || msg->k[4] <= 0) {
+        RCLCPP_ERROR(this->get_logger(), "Invalid focal lengths: fx=%.3f, fy=%.3f", msg->k[0], msg->k[4]);
+        return;
+    }
+
+    // ✅ Set up the camera model
+    camera_model_.camera_matrix = (cv::Mat_<double>(3, 3) << 
+                                    msg->k[0], msg->k[1], msg->k[2],
+                                    msg->k[3], msg->k[4], msg->k[5],
+                                    msg->k[6], msg->k[7], msg->k[8]);
+    camera_model_.distortion_coeffs = cv::Mat(msg->d).clone();
     camera_model_.image_size = cv::Size(msg->width, msg->height);
     camera_model_.initialized = true;
-    
-    RCLCPP_INFO(this->get_logger(), "Camera model initialized: %dx%d, fx=%.1f, fy=%.1f", 
-                msg->width, msg->height, msg->k[0], msg->k[4]);
+
+    RCLCPP_INFO(this->get_logger(), "Camera model initialized successfully.");
 }
+
 
 void PersonTrackerProjectionNode::droneOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg)
 {
@@ -122,6 +190,145 @@ void PersonTrackerProjectionNode::droneOdomCallback(const nav_msgs::msg::Odometr
         return;
     }
     current_odom_ = msg;
+}
+
+bool PersonTrackerProjectionNode::checkAndHandleAltitude()
+{
+    if (!current_odom_) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+                             "No drone odometry available for altitude check");
+        return false;
+    }
+    
+    double current_altitude = current_odom_->pose.pose.position.z;
+    
+    if (current_altitude < min_altitude_threshold_) {
+        RCLCPP_WARN(this->get_logger(), 
+                   "Drone altitude too low (%.2f m < %.2f m). Commanding hover at %.2f m",
+                   current_altitude, min_altitude_threshold_, target_hover_altitude_);
+        
+        // Create hover waypoint at current position but target altitude
+        geometry_msgs::msg::PoseStamped hover_waypoint;
+        hover_waypoint.header.stamp = this->get_clock()->now();
+        hover_waypoint.header.frame_id = target_frame_;
+        
+        // Keep current X,Y position but set target altitude
+        hover_waypoint.pose.position.x = current_odom_->pose.pose.position.x;
+        hover_waypoint.pose.position.y = current_odom_->pose.pose.position.y;
+        hover_waypoint.pose.position.z = target_hover_altitude_;
+        
+        // Keep current orientation
+        hover_waypoint.pose.orientation = current_odom_->pose.pose.orientation;
+        
+        // Publish hover command
+        if (waypoint_pub_) {
+            waypoint_pub_->publish(hover_waypoint);
+            RCLCPP_INFO(this->get_logger(), 
+                       "Published hover waypoint: [%.2f, %.2f, %.2f]",
+                       hover_waypoint.pose.position.x, 
+                       hover_waypoint.pose.position.y, 
+                       hover_waypoint.pose.position.z);
+        }
+        
+        return false; // Don't proceed with person tracking
+    }
+    
+    return true; // Altitude is sufficient, proceed with tracking
+}
+
+void PersonTrackerProjectionNode::handleYawSearch()
+{
+    if (!enable_yaw_search_ || !current_odom_) {
+        return;
+    }
+    
+    auto current_time = this->get_clock()->now();
+    double time_since_detection = (current_time - last_detection_time_).seconds();
+    
+    // Start searching if no detection for timeout period
+    if (time_since_detection > detection_timeout_ && !is_searching_) {
+        RCLCPP_INFO(this->get_logger(), "No person detected for %.2f seconds, starting yaw search", 
+                   time_since_detection);
+        startYawSearch();
+    }
+    
+    // Continue searching if already in search mode
+    if (is_searching_) {
+        performYawSearch();
+    }
+}
+
+void PersonTrackerProjectionNode::startYawSearch()
+{
+    if (!current_odom_) {
+        return;
+    }
+    
+    is_searching_ = true;
+    
+    // Get current yaw from quaternion
+    tf2::Quaternion q(
+        current_odom_->pose.pose.orientation.x,
+        current_odom_->pose.pose.orientation.y,
+        current_odom_->pose.pose.orientation.z,
+        current_odom_->pose.pose.orientation.w);
+    
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+    
+    search_start_yaw_ = yaw;
+    current_search_yaw_ = yaw;
+    
+    RCLCPP_INFO(this->get_logger(), "Started yaw search from angle: %.2f rad", search_start_yaw_);
+}
+
+void PersonTrackerProjectionNode::performYawSearch()
+{
+    if (!current_odom_) {
+        return;
+    }
+    
+    // Increment search yaw
+    current_search_yaw_ += yaw_search_step_;
+    
+    // Check if we've completed a full rotation
+    if (std::abs(current_search_yaw_ - search_start_yaw_) >= 2 * M_PI) {
+        RCLCPP_INFO(this->get_logger(), "Completed full yaw search rotation, stopping search");
+        is_searching_ = false;
+        return;
+    }
+    
+    // Create search waypoint with current position but new yaw
+    geometry_msgs::msg::PoseStamped search_waypoint;
+    search_waypoint.header.stamp = this->get_clock()->now();
+    search_waypoint.header.frame_id = target_frame_;
+    
+    // Keep current position
+    search_waypoint.pose.position = current_odom_->pose.pose.position;
+    
+    // Set new orientation with search yaw
+    tf2::Quaternion search_q;
+    search_q.setRPY(0, 0, current_search_yaw_);
+    search_waypoint.pose.orientation.x = search_q.x();
+    search_waypoint.pose.orientation.y = search_q.y();
+    search_waypoint.pose.orientation.z = search_q.z();
+    search_waypoint.pose.orientation.w = search_q.w();
+    
+    // Publish search waypoint
+    if (waypoint_pub_) {
+        waypoint_pub_->publish(search_waypoint);
+        RCLCPP_DEBUG(this->get_logger(), 
+                    "Published yaw search waypoint: yaw=%.2f rad (%.1f deg)",
+                    current_search_yaw_, current_search_yaw_ * 180.0 / M_PI);
+    }
+}
+
+void PersonTrackerProjectionNode::stopYawSearch()
+{
+    if (is_searching_) {
+        RCLCPP_INFO(this->get_logger(), "Person detected, stopping yaw search");
+        is_searching_ = false;
+    }
 }
 
 void PersonTrackerProjectionNode::detectionsCallback(
@@ -136,15 +343,18 @@ void PersonTrackerProjectionNode::detectionsCallback(
     
     if (!camera_model_.initialized) {
         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                             "Camera model not initialized yet");
+                             "Camera model not initialized yet - this shouldn't happen!");
         return;
     }
     
-    if (!current_odom_) {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                             "No drone odometry available yet");
+    // Check altitude before proceeding with detection processing
+    if (!checkAndHandleAltitude()) {
+        RCLCPP_DEBUG(this->get_logger(), "Skipping detection processing due to insufficient altitude");
         return;
     }
+    
+    // Handle yaw search for when no person is detected
+    handleYawSearch();
     
     // Find the best detection (highest confidence person)
     neural_network_detector::msg::NeuralNetworkDetection best_detection;
@@ -152,9 +362,9 @@ void PersonTrackerProjectionNode::detectionsCallback(
     double highest_confidence = 0.0;
     
     for (const auto& detection : msg->detections) {
-        RCLCPP_INFO(this->get_logger(), "Detection: class=%d, confidence=%.3f, bounds=[%d,%d,%d,%d]", 
-                   detection.object_class, detection.detection_score,
-                   detection.xmin, detection.ymin, detection.xmax, detection.ymax);
+        RCLCPP_DEBUG(this->get_logger(), "Detection: class=%d, confidence=%.3f, bounds=[%d,%d,%d,%d]", 
+                    detection.object_class, detection.detection_score,
+                    detection.xmin, detection.ymin, detection.xmax, detection.ymax);
         
         // Validate detection bounds
         if (detection.xmin < 0 || detection.xmax < 0 || 
@@ -165,18 +375,13 @@ void PersonTrackerProjectionNode::detectionsCallback(
             continue;
         }
         
-        // Debug filtering criteria
-        RCLCPP_INFO(this->get_logger(), "Checking filters: class=%d (target=%d), confidence=%.3f (min=%.3f)", 
-                   detection.object_class, target_person_class_,
-                   detection.detection_score, min_detection_confidence_);
-        
         // Filter by class and confidence
         if (detection.object_class == target_person_class_ && 
             detection.detection_score >= min_detection_confidence_ &&
             detection.detection_score > highest_confidence) {
             
-            RCLCPP_INFO(this->get_logger(), "Found valid person detection with confidence %.3f", 
-                       detection.detection_score);
+            RCLCPP_DEBUG(this->get_logger(), "Found valid person detection with confidence %.3f", 
+                        detection.detection_score);
             best_detection = detection;
             highest_confidence = detection.detection_score;
             found_person = true;
@@ -185,6 +390,12 @@ void PersonTrackerProjectionNode::detectionsCallback(
     
     if (found_person) {
         RCLCPP_INFO(this->get_logger(), "Processing best detection with confidence %.3f", highest_confidence);
+        
+        // Stop yaw search since we found a person
+        stopYawSearch();
+        
+        // Update last detection time
+        last_detection_time_ = this->get_clock()->now();
         
         // Project detection to world coordinates
         auto waypoint = projectDetectionToWorld(best_detection, msg->header);
@@ -203,7 +414,6 @@ void PersonTrackerProjectionNode::detectionsCallback(
             
             last_valid_waypoint_ = waypoint;
             has_valid_waypoint_ = true;
-            last_detection_time_ = this->get_clock()->now();
             
             // Generate and publish feedback
             if (publish_feedback_ && feedback_pub_) {
@@ -215,8 +425,8 @@ void PersonTrackerProjectionNode::detectionsCallback(
             RCLCPP_WARN(this->get_logger(), "Failed to project detection to world coordinates");
         }
     } else {
-        RCLCPP_INFO(this->get_logger(), "No valid person detections found (checked %zu detections)", 
-                   msg->detections.size());
+        RCLCPP_DEBUG(this->get_logger(), "No valid person detections found (checked %zu detections)", 
+                    msg->detections.size());
     }
 }
 
@@ -228,8 +438,8 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
     waypoint.header = header;
     
     try {
-        RCLCPP_INFO(this->get_logger(), "Starting projection for detection [%d,%d,%d,%d]",
-                   detection.xmin, detection.ymin, detection.xmax, detection.ymax);
+        RCLCPP_DEBUG(this->get_logger(), "Starting projection for detection [%d,%d,%d,%d]",
+                    detection.xmin, detection.ymin, detection.xmax, detection.ymax);
         
         // Validate detection bounds against image size
         if (detection.xmax > camera_model_.image_size.width || 
@@ -247,18 +457,18 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
             detection.ymax
         );
         
-        RCLCPP_INFO(this->get_logger(), "Foot pixel: [%.1f, %.1f]", foot_pixel.x, foot_pixel.y);
+        RCLCPP_DEBUG(this->get_logger(), "Foot pixel: [%.1f, %.1f]", foot_pixel.x, foot_pixel.y);
         
         // Convert to normalized image coordinates
         cv::Point2f normalized_point = pixelToNormalizedImageCoordinates(foot_pixel);
         
-        RCLCPP_INFO(this->get_logger(), "Normalized point: [%.3f, %.3f]", 
-                   normalized_point.x, normalized_point.y);
+        RCLCPP_DEBUG(this->get_logger(), "Normalized point: [%.3f, %.3f]", 
+                    normalized_point.x, normalized_point.y);
         
         // Get camera height from current drone position
         double camera_height = current_odom_->pose.pose.position.z;
         
-        RCLCPP_INFO(this->get_logger(), "Camera height: %.2f", camera_height);
+        RCLCPP_DEBUG(this->get_logger(), "Camera height: %.2f", camera_height);
         
         // Validate camera height
         if (camera_height <= 0.1) {
@@ -270,8 +480,8 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
         // Project to ground plane
         geometry_msgs::msg::Point ground_point = projectToGround(normalized_point, camera_height);
         
-        RCLCPP_INFO(this->get_logger(), "Ground point in %s: [%.2f, %.2f, %.2f]", 
-                   camera_frame_.c_str(), ground_point.x, ground_point.y, ground_point.z);
+        RCLCPP_DEBUG(this->get_logger(), "Ground point in %s: [%.2f, %.2f, %.2f]", 
+                    camera_frame_.c_str(), ground_point.x, ground_point.y, ground_point.z);
         
         // Create pose in camera frame
         waypoint.pose.position = ground_point;
@@ -280,9 +490,9 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
         
         // Transform to target frame if needed
         if (transformPoseToTargetFrame(waypoint)) {
-            RCLCPP_INFO(this->get_logger(), "Transformed to %s: [%.2f, %.2f, %.2f]", 
-                       target_frame_.c_str(), 
-                       waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z);
+            RCLCPP_DEBUG(this->get_logger(), "Transformed to %s: [%.2f, %.2f, %.2f]", 
+                        target_frame_.c_str(), 
+                        waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z);
             
             // Add tracking offset (stay behind and above the person)
             waypoint.pose.position.z = std::max(0.0, waypoint.pose.position.z + tracking_offset_height_);
@@ -293,9 +503,9 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
                 double dy = waypoint.pose.position.y - current_odom_->pose.pose.position.y;
                 double distance = std::sqrt(dx*dx + dy*dy);
                 
-                RCLCPP_INFO(this->get_logger(), "Drone at [%.2f, %.2f], person at [%.2f, %.2f], distance: %.2f",
-                           current_odom_->pose.pose.position.x, current_odom_->pose.pose.position.y,
-                           waypoint.pose.position.x, waypoint.pose.position.y, distance);
+                RCLCPP_DEBUG(this->get_logger(), "Drone at [%.2f, %.2f], person at [%.2f, %.2f], distance: %.2f",
+                            current_odom_->pose.pose.position.x, current_odom_->pose.pose.position.y,
+                            waypoint.pose.position.x, waypoint.pose.position.y, distance);
                 
                 if (distance > 0.1) { // Avoid division by zero
                     double offset_x = -(dx / distance) * tracking_offset_distance_;
@@ -303,9 +513,9 @@ geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToW
                     waypoint.pose.position.x += offset_x;
                     waypoint.pose.position.y += offset_y;
                     
-                    RCLCPP_INFO(this->get_logger(), "Applied offset [%.2f, %.2f], final waypoint: [%.2f, %.2f, %.2f]",
-                               offset_x, offset_y,
-                               waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z);
+                    RCLCPP_DEBUG(this->get_logger(), "Applied offset [%.2f, %.2f], final waypoint: [%.2f, %.2f, %.2f]",
+                                offset_x, offset_y,
+                                waypoint.pose.position.x, waypoint.pose.position.y, waypoint.pose.position.z);
                 }
             }
         } else {

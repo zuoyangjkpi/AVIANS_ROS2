@@ -23,7 +23,7 @@ struct CameraModel
     cv::Mat camera_matrix;
     cv::Mat distortion_coeffs;
     cv::Size image_size;
-    bool initialized = true;
+    bool initialized = false;
 };
 
 class PersonTrackerProjectionNode : public rclcpp::Node
@@ -36,6 +36,8 @@ private:
     void detectionsCallback(const neural_network_detector::msg::NeuralNetworkDetectionArray::SharedPtr msg);
     void cameraInfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
     void droneOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
+
+ 
     
     // Core functionality
     geometry_msgs::msg::PoseStamped projectDetectionToWorld(
@@ -53,6 +55,11 @@ private:
     
     // Parameter initialization
     void initializeParameters();
+
+    // Add this method declaration:
+    void checkCameraInitialization();
+
+    bool checkAndHandleAltitude();
     
     // Subscribers
     rclcpp::Subscription<neural_network_detector::msg::NeuralNetworkDetectionArray>::SharedPtr detections_sub_;
@@ -89,6 +96,32 @@ private:
     rclcpp::Time last_detection_time_;
     geometry_msgs::msg::PoseStamped last_valid_waypoint_;
     bool has_valid_waypoint_;
+
+    rclcpp::TimerBase::SharedPtr camera_init_timer_;
+    bool camera_init_timer_active_;
+
+    double min_altitude_threshold_;
+    double target_hover_altitude_;
+
+
+    // Yaw search parameters
+    bool enable_yaw_search_;
+    double yaw_search_rate_;
+    double detection_timeout_;
+    double yaw_search_step_;
+    
+    // Yaw search state
+    bool is_searching_;
+    double search_start_yaw_;
+    double current_search_yaw_;
+    
+    // Method declarations
+    void handleYawSearch();
+    void startYawSearch();
+    void performYawSearch();
+    void stopYawSearch();
+    
+
 };
 
 } // namespace person_tracker_projection
