@@ -5,7 +5,6 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
-
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -17,7 +16,6 @@ find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-
 
 include_directories(include)
 include_directories(third_party/YOLOs-CPP/include)  # Add YOLO include path
@@ -34,10 +32,20 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES  std_msgs
 )
 
+# Define ONNX Runtime paths
+set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1")
+set(ONNXRUNTIME_LIB "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.1.20.1")
+
+# Verify the library exists
+if(NOT EXISTS "${ONNXRUNTIME_LIB}")
+    message(FATAL_ERROR "ONNX Runtime library not found at: ${ONNXRUNTIME_LIB}")
+endif()
+
 add_executable(yolo12_detector_node 
 src/yolo12_detector_node.cpp
 )
-ament_target_dependencies( yolo12_detector_node
+
+ament_target_dependencies(yolo12_detector_node
   rclcpp
   std_msgs
   sensor_msgs
@@ -48,34 +56,26 @@ ament_target_dependencies( yolo12_detector_node
   rclcpp_components
 )
 
-# set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1")
-
-# # Verify the library exists
-# if(NOT EXISTS "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
-#     message(FATAL_ERROR "ONNX Runtime library not found at: ${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so")
-# endif()
-
-
-# Add the ONNX Runtime lib directory to linker search path
-# link_directories(${ONNXRUNTIME_ROOT}/lib)
-
 # Link ONNX Runtime libraries to your executable
 target_link_libraries(yolo12_detector_node 
-    "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/lib/libonnxruntime.so.1.20.1"
+    "${ONNXRUNTIME_LIB}"
+)
+
+# Set RPATH so the executable can find the library at runtime
+set_target_properties(yolo12_detector_node PROPERTIES
+    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/lib"
+    BUILD_WITH_INSTALL_RPATH FALSE
+    INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
 
+ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
   set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
@@ -84,6 +84,23 @@ endif()
 install(TARGETS
   yolo12_detector_node
   DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install ONNX Runtime library
+install(FILES
+  "${ONNXRUNTIME_LIB}"
+  DESTINATION lib/${PROJECT_NAME}/lib
+  RENAME libonnxruntime.so.1
+)
+
+# Install YOLO models and labels
+install(DIRECTORY
+  third_party/
+  DESTINATION share/${PROJECT_NAME}/
+  FILES_MATCHING 
+  PATTERN "*.onnx"
+  PATTERN "*.names"
+  PATTERN "*.txt"
 )
 
 install(DIRECTORY include/

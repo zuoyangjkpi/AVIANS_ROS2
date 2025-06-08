@@ -17,7 +17,8 @@
                 "${workspaceFolder}/src/neural_network_detector/msg",
                 "${workspaceFolder}/src/neural_network_detector/include",
                 "${workspaceFolder}/**",
-                "/usr/include/opencv4/**"
+                "/usr/include/opencv4/**",
+                "${workspaceFolder}/src/projection_model/include"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",

@@ -51,8 +51,8 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
 void YOLO12DetectorNode::initializeParameters()
 {
     // Declare and get parameters
-    this->declare_parameter<std::string>("model_path", "../third_party/YOLOs_CPP/models/yolo12n.onnx");
-    this->declare_parameter<std::string>("labels_path", "../third_party/YOLOs_CPP/models/coco.names");
+    this->declare_parameter<std::string>("model_path", "../third_party/YOLOs-CPP/models/yolo12n.onnx");
+    this->declare_parameter<std::string>("labels_path", "../third_party/YOLOs-CPP/models/coco.names");
     this->declare_parameter<bool>("use_gpu", false);
     this->declare_parameter<float>("confidence_threshold", 0.5f);
     this->declare_parameter<float>("iou_threshold", 0.45f);
