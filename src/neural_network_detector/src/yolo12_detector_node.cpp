@@ -42,10 +42,12 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     detection_count_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>(
         "detection_count", rclcpp::QoS(10));
+
     
-    if (publish_debug_image_) {
-        debug_image_pub_ = this->create_publisher<sensor_msgs::msg::Image>(
-            "debug_image", rclcpp::QoS(1));
+     if (publish_debug_image_) {
+       image_transport_ = std::make_unique<image_transport::ImageTransport>(
+        rclcpp::Node::SharedPtr(this));
+        debug_image_pub_ = image_transport_->advertise("debug_image", 1);
     }
     
     // Set up rate limiting
@@ -320,7 +322,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             detection_array_msg.detections.push_back(detection_msg);
 
             // Debug drawing code...
-            if (publish_debug_image_ && debug_image_pub_ && debug_image_pub_->get_subscription_count() > 0) {
+            if (publish_debug_image_ && debug_image_pub_.getNumSubscribers() > 0) {
                 cv::Point2i debug_min(std::max(detection_min.x, 0), std::max(detection_min.y, 0));
                 cv::Point2i debug_max(std::min(detection_max.x, original_resolution.width), 
                                     std::min(detection_max.y, original_resolution.height));
@@ -342,7 +344,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
         detection_count_pub_->publish(count_msg);
 
         // Publish debug image if enabled and has subscribers
-        if (publish_debug_image_ && debug_image_pub_ && debug_image_pub_->get_subscription_count() > 0) {
+        if (publish_debug_image_ && debug_image_pub_.getNumSubscribers() > 0) {
             // Rectangle on the original image - zoom level in green (like ROS1)
             cv::rectangle(mat_img, crop_area, cv::Scalar(50, 255, 50), 5);
 
@@ -370,13 +372,15 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
 
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
                                 "Debug information on topic %s is active due to having at least 1 subscriber",
-                                debug_image_pub_->get_topic_name());
+                                debug_image_pub_.getTopic().c_str());
 
             // Resize debug image for performance (like ROS1)
             cv::Mat small_img;
             cv::resize(mat_img, small_img, cv::Size(mat_img.cols / 4, mat_img.rows / 4));
+            
+            // Publish using image_transport
             auto debug_msg = cv_bridge::CvImage(msg->header, "bgr8", small_img).toImageMsg();
-            debug_image_pub_->publish(*debug_msg);
+            debug_image_pub_.publish(debug_msg);
         }
 
         // Update detection time

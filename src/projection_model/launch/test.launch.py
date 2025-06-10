@@ -187,9 +187,9 @@ def generate_launch_description():
         'var_const_y_max': 0.00452,
     }],
     remappings=[
-        ('image_raw', '/camera/image_raw'),
+        ('image_raw', '/firefly_1/xtion/rgb/image_raw'),
         ('detections', '/person_detections'),
-        ('detection_count', '/person_detection_count'),  # Added missing remapping
+        ('detection_count', '/person_detection_count'),  
         ('feedback', '/neural_network_feedback'),
         ('debug_image', '/detection_debug_image'),
     ],
@@ -203,12 +203,12 @@ def generate_launch_description():
         name="person_tracker_projection_node",
         output='screen',
         parameters=[{
-            'camera_frame': 'camera_optical_frame',  # Use optical frame for projections
-            'target_frame': 'map',  # Project to map frame
+            'camera_frame': 'camera_optical_frame',  
+            'target_frame': 'map',  
             'drone_frame': 'X3/base_link',  
             'assumed_person_height': 1.7,
             'min_detection_confidence': 0.5,
-            'target_person_class': 0,  # Person class
+            'target_person_class': 0, 
             'feedback_margin_ratio': 0.15,
             'tracking_offset_distance': 7.0,
             'tracking_offset_height': 7.0,
@@ -217,7 +217,7 @@ def generate_launch_description():
         remappings=[
             ('detections', '/person_detections'),
             ('camera_info', '/camera/camera_info'),  
-            ('drone_odom', '/X3/odom'),  # Your odometry topic
+            ('drone_odom', '/X3/odom'),  
             ('target_waypoint', '/target_waypoint'),
             ('feedback', '/neural_network_feedback'),
         ],
@@ -238,25 +238,25 @@ def generate_launch_description():
         gz_plugin_path,
         
         # Gazebo simulation
-        gazebo,
-        gz_ros2_bridge,
+        # gazebo,
+        # gz_ros2_bridge,
         
         # Person tracking nodes (conditional)
         yolo_detector_node,
-        person_tracker_node,
+        # person_tracker_node,
         
         # Core drone nodes with delay
-        TimerAction(
-            period=5.0,  # Reduced delay
-            actions=[
-                static_tf_map_world,
-                static_tf_world_base,
-                static_tf_base_alias,
-                static_tf_camera,
-                static_tf_camera_optical,
-                controller,
-            ]
-        ),
+        # TimerAction(
+        #     period=5.0,  # Reduced delay
+        #     actions=[
+        #         static_tf_map_world,
+        #         static_tf_world_base,
+        #         static_tf_base_alias,
+        #         static_tf_camera,
+        #         static_tf_camera_optical,
+        #         controller,
+        #     ]
+        # ),
         
         # RViz with longer delay to ensure transforms are ready
         TimerAction(

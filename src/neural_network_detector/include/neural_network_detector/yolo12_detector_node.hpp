@@ -46,7 +46,10 @@ private:
     
     rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkDetectionArray>::SharedPtr detection_pub_;
     rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>::SharedPtr detection_count_pub_;
-    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr debug_image_pub_;
+    
+    // Image transport for debug image
+    std::unique_ptr<image_transport::ImageTransport> image_transport_;
+    image_transport::Publisher debug_image_pub_;
 
     // YOLO12 Detector instance
     std::unique_ptr<YOLO12Detector> yolo_detector_;
