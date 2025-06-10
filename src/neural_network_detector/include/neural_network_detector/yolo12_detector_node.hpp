@@ -13,10 +13,10 @@
 #include "cv/extensions/projection.h"
 
 // Include custom message types (assuming they're in a package called 'neural_network_msgs')
-#include "neural_network_detector/msg/neural_network_detection.hpp"
-#include "neural_network_detector/msg/neural_network_detection_array.hpp"
-#include "neural_network_detector/msg/neural_network_feedback.hpp"
-#include "neural_network_detector/msg/neural_network_number_of_detections.hpp"
+#include "neural_network_msgs/msg/neural_network_detection.hpp"
+#include "neural_network_msgs/msg/neural_network_detection_array.hpp"
+#include "neural_network_msgs/msg/neural_network_feedback.hpp"
+#include "neural_network_msgs/msg/neural_network_number_of_detections.hpp"
 
 
 
@@ -42,10 +42,10 @@ public:
 private:
     // ROS2 Publishers and Subscribers
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
-    rclcpp::Subscription<neural_network_detector::msg::NeuralNetworkFeedback>::SharedPtr feedback_sub_;
+    rclcpp::Subscription<neural_network_msgs::msg::NeuralNetworkFeedback>::SharedPtr feedback_sub_;
     
-    rclcpp::Publisher<neural_network_detector::msg::NeuralNetworkDetectionArray>::SharedPtr detection_pub_;
-    rclcpp::Publisher<neural_network_detector::msg::NeuralNetworkNumberOfDetections>::SharedPtr detection_count_pub_;
+    rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkDetectionArray>::SharedPtr detection_pub_;
+    rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>::SharedPtr detection_count_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr debug_image_pub_;
 
     // YOLO12 Detector instance
@@ -77,7 +77,7 @@ private:
     std::unique_ptr<uint8_t[]> buffer_results_;
 
     // Feedback handling
-    neural_network_detector::msg::NeuralNetworkFeedback latest_feedback_;
+    neural_network_msgs::msg::NeuralNetworkFeedback latest_feedback_;
     bool feedback_received_;
     rclcpp::Time last_feedback_time_;
     rclcpp::Duration feedback_timeout_{rclcpp::Duration::from_seconds(5.0)};  
@@ -106,7 +106,7 @@ private:
      * @brief Feedback callback for updating detection parameters
      * @param msg Feedback message
      */
-    void feedbackCallback(const neural_network_detector::msg::NeuralNetworkFeedback::SharedPtr msg);
+    void feedbackCallback(const neural_network_msgs::msg::NeuralNetworkFeedback::SharedPtr msg);
 
     /**
      * @brief Get crop area based on feedback and image properties
@@ -116,7 +116,7 @@ private:
      */
     cv::Rect getCropArea(
     const cv::Size& original_resolution,
-    const neural_network_detector::msg::NeuralNetworkFeedback& feedback,
+    const neural_network_msgs::msg::NeuralNetworkFeedback& feedback,
     const cv::Size& desired_resolution,
     cv::projection2i& proj_crop,
     bool timed_out);
@@ -152,7 +152,7 @@ private:
      */
     std::vector<Detection> filterDetections(const std::vector<Detection>& detections) const;
 
-    bool validateDetection(const neural_network_detector::msg::NeuralNetworkDetection& detection,
+    bool validateDetection(const neural_network_msgs::msg::NeuralNetworkDetection& detection,
     const cv::Size& image_size) const;
 };
 

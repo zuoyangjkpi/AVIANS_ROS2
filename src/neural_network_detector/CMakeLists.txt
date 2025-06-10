@@ -15,22 +15,12 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp_components REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
+find_package(neural_network_msgs REQUIRED)
+
 
 include_directories(include)
 include_directories(third_party/YOLOs-CPP/include)  # Add YOLO include path
 include_directories(third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include)  # Add ONNX include path
-
-set(msg_files
-  "msg/NeuralNetworkDetection.msg"  
-  "msg/NeuralNetworkDetectionArray.msg"
-  "msg/NeuralNetworkFeedback.msg"
-  "msg/NeuralNetworkNumberOfDetections.msg")
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  ${msg_files}
-  DEPENDENCIES  std_msgs
-)
 
 # Define ONNX Runtime paths
 set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1")
@@ -52,8 +42,26 @@ ament_target_dependencies(yolo12_detector_node
   geometry_msgs
   cv_bridge
   image_transport
+  neural_network_msgs
   OpenCV
   rclcpp_components
+)
+
+ament_export_include_directories(include)
+ament_export_libraries(yolo12_detector_node_component)
+ament_export_dependencies(
+  rclcpp
+  rclcpp_components
+  geometry_msgs
+  sensor_msgs
+  std_msgs
+  neural_network_msgs
+  tf2_ros
+  tf2
+  tf2_geometry_msgs
+  cv_bridge
+  nav_msgs
+  OpenCV
 )
 
 # Link ONNX Runtime libraries to your executable
@@ -68,10 +76,8 @@ set_target_properties(yolo12_detector_node PROPERTIES
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
 
-ament_export_dependencies(rosidl_default_runtime)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

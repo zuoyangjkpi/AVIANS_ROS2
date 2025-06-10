@@ -14,8 +14,8 @@
   <depend>geometry_msgs</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
-  <build_depend>neural_network_detector</build_depend>
-  <exec_depend>neural_network_detector</exec_depend> 
+  <build_depend>neural_network_msgs</build_depend>
+  <exec_depend>neural_network_msgs</exec_depend> 
   <depend>tf2_geometry_msgs</depend>
   <depend>cv_bridge</depend>
   <depend>opencv2</depend>

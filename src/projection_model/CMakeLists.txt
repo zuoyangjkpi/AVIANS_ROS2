@@ -12,7 +12,7 @@ find_package(rclcpp_components REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(neural_network_detector REQUIRED)
+find_package(neural_network_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
@@ -40,7 +40,7 @@ ament_target_dependencies(person_tracker_projection_component
   tf2_ros
   tf2_geometry_msgs
   tf2
-  neural_network_detector
+  neural_network_msgs
   cv_bridge
   OpenCV
   nav_msgs

@@ -31,16 +31,16 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
         rclcpp::QoS(1).best_effort(),
         std::bind(&YOLO12DetectorNode::imageCallback, this, std::placeholders::_1));
     
-    feedback_sub_ = this->create_subscription<neural_network_detector::msg::NeuralNetworkFeedback>(
+    feedback_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkFeedback>(
         "feedback",
         rclcpp::QoS(10),
         std::bind(&YOLO12DetectorNode::feedbackCallback, this, std::placeholders::_1));
     
     // Create publishers
-    detection_pub_ = this->create_publisher<neural_network_detector::msg::NeuralNetworkDetectionArray>(
+    detection_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
         "detections", rclcpp::QoS(10));
     
-    detection_count_pub_ = this->create_publisher<neural_network_detector::msg::NeuralNetworkNumberOfDetections>(
+    detection_count_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>(
         "detection_count", rclcpp::QoS(10));
     
     if (publish_debug_image_) {
@@ -202,7 +202,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             resized, confidence_threshold_, iou_threshold_);
 
         // Create detection array message
-        neural_network_detector::msg::NeuralNetworkDetectionArray detection_array_msg;
+        neural_network_msgs::msg::NeuralNetworkDetectionArray detection_array_msg;
         detection_array_msg.header.frame_id = msg->header.frame_id;
         detection_array_msg.header.stamp = msg->header.stamp;
 
@@ -277,7 +277,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             }
 
             // Create detection message
-            neural_network_detector::msg::NeuralNetworkDetection detection_msg;
+            neural_network_msgs::msg::NeuralNetworkDetection detection_msg;
             detection_msg.header.frame_id = msg->header.frame_id;
             detection_msg.header.stamp = msg->header.stamp;
             detection_msg.detection_score = det.conf;
@@ -336,7 +336,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
         }
 
         // Publish detection count
-        auto count_msg = neural_network_detector::msg::NeuralNetworkNumberOfDetections();
+        auto count_msg = neural_network_msgs::msg::NeuralNetworkNumberOfDetections();
         count_msg.header = msg->header;
         count_msg.data = static_cast<uint16_t>(detection_array_msg.detections.size());
         detection_count_pub_->publish(count_msg);
@@ -391,7 +391,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
 }
 
 void YOLO12DetectorNode::feedbackCallback(
-    const neural_network_detector::msg::NeuralNetworkFeedback::SharedPtr msg)
+    const neural_network_msgs::msg::NeuralNetworkFeedback::SharedPtr msg)
 {
     latest_feedback_ = *msg;
     feedback_received_ = true;
@@ -403,7 +403,7 @@ void YOLO12DetectorNode::feedbackCallback(
 
 cv::Rect YOLO12DetectorNode::getCropArea(
     const cv::Size& original_resolution,
-    const neural_network_detector::msg::NeuralNetworkFeedback& feedback,
+    const neural_network_msgs::msg::NeuralNetworkFeedback& feedback,
     const cv::Size& desired_resolution,
     cv::projection2i& proj_crop,
     bool timed_out)
@@ -464,7 +464,7 @@ cv::Rect YOLO12DetectorNode::getCropArea(
 
 
 bool YOLO12DetectorNode::validateDetection(
-    const neural_network_detector::msg::NeuralNetworkDetection& detection,
+    const neural_network_msgs::msg::NeuralNetworkDetection& detection,
     const cv::Size& image_size) const
 {
     // Check if coordinates are within image bounds

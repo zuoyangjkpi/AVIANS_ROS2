@@ -12,8 +12,8 @@
 #include <tf2/LinearMath/Transform.h>
 #include <opencv2/opencv.hpp>
 
-#include "neural_network_detector/msg/neural_network_detection_array.hpp"
-#include "neural_network_detector/msg/neural_network_feedback.hpp"
+#include "neural_network_msgs/msg/neural_network_detection_array.hpp"
+#include "neural_network_msgs/msg/neural_network_feedback.hpp"
 
 namespace person_tracker_projection
 {
@@ -33,7 +33,7 @@ public:
 
 private:
     // Callback functions
-    void detectionsCallback(const neural_network_detector::msg::NeuralNetworkDetectionArray::SharedPtr msg);
+    void detectionsCallback(const neural_network_msgs::msg::NeuralNetworkDetectionArray::SharedPtr msg);
     void cameraInfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr msg);
     void droneOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg);
 
@@ -41,11 +41,11 @@ private:
     
     // Core functionality
     geometry_msgs::msg::PoseStamped projectDetectionToWorld(
-        const neural_network_detector::msg::NeuralNetworkDetection& detection,
+        const neural_network_msgs::msg::NeuralNetworkDetection& detection,
         const std_msgs::msg::Header& header);
     
-    neural_network_detector::msg::NeuralNetworkFeedback generateFeedback(
-        const neural_network_detector::msg::NeuralNetworkDetection& detection);
+    neural_network_msgs::msg::NeuralNetworkFeedback generateFeedback(
+        const neural_network_msgs::msg::NeuralNetworkDetection& detection);
     
     cv::Point2f pixelToNormalizedImageCoordinates(const cv::Point2f& pixel);
     geometry_msgs::msg::Point projectToGround(const cv::Point2f& normalized_point, 
@@ -62,13 +62,13 @@ private:
     bool checkAndHandleAltitude();
     
     // Subscribers
-    rclcpp::Subscription<neural_network_detector::msg::NeuralNetworkDetectionArray>::SharedPtr detections_sub_;
+    rclcpp::Subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>::SharedPtr detections_sub_;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr drone_odom_sub_;
     
     // Publishers
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr waypoint_pub_;
-    rclcpp::Publisher<neural_network_detector::msg::NeuralNetworkFeedback>::SharedPtr feedback_pub_;
+    rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkFeedback>::SharedPtr feedback_pub_;
     
     // TF2
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;

@@ -37,7 +37,7 @@ PersonTrackerProjectionNode::PersonTrackerProjectionNode(const rclcpp::NodeOptio
         "/target_waypoint", rclcpp::QoS(10));
     
     if (publish_feedback_) {
-        feedback_pub_ = this->create_publisher<neural_network_detector::msg::NeuralNetworkFeedback>(
+        feedback_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkFeedback>(
             "feedback", rclcpp::QoS(10));
     }
     
@@ -61,7 +61,7 @@ void PersonTrackerProjectionNode::checkCameraInitialization()
         // Camera is initialized, now create the detections subscriber
         RCLCPP_INFO(this->get_logger(), "Camera model initialized! Creating detection subscriber...");
         
-        detections_sub_ = this->create_subscription<neural_network_detector::msg::NeuralNetworkDetectionArray>(
+        detections_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
             "detections", 
             rclcpp::QoS(10),
             std::bind(&PersonTrackerProjectionNode::detectionsCallback, this, std::placeholders::_1));
@@ -332,7 +332,7 @@ void PersonTrackerProjectionNode::stopYawSearch()
 }
 
 void PersonTrackerProjectionNode::detectionsCallback(
-    const neural_network_detector::msg::NeuralNetworkDetectionArray::SharedPtr msg)
+    const neural_network_msgs::msg::NeuralNetworkDetectionArray::SharedPtr msg)
 {
     if (!msg) {
         RCLCPP_ERROR(this->get_logger(), "Received null DetectionArray message");
@@ -357,7 +357,7 @@ void PersonTrackerProjectionNode::detectionsCallback(
     handleYawSearch();
     
     // Find the best detection (highest confidence person)
-    neural_network_detector::msg::NeuralNetworkDetection best_detection;
+    neural_network_msgs::msg::NeuralNetworkDetection best_detection;
     bool found_person = false;
     double highest_confidence = 0.0;
     
@@ -431,7 +431,7 @@ void PersonTrackerProjectionNode::detectionsCallback(
 }
 
 geometry_msgs::msg::PoseStamped PersonTrackerProjectionNode::projectDetectionToWorld(
-    const neural_network_detector::msg::NeuralNetworkDetection& detection,
+    const neural_network_msgs::msg::NeuralNetworkDetection& detection,
     const std_msgs::msg::Header& header)
 {
     geometry_msgs::msg::PoseStamped waypoint;
@@ -598,10 +598,10 @@ bool PersonTrackerProjectionNode::transformPoseToTargetFrame(geometry_msgs::msg:
     }
 }
 
-neural_network_detector::msg::NeuralNetworkFeedback PersonTrackerProjectionNode::generateFeedback(
-    const neural_network_detector::msg::NeuralNetworkDetection& detection)
+neural_network_msgs::msg::NeuralNetworkFeedback PersonTrackerProjectionNode::generateFeedback(
+    const neural_network_msgs::msg::NeuralNetworkDetection& detection)
 {
-    neural_network_detector::msg::NeuralNetworkFeedback feedback;
+    neural_network_msgs::msg::NeuralNetworkFeedback feedback;
     
     // Validate detection bounds
     if (detection.xmax <= detection.xmin || detection.ymax <= detection.ymin) {

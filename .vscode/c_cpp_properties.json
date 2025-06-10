@@ -14,11 +14,12 @@
                 "${workspaceFolder}/src/pose_cov_ops_interface/include/**",
                 "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/include",
                 "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include",
-                "${workspaceFolder}/src/neural_network_detector/msg",
+                "${workspaceFolder}/src/custom_msgs/neural_network_msgs/msg",
                 "${workspaceFolder}/src/neural_network_detector/include",
                 "${workspaceFolder}/**",
                 "/usr/include/opencv4/**",
-                "${workspaceFolder}/src/projection_model/include"
+                "${workspaceFolder}/src/projection_model/include",
+                "${workspaceFolder}/build/neural_network_msgs/rosidl_generator_cpp"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",
