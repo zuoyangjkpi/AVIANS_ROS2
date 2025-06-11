@@ -175,11 +175,11 @@ def generate_launch_description():
         'desired_class': 0,           # 0 = person class in COCO dataset
         'desired_width': 300,
         'desired_height': 300,
-        'aspect_ratio': 1.33333,      # Will be converted to float in code
+        'aspect_ratio': 1.333333333,      # Will be converted to float in code
         'border_dropoff': 0.05,
         'publish_debug_image': True,
-        'max_update_force': False,
-        'max_update_rate_hz': 0.0,
+        'max_update_force': True,
+        'max_update_rate_hz': 4.0,
         'feedback_timeout_sec': 5.0,
         'var_const_x_min': 0.00387,
         'var_const_x_max': 0.00347,

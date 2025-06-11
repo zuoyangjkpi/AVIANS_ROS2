@@ -215,17 +215,17 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
                 continue;
             }
 
-            // Convert YOLO detection format (center + size) to min/max format
-            float x_center = det.box.x;
-            float y_center = det.box.y;
-            float half_width = det.box.width / 2.0f;
-            float half_height = det.box.height / 2.0f;
+            // Convert YOLO detection format (top_left corner + size) to min/max format
+            float x_min = det.box.x;
+            float y_min = det.box.y;
+            float width = det.box.width ;
+            float height = det.box.height ;
 
             // Calculate bounds in the resized image space (floating point for precision)
-            float xmin_f = x_center - half_width;
-            float ymin_f = y_center - half_height;
-            float xmax_f = x_center + half_width;
-            float ymax_f = y_center + half_height;
+            float xmin_f = x_min ;
+            float ymin_f = y_min ;
+            float xmax_f = x_min + width;
+            float ymax_f = y_min + height;
 
             // Clamp to resized image bounds first
             xmin_f = std::max(0.0f, std::min(xmin_f, static_cast<float>(desired_resolution_.width - 1)));
@@ -348,7 +348,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             // Rectangle on the original image - zoom level in green (like ROS1)
             cv::rectangle(mat_img, crop_area, cv::Scalar(50, 255, 50), 5);
 
-            // Draw feedback debug info if available (like ROS1)
+            // Draw feedback debug info if available 
             if (latest_feedback_.xcenter > 0 && latest_feedback_.xcenter < original_resolution.width
                 && latest_feedback_.debug_included
                 && latest_feedback_.ycenter > 0 && latest_feedback_.ycenter < original_resolution.height) {
