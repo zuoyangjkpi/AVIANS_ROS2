@@ -35,7 +35,7 @@ namespace pose_cov_ops {
       size_t queue_size;
       rclcpp::QoS qos_profile;
 
-      topicSubInfo(std::string _name, K _key, unsigned int _cache_size, size_t _queue_size, const rclcpp::QoS& qos = rclcpp::SystemDefaultsQoS())
+      topicSubInfo(std::string _name, K _key, unsigned int _cache_size, size_t _queue_size, const rclcpp::QoS& qos = rclcpp::QoS(rclcpp::KeepLast(100)))
         : name(_name), key(_key), cache_size(_cache_size), queue_size(_queue_size), qos_profile(qos) {};
     };
 

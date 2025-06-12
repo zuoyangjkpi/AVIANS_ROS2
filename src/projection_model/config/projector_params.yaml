@@ -1,0 +1,19 @@
+projected_object_topic: "/machine_1/object_detections/projected_to_world"
+camera_debug_topic: "/machine_1/object_detections/camera_debug"
+detections_topic: "/machine_1/object_detections"
+tracker_topic: "/machine_1/target_tracker/pose"
+offset_topic: "/machine_1/target_tracker/offset"
+feedback_topic: "/machine_1/object_detections/feedback"
+
+topics:
+  robot: "/machine_1/pose/std"
+  camera: "/machine_1/camera/pose"
+  optical: "/machine_1/camera/pose_optical"
+
+height_model_mean: 1.7
+height_model_var: 0.1
+uncertainty_scale_head: 1.0
+uncertainty_scale_feet: 1.0
+
+camera:
+  info_topic: "/machine_1/video/camera_info"

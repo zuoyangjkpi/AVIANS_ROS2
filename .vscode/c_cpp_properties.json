@@ -19,7 +19,8 @@
                 "${workspaceFolder}/**",
                 "/usr/include/opencv4/**",
                 "${workspaceFolder}/src/projection_model/include",
-                "${workspaceFolder}/build/neural_network_msgs/rosidl_generator_cpp"
+                "${workspaceFolder}/build/neural_network_msgs/rosidl_generator_cpp",
+                "/opt/ros/jazzy/include/geometry_msgs"
             ],
             "name": "ROS",
             "intelliSenseMode": "gcc-x64",

@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.8)
 project(projection_model)
 
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -8,109 +13,112 @@ endif()
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(neural_network_msgs REQUIRED)
-find_package(tf2_ros REQUIRED)
-find_package(tf2 REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
+find_package(image_geometry REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(nav_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(pose_cov_ops_interface REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 
-# Create person tracker projection library
-add_library(person_tracker_projection_component SHARED
-  src/person_tracker_projection_node.cpp
+# Include directories
+include_directories(include)
+
+# Add executable
+add_executable(${PROJECT_NAME}_node
+  src/Projector.cpp
+  src/models/Model3D.cpp
 )
 
-target_compile_features(person_tracker_projection_component PUBLIC c_std_99 cxx_std_17)
-target_include_directories(person_tracker_projection_component PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
+# Add library for the projector class (optional, for reusability)
+add_library(${PROJECT_NAME}
+  src/Projector.cpp
 )
 
-ament_target_dependencies(person_tracker_projection_component
+# Dependencies for the executable
+ament_target_dependencies(${PROJECT_NAME}_node
   rclcpp
-  rclcpp_components
   geometry_msgs
   sensor_msgs
-  std_msgs
-  tf2_ros
-  tf2_geometry_msgs
-  tf2
   neural_network_msgs
+  image_geometry
   cv_bridge
   OpenCV
-  nav_msgs
+  tf2_geometry_msgs
+  pose_cov_ops_interface
+  rcl_interfaces
 )
 
-# Register the component
-rclcpp_components_register_nodes(person_tracker_projection_component 
-  "person_tracker_projection::PersonTrackerProjectionNode")
-
-# Create executable
-add_executable(person_tracker_projection_node
-  src/main.cpp
-)
-
-target_link_libraries(person_tracker_projection_node 
-  person_tracker_projection_component
-)
-
-ament_target_dependencies(person_tracker_projection_node
+# Dependencies for the library
+ament_target_dependencies(${PROJECT_NAME}
   rclcpp
+  geometry_msgs
+  sensor_msgs
+  neural_network_msgs
+  image_geometry
+  cv_bridge
+  OpenCV
+  tf2_geometry_msgs
+  pose_cov_ops_interface
+  rcl_interfaces
 )
+
+# Link OpenCV libraries
+target_link_libraries(${PROJECT_NAME}_node ${OpenCV_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBRARIES})
 
 # Install targets
 install(TARGETS
-  person_tracker_projection_component
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
-
-install(TARGETS
-  person_tracker_projection_node
+  ${PROJECT_NAME}_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
-install(DIRECTORY
-  include/
-  DESTINATION include
+install(TARGETS
+  ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY
-  launch/
-  DESTINATION share/${PROJECT_NAME}/launch
+# Install header files
+install(DIRECTORY include/
+  DESTINATION include/
 )
 
-install(DIRECTORY
-  config/
-  DESTINATION share/${PROJECT_NAME}/config
+# Install launch files
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch/
+  FILES_MATCHING PATTERN "*.launch.py"
 )
 
+# Install config files
+install(DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config/
+  FILES_MATCHING PATTERN "*.yaml"
+)
+
+# Export dependencies
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  rclcpp
+  geometry_msgs
+  sensor_msgs
+  neural_network_msgs
+  image_geometry
+  cv_bridge
+  OpenCV
+  tf2_geometry_msgs
+  pose_cov_ops
+  rcl_interfaces
+)
+
+# Testing
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-ament_export_include_directories(include)
-ament_export_libraries(person_tracker_projection_component)
-ament_export_dependencies(
-  rclcpp
-  rclcpp_components
-  geometry_msgs
-  sensor_msgs
-  std_msgs
-  neural_network_msgs
-  tf2_ros
-  tf2
-  tf2_geometry_msgs
-  cv_bridge
-  nav_msgs
-  OpenCV
-)
 
 ament_package()

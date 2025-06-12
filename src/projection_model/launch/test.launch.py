@@ -8,10 +8,12 @@ from launch.actions import (
     TimerAction,
     DeclareLaunchArgument,
 )
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch import conditions
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch_ros.substitutions import FindPackageShare
+
 
 
 def generate_launch_description():
@@ -32,6 +34,10 @@ def generate_launch_description():
         "models", 
         "coco.names"
     )
+
+
+ 
+    
     
     # Launch arguments
     declare_use_person_tracking = DeclareLaunchArgument(
@@ -121,15 +127,6 @@ def generate_launch_description():
     static_tf_base_alias = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
-        arguments=["0", "0", "0", "0", "0", "0", "X3/base_link", "base_link"],
-        output="screen"
-    )
-    
-    # Camera frame transform - matches SDF pose: <pose>-0.2 0 0 0 0.3491 3.1415</pose>
-    # Note: SDF uses roll-pitch-yaw, but the camera is rotated 180° around Z (3.1415) and pitched down (0.3491)
-    static_tf_camera = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
         arguments=["-0.2", "0", "0", "0", "0.3491", "3.1415", "X3/base_link", "camera_link"],
         output="screen"
     )
@@ -167,6 +164,7 @@ def generate_launch_description():
     name="yolo12_detector_node",
     output='screen',
     parameters=[{
+        # "use_sim_time":True,
         'model_path': LaunchConfiguration('yolo_model_path'),
         'labels_path': LaunchConfiguration('yolo_labels_path'),
         'use_gpu': False,
@@ -196,34 +194,40 @@ def generate_launch_description():
     condition=conditions.IfCondition(LaunchConfiguration('use_person_tracking'))
     )
     
-    # Person Tracking Projection Node
-    person_tracker_node = Node(
-        package="projection_model",
-        executable="person_tracker_projection_node",
-        name="person_tracker_projection_node",
-        output='screen',
-        parameters=[{
-            'camera_frame': 'camera_optical_frame',  
-            'target_frame': 'map',  
-            'drone_frame': 'X3/base_link',  
-            'assumed_person_height': 1.7,
-            'min_detection_confidence': 0.5,
-            'target_person_class': 0, 
-            'feedback_margin_ratio': 0.15,
-            'tracking_offset_distance': 7.0,
-            'tracking_offset_height': 7.0,
-            'publish_feedback': True,
-        }],
-        remappings=[
-            ('detections', '/person_detections'),
-            ('camera_info', '/camera/camera_info'),  
-            ('drone_odom', '/X3/odom'),  
-            ('target_waypoint', '/target_waypoint'),
-            ('feedback', '/neural_network_feedback'),
-        ],
-        condition=conditions.IfCondition(LaunchConfiguration('use_person_tracking'))
-    )
 
+    
+    # Create the projector node
+    projector_node = Node(
+    package='projection_model',
+    executable='projection_model_node',
+    name='model_distance_from_height_node',
+    parameters=[{
+        # 'use_sim_time': True, 
+        'projected_object_topic': "/machine_1/object_detections/projected_to_world",
+        'camera_debug_topic': "/machine_1/object_detections/camera_debug",
+        'detections_topic': "/person_detections",
+        'tracker_topic': "/machine_1/target_tracker/pose",
+        'offset_topic': "/machine_1/target_tracker/offset",
+        'feedback_topic': "/neural_network_feedback",
+        
+        'topics.robot': "/machine_1/pose/raww/std",
+        'topics.camera': "/machine_1/camera/pose",
+        'topics.optical': "/machine_1/camera/pose_optical",
+        
+        'height_model_mean': 1.8,
+        'height_model_var': 1.0,
+        'uncertainty_scale_head': 1.0,
+        'uncertainty_scale_feet': 1.0,
+        
+        'camera.info_topic': "/machine_1/video/camera_info"
+    }],
+    output='screen',
+    # emulate_tty=True,
+    arguments=['--ros-args', '--log-level', 'INFO']
+)
+
+
+    
     return LaunchDescription([
         # Launch arguments
         declare_use_person_tracking,
@@ -242,9 +246,8 @@ def generate_launch_description():
         # gz_ros2_bridge,
         
         # Person tracking nodes (conditional)
-        yolo_detector_node,
-        # person_tracker_node,
-        
+        yolo_detector_node,  
+        projector_node,      
         # Core drone nodes with delay
         # TimerAction(
         #     period=5.0,  # Reduced delay
@@ -258,9 +261,5 @@ def generate_launch_description():
         #     ]
         # ),
         
-        # RViz with longer delay to ensure transforms are ready
-        TimerAction(
-            period=8.0,
-            actions=[rviz_node]
-        )
+        rviz_node
     ])
