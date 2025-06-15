@@ -1,0 +1,10 @@
+
+-
+  ros1_package_name: 'uav_msgs'
+  ros1_message_name: 'uav_pose'
+  ros2_package_name: 'uav_msgs'
+  ros2_message_name: 'UAVPose'
+  fields_1_to_2:
+    angVelocity: 'ang_velocity'
+    POI: 'poi'
+

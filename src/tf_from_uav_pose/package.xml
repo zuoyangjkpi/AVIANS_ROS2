@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypef="xml"?>
+<package format="3">
+  <name>tf_from_uav_pose</name>
+  <version>0.0.0</version>
+  <description>ROS2 package for converting UAV poses to ROS standard transforms and coordinate frames</description>
+  <maintainer email="your.email@example.com">Your Name</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>uav_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>Eigen3</depend>
+
+  
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

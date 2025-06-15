@@ -1,34 +1,31 @@
 {
-    "configurations": [
-        {
-            "browse": {
-                "databaseFilename": "${default}",
-                "limitSymbolsToIncludedHeaders": false
-            },
-            "includePath": [
-                "/opt/ros/jazzy/include/**",
-                "/opt/ros/jazzy/include/cv_bridge/**",
-                "/opt/ros/jazzy/include/sensor_msgs/**",
-                "/home/dell/drone/src/drone_description/include/**",
-                "/usr/include/**",
-                "${workspaceFolder}/src/pose_cov_ops_interface/include/**",
-                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/include",
-                "${workspaceFolder}/src/neural_network_detector/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include",
-                "${workspaceFolder}/src/custom_msgs/neural_network_msgs/msg",
-                "${workspaceFolder}/src/neural_network_detector/include",
-                "${workspaceFolder}/**",
-                "/usr/include/opencv4/**",
-                "${workspaceFolder}/src/projection_model/include",
-                "${workspaceFolder}/build/neural_network_msgs/rosidl_generator_cpp",
-                "/opt/ros/jazzy/include/geometry_msgs"
-            ],
-            "name": "ROS",
-            "intelliSenseMode": "gcc-x64",
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "gnu11",
-            "cppStandard": "c++20",
-            "defines": []
-        }
-    ],
-    "version": 4
+  "configurations": [
+    {
+      "browse": {
+        "databaseFilename": "${default}",
+        "limitSymbolsToIncludedHeaders": false
+      },
+      "includePath": [
+        "/home/dell/drone/install/uav_msgs/include/**",
+        "/home/dell/drone/install/projection_model/include/**",
+        "/home/dell/drone/install/pose_cov_ops_interface/include/**",
+        "/home/dell/drone/install/neural_network_detector/include/**",
+        "/home/dell/drone/install/neural_network_msgs/include/**",
+        "/opt/ros/jazzy/include/**",
+        "/home/dell/drone/src/drone_description/include/**",
+        "/home/dell/drone/src/neural_network_detector/include/**",
+        "/home/dell/drone/src/pose_cov_ops_interface/include/**",
+        "/home/dell/drone/src/projection_model/include/**",
+        "/home/dell/drone/src/target_tracker_distributed_kf/include/**",
+        "/home/dell/drone/src/tf_from_uav_pose/include/**",
+        "/usr/include/**"
+      ],
+      "name": "ROS",
+      "intelliSenseMode": "gcc-x64",
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "gnu11",
+      "cppStandard": "c++14"
+    }
+  ],
+  "version": 4
 }

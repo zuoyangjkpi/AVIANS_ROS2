@@ -13,6 +13,7 @@ from launch import conditions
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from launch.actions import IncludeLaunchDescription
 
 
 
@@ -240,14 +241,33 @@ def generate_launch_description():
         gazebo_resource_path,
         set_gazebo_model_path,
         gz_plugin_path,
+
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(os.path.join(get_package_share_directory("tf_from_uav_pose"), "launch", "tf_from_uav_pose.launch.py"))
+        # ),
+
+
+        TimerAction(
+            period=2.0,  # Reduced delay
+            actions=[
+                projector_node 
+            ]
+         ),
+        
+        TimerAction(
+            period=4.0,  # Reduced delay
+            actions=[
+                 yolo_detector_node,
+                 rviz_node
+            ]
+         ),
         
         # Gazebo simulation
         # gazebo,
         # gz_ros2_bridge,
         
         # Person tracking nodes (conditional)
-        yolo_detector_node,  
-        projector_node,      
+         
         # Core drone nodes with delay
         # TimerAction(
         #     period=5.0,  # Reduced delay
@@ -261,5 +281,5 @@ def generate_launch_description():
         #     ]
         # ),
         
-        rviz_node
+        
     ])
