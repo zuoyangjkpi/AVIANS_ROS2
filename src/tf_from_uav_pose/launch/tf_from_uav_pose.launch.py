@@ -56,7 +56,7 @@ def generate_launch_description():
         parameters=[
             LaunchConfiguration('config_file'),
             {
-                # "use_sim_time":True,
+                "use_sim_time":True,
                 'poseTopicName': LaunchConfiguration('pose_topic'),
                 'rawPoseTopicName': LaunchConfiguration('raw_pose_topic'),
                 'worldFrameID': LaunchConfiguration('world_frame'),

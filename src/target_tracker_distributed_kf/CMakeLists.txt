@@ -7,20 +7,112 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(uav_msgs REQUIRED)
+find_package(pose_cov_ops REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(rcl_interfaces REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+# Find MRPT
+find_package(mrpt-math REQUIRED)
+
+# Include directories
+include_directories(
+  include
+  ${EIGEN3_INCLUDE_DIR}
+)
+
+# Create the library
+add_library(${PROJECT_NAME} SHARED
+  src/DistributedKF3D.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(${PROJECT_NAME}
+  rclcpp
+  geometry_msgs
+  std_msgs
+  uav_msgs
+  pose_cov_ops
+  tf2
+  tf2_geometry_msgs
+  rcl_interfaces
+)
+
+target_link_libraries(${PROJECT_NAME}
+  mrpt::math
+  Eigen3::Eigen
+)
+
+# Create the executable
+add_executable(distributed_kf_node src/main.cpp)
+
+target_link_libraries(distributed_kf_node
+  ${PROJECT_NAME}
+)
+
+ament_target_dependencies(distributed_kf_node
+  rclcpp
+)
+
+# Install targets
+install(TARGETS
+  ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(TARGETS
+  distributed_kf_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install header files
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+# Install launch files if any
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+  OPTIONAL
+)
+
+# Install config files if any
+install(DIRECTORY
+  config
+  DESTINATION share/${PROJECT_NAME}/
+  OPTIONAL
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # comment the line when a copyright and license is added to all source files
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # comment the line when this package is in a git repo and when
-  # a copyright and license is added to all source files
-  set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  rclcpp
+  geometry_msgs
+  std_msgs
+  uav_msgs
+  pose_cov_ops
+  tf2
+  tf2_geometry_msgs
+  rcl_interfaces
+)
+
+ament_export_include_directories(include)
 
 ament_package()

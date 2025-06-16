@@ -2,16 +2,30 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>target_tracker_distributed_kf</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="mohmedsayed0990@gmail.com">dell</maintainer>
-  <license>Apache-2.0</license>
-
+  <version>1.0.0</version>
+  <description>Distributed Kalman Filter for 3D target tracking - ROS2 version</description>
+  
+  <maintainer email="maintainer@example.com">Your Name</maintainer>
+  <license>TODO: License declaration</license>
+  
   <buildtool_depend>ament_cmake</buildtool_depend>
-
+  
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>uav_msgs</depend>
+  <depend>pose_cov_ops</depend>
+  <depend>tf2</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>rcl_interfaces</depend>
+  <depend>eigen3_cmake_module</depend>
+  
+  <build_depend>mrpt2</build_depend>
+  <exec_depend>mrpt2</exec_depend>
+  
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
-
+  
   <export>
     <build_type>ament_cmake</build_type>
   </export>

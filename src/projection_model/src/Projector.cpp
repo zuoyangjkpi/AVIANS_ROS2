@@ -33,6 +33,14 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
   // Camera info topic
   this->declare_parameter("camera.info_topic", "/machine_1/video/camera_info");
 
+  // CRITICAL: Get and set use_sim_time parameter early to ensure consistent time handling
+  bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
+  if (use_sim_time) {
+    RCLCPP_INFO(this->get_logger(), "Using simulation time");
+  } else {
+    RCLCPP_INFO(this->get_logger(), "Using system time");
+  }
+
   // Get parameter values
   std::string projected_object_topic = this->get_parameter("projected_object_topic").as_string();
   std::string camera_debug_topic = this->get_parameter("camera_debug_topic").as_string();
@@ -64,15 +72,15 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
     camera_info_topic, 1, 
     std::bind(&Projector::cameraInfoCallback, this, std::placeholders::_1));
 
-   // Wait for camera info
+   // Wait for camera info with proper sim_time handling
+  RCLCPP_INFO(this->get_logger(), "Waiting for camera info on topic: %s", camera_info_topic.c_str());
   while (!cameraModel_.initialized() && rclcpp::ok()) {
     rclcpp::spin_some(this->get_node_base_interface());
     rclcpp::sleep_for(std::chrono::milliseconds(200));
     RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Waiting for camera info");
   }
   camera_info_sub_.reset();
-  
-
+  RCLCPP_INFO(this->get_logger(), "Camera model initialized successfully");
 
   // Interface PoseWithCovariance composition setup
   topics_ = {
@@ -82,8 +90,6 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
     topicSubInfo<int>(optical_topic, static_cast<int>(Poses::optical), 1, 1,rclcpp::SystemDefaultsQoS())
   };
   
- 
-
   // ROS2 subscribers
   detection_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
     detections_topic, 5, 
@@ -135,6 +141,10 @@ rcl_interfaces::msg::SetParametersResult Projector::parametersCallback(
     } else if (param.get_name() == "uncertainty_scale_feet") {
       feet_uncertainty_scale_ = param.as_double();
       RCLCPP_INFO(this->get_logger(), "Feet uncertainty scale updated to: %f", param.as_double());
+    } else if (param.get_name() == "use_sim_time") {
+      // Handle use_sim_time parameter changes
+      bool use_sim_time = param.as_bool();
+      RCLCPP_INFO(this->get_logger(), "use_sim_time updated to: %s", use_sim_time ? "true" : "false");
     }
   }
   
@@ -150,7 +160,6 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
   if (detectBackwardsTimeJump()) {
     return;
   }
-
 
   geometry_msgs::msg::Point pup, pzero;
   pup.z = -1.0;
@@ -255,10 +264,10 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
     // Rotate using the interface
     interface_->compose_up(center_pose, keys, detection.header.stamp, out_pose);
 
-    // Publish
+    // Publish with consistent timestamp (preserve original detection timestamp)
     geometry_msgs::msg::PoseWithCovarianceStamped out_stamped;
     out_stamped.pose = out_pose;
-    out_stamped.header.stamp = detection.header.stamp;
+    out_stamped.header.stamp = detection.header.stamp;  // Keep original timestamp for consistency
     out_stamped.header.frame_id = "world";  // world frame is hardcoded
     object_pose_pub_->publish(out_stamped);
 
@@ -271,7 +280,6 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
 #endif
   }
 }
-
 
 void Projector::interface_warning() const {
   RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 5000,
@@ -398,12 +406,17 @@ void Projector::trackerCallback(const geometry_msgs::msg::PoseWithCovarianceStam
 }
 
 bool Projector::detectBackwardsTimeJump() {
-  // In ROS2, we use rclcpp::Clock instead of ros::Time
-  // Check if using simulation time
-  rcl_clock_type_t clock_type = this->get_clock()->get_clock_type();
-  if (clock_type != RCL_ROS_TIME) {
-    return false;
+  bool using_sim_time = false;
+  try {
+    using_sim_time = this->get_parameter("use_sim_time").as_bool();
+  } catch (const rclcpp::exceptions::ParameterNotDeclaredException&) {
+    // Parameter not set, default to false
+    RCLCPP_WARN_ONCE(this->get_logger(), "use_sim_time parameter not declared - defaulting to false");
+    using_sim_time = false;
   }
+
+  if (!using_sim_time)
+    return false;
 
   rclcpp::Time current_time = this->now();
 

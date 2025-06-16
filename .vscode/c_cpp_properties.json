@@ -6,6 +6,8 @@
         "limitSymbolsToIncludedHeaders": false
       },
       "includePath": [
+        "/home/dell/drone/install/tf_from_uav_pose/include/**",
+        "/home/dell/drone/install/target_tracker_distributed_kf/include/**",
         "/home/dell/drone/install/uav_msgs/include/**",
         "/home/dell/drone/install/projection_model/include/**",
         "/home/dell/drone/install/pose_cov_ops_interface/include/**",
