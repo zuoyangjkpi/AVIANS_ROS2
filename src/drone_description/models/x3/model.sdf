@@ -37,7 +37,8 @@
         <pose>-0.2 0 0 0 0.3491 3.1415</pose>
         <always_on>1</always_on>
         <update_rate>30</update_rate>
-        <topic>camera/image_raw</topic>
+        <topic>/camera/image_raw</topic>
+        
         <camera name="camera_front">
             <horizontal_fov>1.047</horizontal_fov>
             <distortion>
@@ -60,11 +61,68 @@
             <noise>
                 <type>gaussian</type>
                 <mean>0</mean>
-                <stddev>0.01</stddev>
+                <stddev>0.005</stddev>
             </noise>
+            
+            <!-- IMPORTANT: Use the optical frame for camera data -->
+            <frame_id>X3/camera_optical_frame</frame_id>
+            <camera_info_topic>/camera/camera_info</camera_info_topic>
         </camera>
+        
+        <!-- Gazebo plugin -->
+        <plugin filename="gz-sim-camera-system" name="gz::sim::systems::Camera">
+            <topic_name>/camera/image_raw</topic_name>
+            <camera_info_topic>/camera/camera_info</camera_info_topic>
+            <frame_id>X3/camera_optical_frame</frame_id>
+        </plugin>
     </sensor>
     </link>
+
+    <link name='X3/camera_link'>
+      <pose frame=''>-0.2 0 0 0 0.3491 3.1415</pose>
+      <inertial>
+        <pose frame=''>0 0 0 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>1e-6</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1e-6</iyy>
+          <iyz>0</iyz>
+          <izz>1e-6</izz>
+        </inertia>
+      </inertial>
+    </link>
+
+    <link name='X3/camera_optical_frame'>
+      <!-- Pose calculation: base pose + optical transform -->
+      <!-- Original camera: (-0.2, 0, 0, 0, 0.3491, 3.1415) -->
+      <!-- + ROS optical: (0, 0, 0, -1.5708, 0, -1.5708) -->
+      <pose frame=''>-0.2 0 0 -1.5708 0.3491 1.5708</pose>
+      <inertial>
+        <pose frame=''>0 0 0 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>1e-6</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1e-6</iyy>
+          <iyz>0</iyz>
+          <izz>1e-6</izz>
+        </inertia>
+      </inertial>
+    </link>
+
+    <joint name='X3/camera_joint' type='fixed'>
+      <child>X3/camera_link</child>
+      <parent>X3/base_link</parent>
+    </joint>
+
+    <joint name='X3/camera_optical_joint' type='fixed'>
+      <child>X3/camera_optical_frame</child>
+      <parent>X3/camera_link</parent>
+    </joint>
+
     <link name='X3/rotor_0'>
       <pose frame=''>0.13 -0.22 0.023 0 -0 0</pose>
       <inertial>

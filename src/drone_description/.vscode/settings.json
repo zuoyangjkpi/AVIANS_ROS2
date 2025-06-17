@@ -1,0 +1,14 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/dell/drone/install/uav_msgs/lib/python3.12/site-packages",
+        "/home/dell/drone/install/person_tracker/lib/python3.12/site-packages",
+        "/home/dell/drone/install/neural_network_msgs/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/dell/drone/install/uav_msgs/lib/python3.12/site-packages",
+        "/home/dell/drone/install/person_tracker/lib/python3.12/site-packages",
+        "/home/dell/drone/install/neural_network_msgs/lib/python3.12/site-packages",
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}

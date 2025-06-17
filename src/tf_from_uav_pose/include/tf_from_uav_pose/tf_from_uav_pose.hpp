@@ -39,10 +39,14 @@ namespace tf_from_uav_pose {
         rclcpp::Publisher<uav_msgs::msg::UAVPose>::SharedPtr throttled_uav_pose_pub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr camera_pose_pub_;
         rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr cam_rgb_pose_pub_;
+        
 
         // TF Broadcasters
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         std::unique_ptr<tf2_ros::StaticTransformBroadcaster> static_tf_broadcaster_;
+
+        rclcpp::TimerBase::SharedPtr camera_pose_timer_;
+
 
         // Message storage
         geometry_msgs::msg::PoseWithCovarianceStamped std_pose_, std_raw_pose_, cam_rob_pose_, rgb_cam_pose_;
