@@ -18,8 +18,6 @@
 #include "neural_network_msgs/msg/neural_network_feedback.hpp"
 #include "neural_network_msgs/msg/neural_network_number_of_detections.hpp"
 
-
-
 namespace yolo12_detector_node
 {
 
@@ -38,6 +36,11 @@ public:
      * @brief Destructor
      */
     ~YOLO12DetectorNode() = default;
+
+    /**
+     * @brief Update timestamps after clock synchronization
+     */
+    void updateTimestampsAfterClockSync();
 
 private:
     // ROS2 Publishers and Subscribers
@@ -100,6 +103,11 @@ private:
     void initializeDetector();
 
     /**
+     * @brief Initialize timing after clock sync
+     */
+    void initializeAfterClockSync();
+
+    /**
      * @brief Image callback for processing incoming images
      * @param msg Incoming image message
      */
@@ -123,18 +131,6 @@ private:
     const cv::Size& desired_resolution,
     cv::projection2i& proj_crop,
     bool timed_out);
-
-    // /**
-    //  * @brief Convert YOLO12 detections to ROS2 detection messages
-    //  * @param detections Vector of YOLO12 detections
-    //  * @param header Message header
-    //  * @param crop_offset Offset applied due to cropping
-    //  * @return ROS2 detection array message
-    //  */
-    // neural_network_detector::msg::NeuralNetworkDetectionArray convertDetectionsToROS(
-    // const std::vector<Detection>& detections,
-    // const std_msgs::msg::Header& header,
-    //  const cv::projection2i& proj_crop);
 
     /**
      * @brief Check if feedback has timed out

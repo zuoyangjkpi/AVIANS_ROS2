@@ -89,6 +89,9 @@ namespace tf_from_uav_pose {
     public:
         TfFromUAVPose();
 
+        // NEW: Method to update timestamps after clock sync
+        void updateTimestampsAfterClockSync();
+
         // Parameter callback
         rcl_interfaces::msg::SetParametersResult parametersCallback(
             const std::vector<rclcpp::Parameter> & parameters);

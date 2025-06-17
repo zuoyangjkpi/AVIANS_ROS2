@@ -9,11 +9,14 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <ros2_utils/clock_sync.hpp>
 
-
-
 namespace tf_from_uav_pose {
 
 TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
+    
+    // CRITICAL: Declare use_sim_time parameter FIRST
+    if (!this->has_parameter("use_sim_time")) {
+        this->declare_parameter("use_sim_time", true);
+    }
     
     // Initialize parameters first
     initializeParameters();
@@ -33,7 +36,7 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
     param_callback_handle_ = this->add_on_set_parameters_callback(
         std::bind(&TfFromUAVPose::parametersCallback, this, std::placeholders::_1));
 
-    // Setup static transforms
+    // Setup static transforms (with placeholder timestamps - will be updated after clock sync)
     setupStaticTransforms();
     
     // Initialize publishers and subscribers
@@ -44,9 +47,12 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
 }
 
 void TfFromUAVPose::initializeParameters() {
-    // Declare use_sim_time parameter first - CRITICAL for time consistency
-    if (!this->has_parameter("use_sim_time")) {
-        this->declare_parameter("use_sim_time", false);
+    // Get sim time status for logging
+    bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
+    if (use_sim_time) {
+        RCLCPP_INFO(this->get_logger(), "Using simulation time");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "Using system time");
     }
     
     // Declare topic name parameters
@@ -111,14 +117,6 @@ void TfFromUAVPose::initializeParameters() {
     publish_camera_to_robot_tf_and_pose_ = this->get_parameter("camera_static_publish.publish").as_bool();
     camera_tf_parameters_ = this->get_parameter("camera_static_publish.tf_parameters").as_double_array();
 
-    // Log sim_time status
-    bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
-    if (use_sim_time) {
-        RCLCPP_INFO(this->get_logger(), "Using simulation time");
-    } else {
-        RCLCPP_INFO(this->get_logger(), "Using system time");
-    }
-
     RCLCPP_INFO(this->get_logger(), "Parameters initialized:");
     RCLCPP_INFO(this->get_logger(), "  Offset: [%.3f, %.3f, %.3f]", offset_[0], offset_[1], offset_[2]);
     RCLCPP_INFO(this->get_logger(), "  Added covariance: [%.3f, %.3f, %.3f]", 
@@ -127,54 +125,44 @@ void TfFromUAVPose::initializeParameters() {
 }
 
 void TfFromUAVPose::setupStaticTransforms() {
-    // Prepare TF Messages
+    // Prepare TF Messages with placeholder timestamps (will be updated after clock sync)
+    rclcpp::Time placeholder_time(0);
+    
     // TF from world to machine (this will be dynamic)
     tf_pose_.header.frame_id = world_frame_id_;
     tf_pose_.child_frame_id = machine_frame_id_;
 
     // TF from world_ENU to world (world_ENU will be the root of the tree)
-    tf_world_enu_.header.stamp = this->get_clock()->now();
+    tf_world_enu_.header.stamp = placeholder_time;
     tf_world_enu_.header.frame_id = world_enu_frame_id_;
     tf_world_enu_.child_frame_id = world_frame_id_;
     tf2::Quaternion q_enu;
-    q_enu.setEuler(M_PI, 0, M_PI_2);  // Changed from (0, 0, M_PI_2)
+    q_enu.setEuler(M_PI, 0, M_PI_2);
     q_enu.normalize();
     tf_world_enu_.transform.rotation = tf2::toMsg(q_enu);
 
     // TF from world to world_NWU
-    tf_world_nwu_.header.stamp = tf_world_enu_.header.stamp;
+    tf_world_nwu_.header.stamp = placeholder_time;
     tf_world_nwu_.header.frame_id = world_frame_id_;
     tf_world_nwu_.child_frame_id = world_nwu_frame_id_;
     tf2::Quaternion q_nwu;
-    q_nwu.setEuler(0, M_PI, 0);  // Changed from (0, 0, 0)
+    q_nwu.setEuler(0, M_PI, 0);
     tf_world_nwu_.transform.rotation = tf2::toMsg(q_nwu);
 
     // TF from camera to rgb optical link
-    tf_cam_rgb_.header.stamp = tf_world_enu_.header.stamp;
+    tf_cam_rgb_.header.stamp = placeholder_time;
     tf_cam_rgb_.header.frame_id = camera_frame_id_;
     tf_cam_rgb_.child_frame_id = camera_optical_frame_id_;
     tf2::Quaternion q_cr;
     q_cr.setEuler(M_PI_2, 0, M_PI_2);
     tf_cam_rgb_.transform.rotation = tf2::toMsg(q_cr);
 
-    // Collect static transforms
-    std::vector<geometry_msgs::msg::TransformStamped> static_tfs{tf_world_nwu_, tf_world_enu_, tf_cam_rgb_};
-
     // Setup camera transforms if requested
     if (publish_camera_to_robot_tf_and_pose_) {
         setupCameraTransforms();
     }
 
-    // Broadcast all static tfs
-    if (!dont_publish_tfs_ && static_tf_broadcaster_) {
-        // Add camera transform if configured
-        if (publish_camera_to_robot_tf_and_pose_) {
-            static_tfs.push_back(camera_transform_);
-        }
-        
-        static_tf_broadcaster_->sendTransform(static_tfs);
-        RCLCPP_INFO(this->get_logger(), "Published %zu static transforms", static_tfs.size());
-    }
+    RCLCPP_INFO(this->get_logger(), "Static transforms configured (timestamps will be updated after clock sync)");
 }
 
 void TfFromUAVPose::setupCameraTransforms() {
@@ -183,41 +171,33 @@ void TfFromUAVPose::setupCameraTransforms() {
         return;
     }
 
-    geometry_msgs::msg::TransformStamped tf_cam_rob_msg;
-    tf_cam_rob_msg.header.frame_id = machine_frame_id_;
-    tf_cam_rob_msg.child_frame_id = camera_frame_id_;
-    
-    // FIX: Use current time instead of static time
-    tf_cam_rob_msg.header.stamp = this->get_clock()->now();  // CHANGED FROM tf_world_enu_.header.stamp
+    // Camera transform with placeholder timestamp
+    camera_transform_.header.frame_id = machine_frame_id_;
+    camera_transform_.child_frame_id = camera_frame_id_;
+    camera_transform_.header.stamp = rclcpp::Time(0);  // Will be updated after clock sync
 
     // Set translation
-    tf_cam_rob_msg.transform.translation.x = camera_tf_parameters_[0];
-    tf_cam_rob_msg.transform.translation.y = camera_tf_parameters_[1];
-    tf_cam_rob_msg.transform.translation.z = camera_tf_parameters_[2];
+    camera_transform_.transform.translation.x = camera_tf_parameters_[0];
+    camera_transform_.transform.translation.y = camera_tf_parameters_[1];
+    camera_transform_.transform.translation.z = camera_tf_parameters_[2];
 
     // Set rotation
-    tf_cam_rob_msg.transform.rotation.x = camera_tf_parameters_[3];
-    tf_cam_rob_msg.transform.rotation.y = camera_tf_parameters_[4];
-    tf_cam_rob_msg.transform.rotation.z = camera_tf_parameters_[5];
-    tf_cam_rob_msg.transform.rotation.w = camera_tf_parameters_[6];
+    camera_transform_.transform.rotation.x = camera_tf_parameters_[3];
+    camera_transform_.transform.rotation.y = camera_tf_parameters_[4];
+    camera_transform_.transform.rotation.z = camera_tf_parameters_[5];
+    camera_transform_.transform.rotation.w = camera_tf_parameters_[6];
 
-    // Store for later static broadcast
-    camera_transform_ = tf_cam_rob_msg;
+    // Setup camera pose message with placeholder timestamp
+    cam_rob_pose_.header = camera_transform_.header;
+    cam_rob_pose_.header.stamp = rclcpp::Time(0);  // Will be updated
+    cam_rob_pose_.pose.pose.position.x = camera_transform_.transform.translation.x;
+    cam_rob_pose_.pose.pose.position.y = camera_transform_.transform.translation.y;
+    cam_rob_pose_.pose.pose.position.z = camera_transform_.transform.translation.z;
+    cam_rob_pose_.pose.pose.orientation = camera_transform_.transform.rotation;
 
-    // Setup camera pose message - FIX TIMESTAMP
-    cam_rob_pose_.header = tf_cam_rob_msg.header;
-    cam_rob_pose_.header.stamp = this->get_clock()->now();  // ADDED: Current timestamp
-    cam_rob_pose_.pose.pose.position.x = tf_cam_rob_msg.transform.translation.x;
-    cam_rob_pose_.pose.pose.position.y = tf_cam_rob_msg.transform.translation.y;
-    cam_rob_pose_.pose.pose.position.z = tf_cam_rob_msg.transform.translation.z;
-    cam_rob_pose_.pose.pose.orientation = tf_cam_rob_msg.transform.rotation;
-
-    // FIX: Properly initialize RGB camera pose
-    rgb_cam_pose_.header = tf_cam_rgb_.header;
-    rgb_cam_pose_.header.frame_id = camera_frame_id_;  // Ensure correct frame
-    rgb_cam_pose_.header.stamp = this->get_clock()->now();
-    
-    // Initialize position (was missing)
+    // Setup RGB camera pose
+    rgb_cam_pose_.header.frame_id = camera_frame_id_;
+    rgb_cam_pose_.header.stamp = rclcpp::Time(0);  // Will be updated
     rgb_cam_pose_.pose.pose.position.x = 0.0;
     rgb_cam_pose_.pose.pose.position.y = 0.0;
     rgb_cam_pose_.pose.pose.position.z = 0.0;
@@ -226,6 +206,36 @@ void TfFromUAVPose::setupCameraTransforms() {
     RCLCPP_INFO(this->get_logger(), "Camera to robot transform and poses configured");
 }
 
+void TfFromUAVPose::updateTimestampsAfterClockSync() {
+    auto current_time = this->get_clock()->now();
+    
+    RCLCPP_INFO(this->get_logger(), "Updating static transform timestamps after clock sync: %.3f", 
+               current_time.seconds());
+    
+    // Update all static transform timestamps
+    tf_world_enu_.header.stamp = current_time;
+    tf_world_nwu_.header.stamp = current_time; 
+    tf_cam_rgb_.header.stamp = current_time;
+    
+    if (publish_camera_to_robot_tf_and_pose_) {
+        camera_transform_.header.stamp = current_time;
+        cam_rob_pose_.header.stamp = current_time;
+        rgb_cam_pose_.header.stamp = current_time;
+    }
+    
+    // Re-broadcast static transforms with correct timestamps
+    if (!dont_publish_tfs_ && static_tf_broadcaster_) {
+        std::vector<geometry_msgs::msg::TransformStamped> static_tfs{
+            tf_world_nwu_, tf_world_enu_, tf_cam_rgb_
+        };
+        if (publish_camera_to_robot_tf_and_pose_) {
+            static_tfs.push_back(camera_transform_);
+        }
+        static_tf_broadcaster_->sendTransform(static_tfs);
+        RCLCPP_INFO(this->get_logger(), "Re-broadcasted %zu static transforms with synced timestamps", 
+                   static_tfs.size());
+    }
+}
 
 void TfFromUAVPose::initializePublishers() {
     // Standard pose publishers
@@ -239,7 +249,7 @@ void TfFromUAVPose::initializePublishers() {
 
     // Throttled pose publishers
     throttled_pose_.header.frame_id = world_frame_id_;
-    throttled_pose_.header.stamp = this->get_clock()->now();
+    throttled_pose_.header.stamp = rclcpp::Time(0);  // Will be updated
     throttled_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
         throttled_pose_topic_name_, 10);
     throttled_uav_pose_pub_ = this->create_publisher<uav_msgs::msg::UAVPose>(
@@ -255,17 +265,20 @@ void TfFromUAVPose::initializePublishers() {
         cam_rgb_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             cam_rgb_pose_topic, rclcpp::QoS(1).transient_local());
 
-         // FIX: Timer to continuously publish camera poses with updated timestamps
-            camera_pose_timer_ = this->create_wall_timer(
+        // Timer to continuously publish camera poses with updated timestamps
+        camera_pose_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(100),  // 10 Hz
             [this]() {
-                if (camera_pose_pub_) {
-                    cam_rob_pose_.header.stamp = this->get_clock()->now();
-                    camera_pose_pub_->publish(cam_rob_pose_);
-                }
-                if (cam_rgb_pose_pub_) {
-                    rgb_cam_pose_.header.stamp = this->get_clock()->now();
-                    cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+                auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
+                if (current_time.nanoseconds() > 0) {
+                    if (camera_pose_pub_) {
+                        cam_rob_pose_.header.stamp = current_time;
+                        camera_pose_pub_->publish(cam_rob_pose_);
+                    }
+                    if (cam_rgb_pose_pub_) {
+                        rgb_cam_pose_.header.stamp = current_time;
+                        cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+                    }
                 }
             });
             
@@ -291,6 +304,12 @@ void TfFromUAVPose::initializeSubscribers() {
 }
 
 void TfFromUAVPose::poseCallback(const uav_msgs::msg::UAVPose::SharedPtr msg) {
+    // Validate timestamp
+    if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in pose message");
+        return;
+    }
+    
     // Copy contents to std pose msg
     std_pose_.header.stamp = msg->header.stamp;
     std_pose_.pose.pose.position = msg->position;
@@ -348,6 +367,12 @@ void TfFromUAVPose::poseCallback(const uav_msgs::msg::UAVPose::SharedPtr msg) {
 }
 
 void TfFromUAVPose::rawPoseCallback(const uav_msgs::msg::UAVPose::SharedPtr msg) {
+    // Validate timestamp
+    if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in raw pose message");
+        return;
+    }
+    
     // Copy contents to std pose msg
     std_raw_pose_.header.stamp = msg->header.stamp;
     std_raw_pose_.pose.pose.position = msg->position;
@@ -453,7 +478,7 @@ void uavCovariance_to_rosCovariance(const uav_msgs::msg::UAVPose::SharedPtr uav_
     }
 }
 
-} // namespace tf_from_uav_pose_ros2
+} // namespace tf_from_uav_pose
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
@@ -461,7 +486,9 @@ int main(int argc, char **argv) {
     auto node = std::make_shared<tf_from_uav_pose::TfFromUAVPose>();
     
     WAIT_FOR_CLOCK_DELAYED(node);
-
+    
+    // CRITICAL: Update timestamps after clock sync
+    node->updateTimestampsAfterClockSync();
 
     rclcpp::spin(node);
 

@@ -1,10 +1,22 @@
 #include "drone_state_publisher/drone_state_publisher.hpp"
 #include <ros2_utils/clock_sync.hpp>
 
-
 namespace drone_state_publisher {
 
 DroneStatePublisher::DroneStatePublisher() : Node("drone_state_publisher") {
+    
+    // CRITICAL: Declare use_sim_time parameter FIRST
+    if (!this->has_parameter("use_sim_time")) {
+        this->declare_parameter("use_sim_time", false);
+    }
+    
+    // Log sim time status
+    bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
+    if (use_sim_time) {
+        RCLCPP_INFO(this->get_logger(), "Using simulation time");
+    } else {
+        RCLCPP_INFO(this->get_logger(), "Using system time");
+    }
     
     // Declare parameters
     this->declare_parameter("optimal_distance", 4.0);
@@ -68,7 +80,19 @@ void DroneStatePublisher::initializeConstantCovariance() {
     constant_covariance_[99] = 0.001; // qz variance
 }
 
+bool DroneStatePublisher::validateTimestamp(const rclcpp::Time& timestamp)  {
+    // Use const_cast to work with the shared_ptr requirement
+    auto drone_ptr = std::static_pointer_cast<DroneStatePublisher>(shared_from_this());
+    return ros2_utils::ClockSynchronizer::validateTimestamp(drone_ptr, timestamp);
+}
+
 void DroneStatePublisher::droneOdomCallback(const nav_msgs::msg::Odometry::SharedPtr msg) {
+    // Validate timestamp
+    if (!validateTimestamp(rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in odometry message");
+        return;
+    }
+    
     current_drone_odom_ = msg;
     
     // Publish BOTH UAV pose topics whenever we get new odometry
@@ -82,6 +106,12 @@ void DroneStatePublisher::droneOdomCallback(const nav_msgs::msg::Odometry::Share
 }
 
 void DroneStatePublisher::targetPoseCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+    // Validate timestamp
+    if (!validateTimestamp(rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in target pose message");
+        return;
+    }
+    
     current_target_pose_ = msg;
     
     // Publish waypoint if we have drone odometry
@@ -91,10 +121,22 @@ void DroneStatePublisher::targetPoseCallback(const geometry_msgs::msg::PoseWithC
 }
 
 void DroneStatePublisher::targetTwistCallback(const geometry_msgs::msg::TwistWithCovarianceStamped::SharedPtr msg) {
+    // Validate timestamp
+    if (!validateTimestamp(rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in target twist message");
+        return;
+    }
+    
     current_target_twist_ = msg;
 }
 
 void DroneStatePublisher::targetOffsetCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
+    // Validate timestamp
+    if (!validateTimestamp(rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in target offset message");
+        return;
+    }
+    
     current_target_offset_ = msg;
 }
 
@@ -214,7 +256,7 @@ void DroneStatePublisher::publishTargetWaypoint() {
 
 geometry_msgs::msg::PoseStamped DroneStatePublisher::calculateOptimalViewingPose() {
     auto waypoint = geometry_msgs::msg::PoseStamped();
-    waypoint.header.stamp = this->get_clock()->now();
+    waypoint.header.stamp = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
     waypoint.header.frame_id = "world";
     
     // Target position
@@ -273,8 +315,8 @@ int main(int argc, char** argv) {
     
     auto node = std::make_shared<drone_state_publisher::DroneStatePublisher>();
     
-
     WAIT_FOR_CLOCK_DELAYED(node);
+    
     RCLCPP_INFO(node->get_logger(), "Starting Drone State Publisher Node...");
     rclcpp::spin(node);
     

@@ -13,6 +13,13 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
   last_feedback_time_(this->get_clock()->now()),
   last_detection_time_(this->get_clock()->now())
 {
+
+
+
+      // CRITICAL: Declare use_sim_time parameter FIRST
+    if (!this->has_parameter("use_sim_time")) {
+        this->declare_parameter("use_sim_time", false);
+    }
     // Initialize parameters
     initializeParameters();
     
@@ -26,6 +33,10 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     RCLCPP_INFO(this->get_logger(), "Allocated buffers: final_img=%zu bytes, results=%zu bytes", 
                 length_final_img_, length_final_img_);
+
+
+    // NOTE: Initialize timing variables with placeholder - will be updated after clock sync
+    initializeAfterClockSync();
     
     // Create subscribers
     image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
@@ -60,6 +71,30 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     }
     
     RCLCPP_INFO(this->get_logger(), "YOLO12 Detector Node initialized successfully");
+}
+
+
+// NEW: Method to update timing after clock sync
+void YOLO12DetectorNode::initializeAfterClockSync() {
+    // This will be called after clock sync in main()
+    // For now, just log that we're ready
+    RCLCPP_DEBUG(this->get_logger(), "Ready for clock sync initialization");
+}
+
+// NEW: Method to update timestamps after clock sync
+void YOLO12DetectorNode::updateTimestampsAfterClockSync() {
+    auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
+    
+    if (current_time.nanoseconds() > 0) {
+        last_feedback_time_ = current_time;
+        last_detection_time_ = current_time;
+        
+        RCLCPP_INFO(this->get_logger(), 
+                   "Updated internal timestamps after clock sync: %.3f", 
+                   current_time.seconds());
+    } else {
+        RCLCPP_WARN(this->get_logger(), "Cannot update timestamps - invalid clock time");
+    }
 }
 
 void YOLO12DetectorNode::initializeParameters()
@@ -146,6 +181,12 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
 {
     if (!msg) {
         RCLCPP_WARN(this->get_logger(), "Invalid ImageConstPtr received, not handled.");
+        return;
+    }
+
+     // Validate timestamp
+    if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in image message");
         return;
     }
 
@@ -399,6 +440,13 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
 void YOLO12DetectorNode::feedbackCallback(
     const neural_network_msgs::msg::NeuralNetworkFeedback::SharedPtr msg)
 {
+
+     // Validate timestamp
+    if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in feedback message");
+        return;
+    }
+
     latest_feedback_ = *msg;
     feedback_received_ = true;
     last_feedback_time_ = this->get_clock()->now();
@@ -558,6 +606,9 @@ int main(int argc, char** argv) {
             rclcpp::NodeOptions()
         );
         WAIT_FOR_CLOCK_DELAYED(node);
+        
+        // CRITICAL: Update timestamps after clock sync
+        node->updateTimestampsAfterClockSync();
 
         RCLCPP_INFO(node->get_logger(), "Starting YOLO12 Detector Node...");
         rclcpp::spin(node);

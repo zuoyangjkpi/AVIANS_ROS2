@@ -56,6 +56,9 @@ private:
     void publishTargetWaypoint();
     geometry_msgs::msg::PoseStamped calculateOptimalViewingPose();
     void initializeConstantCovariance();
+    
+    // NEW: Timestamp validation
+    bool validateTimestamp(const rclcpp::Time& timestamp) ;
 };
 
 } // namespace drone_state_publisher

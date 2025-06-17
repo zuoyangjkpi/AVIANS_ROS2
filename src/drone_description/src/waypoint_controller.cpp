@@ -8,11 +8,22 @@
 #include <Eigen/Dense>
 #include <ros2_utils/clock_sync.hpp>
 
-
-
 class waypoint_controller : public rclcpp::Node {
 public:
   waypoint_controller() : Node("waypoint_controller") {
+    // CRITICAL: Declare use_sim_time parameter FIRST
+    if (!this->has_parameter("use_sim_time")) {
+      this->declare_parameter("use_sim_time", false);
+    }
+    
+    // Log sim time status
+    bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
+    if (use_sim_time) {
+      RCLCPP_INFO(this->get_logger(), "Using simulation time");
+    } else {
+      RCLCPP_INFO(this->get_logger(), "Using system time");
+    }
+    
     // Parameters
     declare_parameter("max_horizontal_speed", 1.0);
     declare_parameter("max_vertical_speed", 0.5);
@@ -38,6 +49,12 @@ public:
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       odom_topic, 10,
       [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
+        // Validate timestamp
+        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in odometry");
+          return;
+        }
+        
         current_odom_ = msg;
         odom_received_ = true;
         if (target_received_) compute_body_frame_velocity();
@@ -46,6 +63,12 @@ public:
     target_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       "/target_waypoint", 10,
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        // Validate timestamp
+        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+          RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in waypoint");
+          return;
+        }
+        
         if (target_received_) {
           auto dt = (now() - previous_target_time_).seconds();
           if (dt > 0.01) {
@@ -90,6 +113,10 @@ public:
           cmd_vel_pub_->publish(geometry_msgs::msg::Twist());
         }
       });
+      
+    // Initialize timing variables with safe values
+    last_yaw_error_time_ = rclcpp::Time(0);
+    previous_target_time_ = rclcpp::Time(0);
   }
 
 private:
@@ -149,8 +176,12 @@ private:
     while (yaw_error < -M_PI) yaw_error += 2.0 * M_PI;
 
     double yaw_rate = 0.0;
-    if (last_yaw_error_time_.nanoseconds() > 0) {
-      double dt = (now() - last_yaw_error_time_).seconds();
+    auto current_time = this->get_clock()->now();
+    
+    // Validate timing for derivative calculation
+    if (last_yaw_error_time_.nanoseconds() > 0 && 
+        ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), current_time)) {
+      double dt = (current_time - last_yaw_error_time_).seconds();
       if (dt > 0.01) {
         yaw_rate = (yaw_error - last_yaw_error_) / dt;
       }
@@ -163,7 +194,7 @@ private:
       get_parameter("max_yaw_rate").as_double());
     
     last_yaw_error_ = yaw_error;
-    last_yaw_error_time_ = now();
+    last_yaw_error_time_ = current_time;
 
     // Position control
     if (!get_parameter("pure_tracking_mode").as_bool() || distance > tolerance) {
@@ -214,7 +245,10 @@ private:
 int main(int argc, char * argv[]) {
   rclcpp::init(argc, argv);
   auto node = std::make_shared<waypoint_controller>();
+  
   WAIT_FOR_CLOCK_DELAYED(node);
+  
+  RCLCPP_INFO(node->get_logger(), "Waypoint controller started with synchronized clock");
   rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;

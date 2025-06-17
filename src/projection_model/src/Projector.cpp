@@ -7,11 +7,15 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <ros2_utils/clock_sync.hpp>
 
-
 namespace model_distance_from_height {
 
-Projector::Projector() : Node("model_distance_from_height_node"), last_time_(this->get_clock()->now()) {
+Projector::Projector() : Node("model_distance_from_height_node"), last_time_(rclcpp::Time(0)) {
   using namespace pose_cov_ops::interface;
+
+  // CRITICAL: Declare use_sim_time parameter FIRST
+  if (!this->has_parameter("use_sim_time")) {
+    this->declare_parameter("use_sim_time", true);
+  }
 
   // Declare and get parameters
   this->declare_parameter("projected_object_topic", "/machine_1/object_detections/projected_to_world");
@@ -35,7 +39,7 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
   // Camera info topic
   this->declare_parameter("camera.info_topic", "/machine_1/video/camera_info");
 
-  // CRITICAL: Get and set use_sim_time parameter early to ensure consistent time handling
+  // Get use_sim_time status for logging
   bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
   if (use_sim_time) {
     RCLCPP_INFO(this->get_logger(), "Using simulation time");
@@ -44,23 +48,23 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
   }
 
   // Get parameter values
-  std::string projected_object_topic = this->get_parameter("projected_object_topic").as_string();
-  std::string camera_debug_topic = this->get_parameter("camera_debug_topic").as_string();
-  std::string detections_topic = this->get_parameter("detections_topic").as_string();
-  std::string tracker_topic = this->get_parameter("tracker_topic").as_string();
-  std::string offset_topic = this->get_parameter("offset_topic").as_string();
-  std::string feedback_topic = this->get_parameter("feedback_topic").as_string();
+  projected_object_topic_ = this->get_parameter("projected_object_topic").as_string();
+  camera_debug_topic_ = this->get_parameter("camera_debug_topic").as_string();
+  detections_topic_ = this->get_parameter("detections_topic").as_string();
+  tracker_topic_ = this->get_parameter("tracker_topic").as_string();
+  offset_topic_ = this->get_parameter("offset_topic").as_string();
+  feedback_topic_ = this->get_parameter("feedback_topic").as_string();
   
-  std::string robot_topic = this->get_parameter("topics.robot").as_string();
-  std::string camera_topic = this->get_parameter("topics.camera").as_string();
-  std::string optical_topic = this->get_parameter("topics.optical").as_string();
+  robot_topic_ = this->get_parameter("topics.robot").as_string();
+  camera_topic_ = this->get_parameter("topics.camera").as_string();
+  optical_topic_ = this->get_parameter("topics.optical").as_string();
   
   double height_model_mean = this->get_parameter("height_model_mean").as_double();
   double height_model_var = this->get_parameter("height_model_var").as_double();
   head_uncertainty_scale_ = this->get_parameter("uncertainty_scale_head").as_double();
   feet_uncertainty_scale_ = this->get_parameter("uncertainty_scale_feet").as_double();
   
-  std::string camera_info_topic = this->get_parameter("camera.info_topic").as_string();
+  camera_info_topic_ = this->get_parameter("camera.info_topic").as_string();
 
   // Model configuration
   projectionModel_ = std::make_unique<Model3D>(height_model_mean, height_model_var);
@@ -69,13 +73,17 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
   param_callback_handle_ = this->add_on_set_parameters_callback(
     std::bind(&Projector::parametersCallback, this, std::placeholders::_1));
 
+  RCLCPP_INFO(this->get_logger(), "Projector node constructed - call init() next");
+}
+
+void Projector::init() {
   // Camera information subscriber - keep active until camera model is initialized
   camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-    camera_info_topic, 1, 
+    camera_info_topic_, 1, 
     std::bind(&Projector::cameraInfoCallback, this, std::placeholders::_1));
 
    // Wait for camera info with proper sim_time handling
-  RCLCPP_INFO(this->get_logger(), "Waiting for camera info on topic: %s", camera_info_topic.c_str());
+  RCLCPP_INFO(this->get_logger(), "Waiting for camera info on topic: %s", camera_info_topic_.c_str());
   while (!cameraModel_.initialized() && rclcpp::ok()) {
     rclcpp::spin_some(this->get_node_base_interface());
     rclcpp::sleep_for(std::chrono::milliseconds(200));
@@ -84,43 +92,49 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
   camera_info_sub_.reset();
   RCLCPP_INFO(this->get_logger(), "Camera model initialized successfully");
 
-  // Interface PoseWithCovariance composition setup
+  // Setup interface configuration
   topics_ = {
-    topicSubInfo<int>(robot_topic, static_cast<int>(Poses::robot), 2000, 50, 
+    pose_cov_ops::interface::topicSubInfo<int>(robot_topic_, static_cast<int>(Poses::robot), 2000, 50, 
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    topicSubInfo<int>(offset_topic, static_cast<int>(Poses::gpsoffset), 2000, 50, 
+    pose_cov_ops::interface::topicSubInfo<int>(offset_topic_, static_cast<int>(Poses::gpsoffset), 2000, 50, 
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    topicSubInfo<int>(camera_topic, static_cast<int>(Poses::camera), 1, 1, 
+    pose_cov_ops::interface::topicSubInfo<int>(camera_topic_, static_cast<int>(Poses::camera), 1, 1, 
                      rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    topicSubInfo<int>(optical_topic, static_cast<int>(Poses::optical), 1, 1, 
+    pose_cov_ops::interface::topicSubInfo<int>(optical_topic_, static_cast<int>(Poses::optical), 1, 1, 
                      rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable))
-};
+  };
+
+  // NOW it's safe to call shared_from_this() - Initialize interface
+  interface_ = std::make_unique<pose_cov_ops::interface::Interface<int>>(topics_, shared_from_this());
   
   // ROS2 subscribers
   detection_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
-    detections_topic, 5, 
+    detections_topic_, 5, 
     std::bind(&Projector::detectionCallback3D, this, std::placeholders::_1));
 
   tracker_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(
-    tracker_topic, 5,
+    tracker_topic_, 5,
     std::bind(&Projector::trackerCallback, this, std::placeholders::_1));
 
   // ROS2 publishers
   object_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-    projected_object_topic, 10);
+    projected_object_topic_, 10);
     
   camera_debug_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-    camera_debug_topic, 10);
+    camera_debug_topic_, 10);
     
   feedback_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkFeedback>(
-    feedback_topic, 5);
+    feedback_topic_, 5);
 
-#ifdef DEBUG_PUBLISHERS
+// #ifdef DEBUG_PUBLISHERS
   debug_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "debug/model_distance_from_height/debugPose", 10);
-#endif
+// #endif
 
-  RCLCPP_INFO(this->get_logger(), "Projector node initialized");
+  // Update timestamps after clock sync
+  updateTimestampsAfterClockSync();
+
+  RCLCPP_INFO(this->get_logger(), "Projector node fully initialized");
 }
 
 void Projector::cameraInfoCallback(const sensor_msgs::msg::CameraInfo::SharedPtr msg) {
@@ -172,10 +186,10 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
   geometry_msgs::msg::PoseWithCovariance vec_zero, vec_up, out_pose;
 
   const static std::vector<int> keys{
-    static_cast<int>(Poses::gpsoffset), 
-    static_cast<int>(Poses::robot), 
-    static_cast<int>(Poses::camera), 
-    static_cast<int>(Poses::optical)
+    (int)(Poses::gpsoffset), 
+    (int)(Poses::robot), 
+    (int)(Poses::camera), 
+    (int)(Poses::optical)
   };
 
   // Covariance matrix indices
@@ -277,13 +291,13 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
     out_stamped.header.frame_id = "world";  // world frame is hardcoded
     object_pose_pub_->publish(out_stamped);
 
-#ifdef DEBUG_PUBLISHERS
+// #ifdef DEBUG_PUBLISHERS
     geometry_msgs::msg::PoseWithCovarianceStamped debug_pose_stamped;
     debug_pose_stamped.pose = vec_up;
     debug_pose_stamped.header.stamp = detection.header.stamp;
     debug_pose_stamped.header.frame_id = "machine_1_camera_rgb_optical_link";
-    // debug_pub_->publish(debug_pose_stamped);
-#endif
+    debug_pub_->publish(debug_pose_stamped);
+// #endif
   }
 }
 
@@ -294,9 +308,6 @@ void Projector::interface_warning() const {
     "2) There is a large time offset between different cache keys while composing; this can be caused by a node crash OR "
     "not setting the parameter use_sim_time true while using offline data - static TFs might be using rclcpp::Clock::now() "
     "and normal topics will use the stamps from when they were produced");
-  
-  // For debug stream output, you might need to implement operator<< for the interface
-  // RCLCPP_DEBUG_STREAM_THROTTLE(this->get_logger(), *this->get_clock(), 500, *interface_);
 }
 
 void Projector::trackerCallback(const geometry_msgs::msg::PoseWithCovarianceStamped::SharedPtr msg) {
@@ -400,15 +411,6 @@ void Projector::trackerCallback(const geometry_msgs::msg::PoseWithCovarianceStam
     camera_pose_stamped.header.frame_id = "world";
     camera_debug_pub_->publish(camera_pose_stamped);
   }
-
-#ifdef DEBUG_PUBLISHERS
-  // Note: ymin_pose variable was not defined in original, might need fixing
-  // geometry_msgs::msg::PoseWithCovarianceStamped debug_pose_stamped;
-  // debug_pose_stamped.pose.pose = ymin_pose;
-  // debug_pose_stamped.header.stamp = msg->header.stamp;
-  // debug_pose_stamped.header.frame_id = "machine_1_camera_rgb_optical_link";
-  // debug_pub_->publish(debug_pose_stamped);
-#endif
 }
 
 bool Projector::detectBackwardsTimeJump() {
@@ -437,12 +439,20 @@ bool Projector::detectBackwardsTimeJump() {
   return false;
 }
 
-void Projector::init()
-{
-  // Now it is safe to call shared_from_this()
-  interface_ = std::make_unique<pose_cov_ops::interface::Interface<int>>(topics_, shared_from_this());
-
-  // Other initializations that require shared_from_this() can be done here
+void Projector::updateTimestampsAfterClockSync() {
+  auto current_time = this->get_clock()->now();
+  
+  if (current_time.nanoseconds() > 0) {
+    RCLCPP_INFO(this->get_logger(), "Updating internal timestamps after clock sync: %.3f", 
+               current_time.seconds());
+    
+    // Update last_time_ to prevent false backwards time jump detection
+    last_time_ = current_time;
+    
+    RCLCPP_INFO(this->get_logger(), "Internal timestamps updated successfully");
+  } else {
+    RCLCPP_WARN(this->get_logger(), "Cannot update timestamps - invalid clock time");
+  }
 }
 
 } // namespace model_distance_from_height
@@ -453,12 +463,9 @@ int main(int argc, char **argv)
 
   auto node = std::make_shared<model_distance_from_height::Projector>();
 
-
   WAIT_FOR_CLOCK_DELAYED(node);
 
-  node->init();  // Now safe to call shared_from_this()
-  
-  
+  node->init();  // Now safe to call shared_from_this() and update timestamps
 
   rclcpp::spin(node);
 

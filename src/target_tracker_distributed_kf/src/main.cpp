@@ -11,9 +11,11 @@ int main(int argc, char** argv) {
     
     auto node = std::make_shared<target_tracker_distributed_kf::DistributedKF3D>();
     
-    RCLCPP_INFO(node->get_logger(), "DistributedKF3D node started");
+    RCLCPP_INFO(node->get_logger(), "DistributedKF3D node created");
 
     WAIT_FOR_CLOCK_DELAYED(node);
+
+    RCLCPP_INFO(node->get_logger(), "DistributedKF3D node started with synchronized clock");
 
     rclcpp::spin(node);
     rclcpp::shutdown();
