@@ -7,7 +7,6 @@
       },
       "includePath": [
         "/home/dell/drone/install/tf_from_uav_pose_ros2/include/**",
-        "/home/dell/drone/install/tf_from_uav_pose/include/**",
         "/home/dell/drone/install/target_tracker_distributed_kf/include/**",
         "/home/dell/drone/install/drone_state_publisher/include/**",
         "/home/dell/drone/install/uav_msgs/include/**",

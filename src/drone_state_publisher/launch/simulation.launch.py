@@ -314,6 +314,7 @@ def generate_launch_description():
             'topics.camera': "/machine_1/camera/pose",
             'topics.optical': "/machine_1/camera/pose_optical",
             
+            
             # Model parameters
             'height_model_mean': 1.8,
             'height_model_var': 1.0,
@@ -438,26 +439,27 @@ def generate_launch_description():
         # ]),
         
         # Core nodes
-        # TimerAction(period=5.0, actions=[
+        TimerAction(period=5.0, actions=[
             tf_from_uav_pose_node,
             drone_state_publisher_node,
-        # ]),
+            yolo_detector_node,
+            projector_node,
+            distributed_kf_node,
+            waypoint_controller,
+
+        ]),
         
         # Detection and tracking
         # TimerAction(period=8.0, actions=[
-            yolo_detector_node,
         # ]),
         
         # TimerAction(period=12.0, actions=[
-            projector_node,
         # ]),
         
         # TimerAction(period=15.0, actions=[
-            distributed_kf_node,
         # ]),
         
         # TimerAction(period=18.0, actions=[
-            waypoint_controller,
         # ]),
         
         # Visualization last

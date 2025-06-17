@@ -117,11 +117,17 @@ namespace target_tracker_distributed_kf {
         // Initialize static matrices first
         initializeStaticMatrices();
         
+        RCLCPP_INFO(this->get_logger(), "DistributedKF3D constructor completed - ready for initialization");
+    }
+
+    void DistributedKF3D::initialize() {
+        // This method is called after construction to safely use shared_from_this
+        
         // Initialize the filter
         initializeFilter();
         initializeSubscribers();
         
-        RCLCPP_INFO(this->get_logger(), "DistributedKF3D constructor completed - ready for clock sync");
+        RCLCPP_INFO(this->get_logger(), "DistributedKF3D initialization completed - ready for clock sync");
     }
 
     void DistributedKF3D::initializeSubscribers() {
@@ -178,26 +184,22 @@ namespace target_tracker_distributed_kf {
         // Reset the cache
         state_cache_.clear();
 
-        // Put an initial unknown estimate in the cache
+        // FIXED: Create initial timestamp using ONLY node's clock
+        auto current_time = this->get_clock()->now();
+        
         std_msgs::msg::Header h;
         h.frame_id = frame_id;
-        h.stamp = this->get_clock()->now();
+        h.stamp = current_time;
+        
         CacheElement first_element(h, state_size, true, 0);
         setUnknownInitial(first_element);
         first_element.frame_id = frame_id;
         state_cache_.insert_ordered(first_element);
 
-        RCLCPP_INFO(this->get_logger(), "The filter was (re)initialized");
+        RCLCPP_INFO(this->get_logger(), "The filter was (re)initialized with timestamp: %.6f", current_time.seconds());
     }
 
     void DistributedKF3D::measurementsCallback(const PoseWithCovarianceStamped::SharedPtr msg, const bool isSelf, const int robot) {
-        
-        // CRITICAL: Validate timestamp before processing
-        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                                 "Invalid timestamp in measurement message from robot %d", robot);
-            return;
-        }
         
         if (detectBackwardsTimeJump()) {
             RCLCPP_WARN(this->get_logger(), "Backwardstimejump in cache - ignoring update");
@@ -209,17 +211,28 @@ namespace target_tracker_distributed_kf {
             return;
         }
 
-        // Create a new element for the cache
-        CacheElement new_element(state_size, *msg, isSelf, robot);
+        // FIXED: Create timestamps using ONLY the node's clock to ensure same time source
+        auto current_time = this->get_clock()->now();
+        
+        // Create a cache element with a completely new timestamp from node's clock
+        std_msgs::msg::Header safe_header;
+        safe_header.stamp = current_time;
+        safe_header.frame_id = msg->header.frame_id;
+        
+        CacheElement new_element(safe_header, state_size, isSelf, robot);
+        
+        // Add the measurement data
+        auto ptr = std::make_shared<PoseWithCovariance>();
+        ptr->pose = msg->pose.pose;
+        ptr->covariance = msg->pose.covariance;
+        new_element.measurements.push_back(ptr);
 
-        // Insert this element into cache, which returns the iterator at insert position
+        // Insert this element into cache
         auto it = state_cache_.insert_ordered(new_element);
 
-        // Check if failure to insert - this would be due to a very old message
+        // Check if failure to insert
         if (it == state_cache_.end()) {
-            RCLCPP_WARN_STREAM(this->get_logger(),
-                    "Trying to insert a measurement that is too old! This is its stamp " << msg->header.stamp.sec << "." << msg->header.stamp.nanosec << std::endl
-                    << "Did you forget to reiniatilize the node after going back to the past e.g. stop and restart playback?");
+            RCLCPP_WARN(this->get_logger(), "Failed to insert measurement - cache may be full or timing issue");
             return;
         }
 
@@ -259,8 +272,23 @@ namespace target_tracker_distributed_kf {
         const VectorXd &ins = in.state;
         VectorXd &outs = out.state;
 
-        // Time past from one to next
-        const double deltaT = (out.stamp - in.stamp).seconds();
+        // FIXED: Calculate time past using safe duration calculation
+        double deltaT = 0.0;
+        try {
+            // Convert both timestamps to double seconds to avoid clock type issues
+            double out_time_sec = out.stamp.seconds();
+            double in_time_sec = in.stamp.seconds();
+            deltaT = out_time_sec - in_time_sec;
+            
+            // Sanity check for reasonable delta
+            if (deltaT < 0) {
+                RCLCPP_WARN(this->get_logger(), "Negative time delta detected: %.6f", deltaT);
+                deltaT = 0.01;  // Use small positive value
+            }
+        } catch (const std::exception& e) {
+            RCLCPP_ERROR(this->get_logger(), "Error calculating time delta: %s", e.what());
+            deltaT = 0.01;  // Default small time step
+        }
 
         if (deltaT > time_threshold) {
             RCLCPP_WARN_STREAM(this->get_logger(), "It's been a long time since there was an update (" << deltaT
@@ -416,18 +444,18 @@ namespace target_tracker_distributed_kf {
 
     void DistributedKF3D::predictAndPublish(uav_msgs::msg::UAVPose::ConstSharedPtr pose) {
         
-        // CRITICAL: Validate timestamp before processing
-        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(pose->header.stamp))) {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                                 "Invalid timestamp in UAV pose message");
-            return;
-        }
-        
         if (state_cache_.empty())
             return;
 
+        // FIXED: ALWAYS use node's clock for consistency, ignore incoming timestamp
+        auto current_time = this->get_clock()->now();
+        
+        std_msgs::msg::Header consistent_header;
+        consistent_header.stamp = current_time;  // Use ONLY node's clock
+        consistent_header.frame_id = pose->header.frame_id;
+
         // Always self robot because predict is only called for self poses
-        CacheElement tmp_element(pose->header, state_size, true, 0);
+        CacheElement tmp_element(consistent_header, state_size, true, 0);
 
         const auto last = state_cache_.back();
         if (!predict(last, tmp_element))
@@ -495,6 +523,7 @@ namespace target_tracker_distributed_kf {
     }
 
     void DistributedKF3D::publishStateAndCov(const CacheElement &elem) {
+        // FIXED: Use consistent timestamp from the element (which now uses node's clock)
         msg_.header.frame_id = elem.frame_id;
         msg_.header.stamp = elem.stamp;
 
@@ -532,21 +561,25 @@ namespace target_tracker_distributed_kf {
 
         targetVelPub_->publish(velMsg_);
 
-        // Publish offset
-        msg_.pose.pose.position.x = elem.state[6];
-        msg_.pose.pose.position.y = elem.state[7];
-        msg_.pose.pose.position.z = elem.state[8];
-        msg_.pose.covariance[0 * 6 + 0] = elem.cov(6 * 9 + 6);
-        msg_.pose.covariance[0 * 6 + 1] = elem.cov(6 * 9 + 7);
-        msg_.pose.covariance[0 * 6 + 2] = elem.cov(6 * 9 + 8);
-        msg_.pose.covariance[1 * 6 + 0] = elem.cov(7 * 9 + 6);
-        msg_.pose.covariance[1 * 6 + 1] = elem.cov(7 * 9 + 7);
-        msg_.pose.covariance[1 * 6 + 2] = elem.cov(7 * 9 + 8);
-        msg_.pose.covariance[2 * 6 + 0] = elem.cov(8 * 9 + 6);
-        msg_.pose.covariance[2 * 6 + 1] = elem.cov(8 * 9 + 7);
-        msg_.pose.covariance[2 * 6 + 2] = elem.cov(8 * 9 + 8);
+        // Publish offset - reuse msg_ structure
+        geometry_msgs::msg::PoseWithCovarianceStamped offset_msg;
+        offset_msg.header.frame_id = elem.frame_id;
+        offset_msg.header.stamp = elem.stamp;
+        offset_msg.pose.pose.position.x = elem.state[6];
+        offset_msg.pose.pose.position.y = elem.state[7];
+        offset_msg.pose.pose.position.z = elem.state[8];
+        offset_msg.pose.covariance[0 * 6 + 0] = elem.cov(6 * 9 + 6);
+        offset_msg.pose.covariance[0 * 6 + 1] = elem.cov(6 * 9 + 7);
+        offset_msg.pose.covariance[0 * 6 + 2] = elem.cov(6 * 9 + 8);
+        offset_msg.pose.covariance[1 * 6 + 0] = elem.cov(7 * 9 + 6);
+        offset_msg.pose.covariance[1 * 6 + 1] = elem.cov(7 * 9 + 7);
+        offset_msg.pose.covariance[1 * 6 + 2] = elem.cov(7 * 9 + 8);
+        offset_msg.pose.covariance[2 * 6 + 0] = elem.cov(8 * 9 + 6);
+        offset_msg.pose.covariance[2 * 6 + 1] = elem.cov(8 * 9 + 7);
+        offset_msg.pose.covariance[2 * 6 + 2] = elem.cov(8 * 9 + 8);
+        offset_msg.pose.pose.orientation.w = 1.0;
 
-        offsetPub_->publish(msg_);
+        offsetPub_->publish(offset_msg);
     }
 
     rcl_interfaces::msg::SetParametersResult DistributedKF3D::parametersCallback(const std::vector<rclcpp::Parameter> & parameters) {

@@ -98,9 +98,9 @@ void Projector::init() {
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
     pose_cov_ops::interface::topicSubInfo<int>(offset_topic_, static_cast<int>(Poses::gpsoffset), 2000, 50, 
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    pose_cov_ops::interface::topicSubInfo<int>(camera_topic_, static_cast<int>(Poses::camera), 1, 1, 
+    pose_cov_ops::interface::topicSubInfo<int>(camera_topic_, static_cast<int>(Poses::camera), 2000, 50, 
                      rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    pose_cov_ops::interface::topicSubInfo<int>(optical_topic_, static_cast<int>(Poses::optical), 1, 1, 
+    pose_cov_ops::interface::topicSubInfo<int>(optical_topic_, static_cast<int>(Poses::optical), 2000, 50, 
                      rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable))
   };
 

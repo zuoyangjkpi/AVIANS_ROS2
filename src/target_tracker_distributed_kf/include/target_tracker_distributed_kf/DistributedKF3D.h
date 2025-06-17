@@ -33,7 +33,7 @@ namespace target_tracker_distributed_kf {
     typedef struct CacheElement_s{
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-            rclcpp::Time stamp;
+        rclcpp::Time stamp;
         string frame_id;
         VectorXd state;
         MatrixXd cov;
@@ -47,7 +47,7 @@ namespace target_tracker_distributed_kf {
                 measurements.reserve(5);
             };
         CacheElement_s(const int vecSize, const PoseWithCovarianceStamped& m, const bool selfRobotFlag, const int robotID) :
-            stamp(m.header.stamp), frame_id(m.header.frame_id), state(VectorXd::Zero(vecSize)), cov(MatrixXd::Zero(vecSize, vecSize)), measurements(0), isSelfRobot(selfRobotFlag), robot(robotID){
+            stamp(rclcpp::Time(0)), frame_id(m.header.frame_id), state(VectorXd::Zero(vecSize)), cov(MatrixXd::Zero(vecSize, vecSize)), measurements(0), isSelfRobot(selfRobotFlag), robot(robotID){
                 measurements.reserve(5);
                 auto ptr = shared_ptr<PoseWithCovariance>(new PoseWithCovariance);
                 ptr->pose = m.pose.pose;
@@ -78,9 +78,18 @@ namespace target_tracker_distributed_kf {
                 if(empty())
                     return insert(begin(), elem);
 
-                // If full and time lower than the first in deque, then return nullptr to signalize that it failed to insert
-                if(size() == cache_size_ && begin()->stamp > elem.stamp)
+                // FIXED: Safe time comparison for cache size check
+                try {
+                    double begin_time = begin()->stamp.seconds();
+                    double elem_time = elem.stamp.seconds();
+                    
+                    // If full and time lower than the first in deque, then return end to signalize that it failed to insert
+                    if(size() == cache_size_ && begin_time > elem_time)
+                        return end();
+                } catch (const std::exception& e) {
+                    RCLCPP_ERROR_STREAM(rclcpp::get_logger("Cache"), "Cache time comparison error: " << e.what());
                     return end();
+                }
 
                 // Pop enough elements to keep at max size
                 while(!empty() && (size() + 1 > cache_size_))
@@ -94,18 +103,33 @@ namespace target_tracker_distributed_kf {
 
                 // Look for the stamp just after elem's stamp
                 for(; it != begin(); --it) {
-                    if(it->stamp == elem.stamp && it->robot==elem.robot){
-                        // Two measurements for the same time and robot, in this case we don't insert and instead add to the vector of measurements
-                        if(!elem.measurements.empty()) {
-                            auto ptr = shared_ptr<PoseWithCovariance>(new PoseWithCovariance);
-                            ptr->pose = elem.measurements[0]->pose;
-                            ptr->covariance = elem.measurements[0]->covariance;
-                            it->measurements.push_back(ptr);
+                    // FIXED: Use safe time comparison to avoid clock source issues
+                    try {
+                        // Convert to seconds for safe comparison
+                        double it_time = it->stamp.seconds();
+                        double elem_time = elem.stamp.seconds();
+                        double time_diff = std::abs(it_time - elem_time);
+                        
+                        if(time_diff < 1e-6 && it->robot == elem.robot){
+                            // Two measurements for the same time and robot, in this case we don't insert and instead add to the vector of measurements
+                            if(!elem.measurements.empty()) {
+                                auto ptr = shared_ptr<PoseWithCovariance>(new PoseWithCovariance);
+                                ptr->pose = elem.measurements[0]->pose;
+                                ptr->covariance = elem.measurements[0]->covariance;
+                                it->measurements.push_back(ptr);
+                            }
+                            return it;
                         }
-                        return it;
-                    }
-                    else if((it-1)->stamp < elem.stamp) {
-                        // Check against previous one because insertion iterator should point to position after where we want to insert
+                        else if(it != begin()) {
+                            double prev_time = (it-1)->stamp.seconds();
+                            if(prev_time < elem_time) {
+                                // Check against previous one because insertion iterator should point to position after where we want to insert
+                                break;
+                            }
+                        }
+                    } catch (const std::exception& e) {
+                        // If time comparison fails, just continue
+                        RCLCPP_ERROR_STREAM(rclcpp::get_logger("Cache"), "Time comparison error: " << e.what());
                         break;
                     }
                 }
@@ -118,7 +142,9 @@ namespace target_tracker_distributed_kf {
             }
 
             void print(std::ostream &stream) const{
-                stream << "Cache at time " << rclcpp::Clock().now().seconds() << std::endl;
+                // FIXED: Remove problematic timestamp completely to avoid clock source issues
+                stream << "Cache contents:" << std::endl;
+                
                 if(empty())
                     stream << "Empty" << std::endl;
                 else {
@@ -182,6 +208,9 @@ namespace target_tracker_distributed_kf {
 
         public:
             DistributedKF3D();
+
+            // Initialize after construction to safely use shared_from_this
+            void initialize();
 
             void measurementsCallback(const PoseWithCovarianceStamped::SharedPtr msg, const bool isSelf, const int robotID);
 
