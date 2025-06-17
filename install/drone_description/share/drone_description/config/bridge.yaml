@@ -47,7 +47,13 @@
 #   gz_topic_name: "/tf_static"
 #   ros_type_name: "tf2_msgs/msg/TFMessage"
 #   gz_type_name: "gz.msgs.Pose_V"
-#   direction: GZ_TO_ROS
+#   direction: BIDIRECTIONAL
+#   qos:
+#     durability: TRANSIENT_LOCAL
+#     reliability: RELIABLE
+#     history: KEEP_LAST
+#     depth: 1
+
 
   # topics:
   # - topic: /world/default/pose

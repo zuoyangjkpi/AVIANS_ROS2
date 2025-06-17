@@ -15,7 +15,7 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
     
     // CRITICAL: Declare use_sim_time parameter FIRST
     if (!this->has_parameter("use_sim_time")) {
-        this->declare_parameter("use_sim_time", true);
+        this->declare_parameter("use_sim_time", false);
     }
     
     // Initialize parameters first
@@ -27,7 +27,14 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
                    pose_topic_name_.c_str(), world_frame_id_.c_str(), machine_frame_id_.c_str());
         
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-        static_tf_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(*this);
+         rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1))
+                      .transient_local()
+                      .reliable();
+    
+        static_tf_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(
+            *this,  // The node reference
+            qos      // QoS settings
+        );
     } else {
         RCLCPP_INFO(this->get_logger(), "Requested to not publish TFs - Publishing only poses!");
     }
@@ -150,7 +157,7 @@ void TfFromUAVPose::setupStaticTransforms() {
     tf_world_nwu_.transform.rotation = tf2::toMsg(q_nwu);
 
     // TF from camera to rgb optical link
-    tf_cam_rgb_.header.stamp = placeholder_time;
+    tf_cam_rgb_.header.stamp = tf_world_enu_.header.stamp;
     tf_cam_rgb_.header.frame_id = camera_frame_id_;
     tf_cam_rgb_.child_frame_id = camera_optical_frame_id_;
     tf2::Quaternion q_cr;

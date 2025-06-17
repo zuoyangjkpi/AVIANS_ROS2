@@ -14,7 +14,7 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(rcl
 
   // CRITICAL: Declare use_sim_time parameter FIRST
   if (!this->has_parameter("use_sim_time")) {
-    this->declare_parameter("use_sim_time", true);
+    this->declare_parameter("use_sim_time", false);
   }
 
   // Declare and get parameters
@@ -106,7 +106,31 @@ void Projector::init() {
 
   // NOW it's safe to call shared_from_this() - Initialize interface
   interface_ = std::make_unique<pose_cov_ops::interface::Interface<int>>(topics_, shared_from_this());
-  
+  RCLCPP_INFO(this->get_logger(), "Waiting for camera poses to be available...");
+rclcpp::Time start_wait = this->get_clock()->now();
+while (rclcpp::ok()) {
+    try {
+        // Try to get camera pose - this will throw if not available
+        geometry_msgs::msg::PoseWithCovariance test_pose;
+        if (interface_->compose_up(geometry_msgs::msg::Point(), 
+                                  static_cast<int>(Poses::camera), 
+                                  this->get_clock()->now(), test_pose)) {
+            RCLCPP_INFO(this->get_logger(), "Camera poses available, proceeding with initialization");
+            break;
+        }
+    } catch (const std::exception& e) {
+        // Expected during startup
+    }
+    
+    rclcpp::spin_some(this->get_node_base_interface());
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    
+    // Timeout after 10 seconds
+    if ((this->get_clock()->now() - start_wait).seconds() > 10.0) {
+        RCLCPP_WARN(this->get_logger(), "Timeout waiting for camera poses - proceeding anyway");
+        break;
+    }
+}
   // ROS2 subscribers
   detection_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
     detections_topic_, 5, 
@@ -126,10 +150,10 @@ void Projector::init() {
   feedback_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkFeedback>(
     feedback_topic_, 5);
 
-// #ifdef DEBUG_PUBLISHERS
+#ifdef DEBUG_PUBLISHERS
   debug_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
     "debug/model_distance_from_height/debugPose", 10);
-// #endif
+#endif
 
   // Update timestamps after clock sync
   updateTimestampsAfterClockSync();
@@ -291,13 +315,13 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
     out_stamped.header.frame_id = "world";  // world frame is hardcoded
     object_pose_pub_->publish(out_stamped);
 
-// #ifdef DEBUG_PUBLISHERS
+#ifdef DEBUG_PUBLISHERS
     geometry_msgs::msg::PoseWithCovarianceStamped debug_pose_stamped;
     debug_pose_stamped.pose = vec_up;
     debug_pose_stamped.header.stamp = detection.header.stamp;
     debug_pose_stamped.header.frame_id = "machine_1_camera_rgb_optical_link";
     debug_pub_->publish(debug_pose_stamped);
-// #endif
+#endif
   }
 }
 

@@ -51,9 +51,9 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr camera_debug_pub_;
     rclcpp::Publisher<neural_network_msgs::msg::NeuralNetworkFeedback>::SharedPtr feedback_pub_;
 
-// #ifdef DEBUG_PUBLISHERS
+#ifdef DEBUG_PUBLISHERS
     rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr debug_pub_;
-// #endif
+#endif
 
     // Parameter callback
     rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;

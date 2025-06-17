@@ -22,6 +22,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <pose_cov_ops/pose_cov_ops.h>
+#include <ros2_utils/clock_sync.hpp>  // ADDED: For clock synchronization utilities
 
 namespace target_tracker_distributed_kf {
 

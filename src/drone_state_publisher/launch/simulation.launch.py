@@ -99,16 +99,16 @@ def generate_launch_description():
     # =============================================================================
     
     # Map Gazebo base frame to ROS robot frame
-    # base_to_machine_tf = Node(
-    #     package="tf2_ros",
-    #     executable="static_transform_publisher",
-    #     arguments=["0", "0", "0", "0", "0", "0", "1", "X3/base_link", "machine_1"],
-    #     parameters=[get_base_params()],
-    #     output="screen",
-    #     name="base_to_machine_tf"
-    # )
+    base_to_machine_tf = Node(
+        package="tf2_ros",
+        executable="static_transform_publisher",
+        arguments=["0", "0", "0", "0", "0", "0", "1", "X3/base_link", "machine_1"],
+        parameters=[get_base_params()],
+        output="screen",
+        name="base_to_machine_tf"
+    )
     
-    # # Map Gazebo camera link to ROS camera frame
+    # Map Gazebo camera link to ROS camera frame
     # camera_link_tf = Node(
     #     package="tf2_ros", 
     #     executable="static_transform_publisher",
@@ -118,7 +118,7 @@ def generate_launch_description():
     #     name="camera_link_tf"
     # )
     
-    # # Map Gazebo optical frame to ROS optical frame (MOST CRITICAL)
+    # Map Gazebo optical frame to ROS optical frame (MOST CRITICAL)
     # optical_frame_tf = Node(
     #     package="tf2_ros",
     #     executable="static_transform_publisher", 
@@ -128,7 +128,7 @@ def generate_launch_description():
     #     name="optical_frame_tf"
     # )
     
-    # # World frame setup
+    # World frame setup
     # world_tf = Node(
     #     package="tf2_ros",
     #     executable="static_transform_publisher",
@@ -159,6 +159,66 @@ def generate_launch_description():
     # 4. TF TRANSFORM PUBLISHER (FIXED FRAME NAMES)
     # =============================================================================
     
+#     tf_from_uav_pose_node = Node(
+#     package='tf_from_uav_pose_ros2',
+#     executable='tf_from_uav_pose_node',
+#     name='tf_from_uav_pose',
+#     output='screen',
+#     parameters=[{
+#         **get_base_params(),
+        
+#         # Topic mapping
+#         'pose_topic_name': '/machine_1/pose',
+#         'raw_pose_topic_name': '/machine_1/pose/raw', 
+#         'std_pose_topic_name': '/machine_1/pose/corr/std',
+#         'std_raw_pose_topic_name': '/machine_1/pose/raww/std',
+        
+#         # Frame IDs to match the SDF camera frames
+#         'machine_frame_id': 'X3/base_link',
+#         'world_frame_id': 'world',
+#         'camera_frame_id': 'X3/camera_link',
+#         'camera_rgb_optical_frame_id': 'X3/camera_optical_frame',
+        
+#         # Let Gazebo handle camera transforms through SDF
+#         'camera_static_publish.publish': False,
+#         'camera_static_publish.topic': '/machine_1/camera/pose',
+#         'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
+#     }]
+# )
+
+    # Static transforms to map Gazebo frames to expected ROS frames
+    # gazebo_to_ros_base_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     arguments=["0", "0", "0", "0", "0", "0", "1", "X3/base_link", "machine_1"],
+    #     parameters=[get_base_params()],
+    #     output="screen",
+    #     name="gazebo_to_ros_base_tf"
+    # )
+
+    # Map the tilted optical frame to expected ROS frame name
+    # camera_optical_tf = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher", 
+    #     arguments=["0", "0", "0", "0", "0", "0", "1", "X3/camera_optical_frame", "machine_1_camera_rgb_optical_link"],
+    #     parameters=[get_base_params()],
+    #     output="screen",
+    #     name="gazebo_to_ros_camera_optical_tf"
+    # )
+
+    # Also create a manual camera pose publisher for the projection model
+    # This publishes the camera pose in world coordinates for the projector to use
+    # camera_pose_publisher = Node(
+    #     package="tf2_ros",
+    #     executable="static_transform_publisher",
+    #     arguments=[
+    #         "0.2", "0", "0",           # Camera position: 0.2m forward
+    #         "0", "0.5236", "0", "1"    # Camera orientation: 30° pitch down (quaternion approximation)
+    #     ],
+    #     parameters=[get_base_params()],
+    #     output="screen",
+    #     name="camera_pose_static_tf"
+    # )
     tf_from_uav_pose_node = Node(
         package='tf_from_uav_pose_ros2',
         executable='tf_from_uav_pose_node',
@@ -180,10 +240,11 @@ def generate_launch_description():
             'camera_rgb_optical_frame_id': 'machine_1_camera_rgb_optical_link',  # Matches optical_frame_tf
             
             # Camera static transform (from machine_1 to camera)
+            'dont_publish_tfs': False, 
             'camera_static_publish.publish': True,
             'camera_static_publish.tf_parameters': [
-                -0.2, 0.0, 0.0,                    # Position from SDF
-                0.0, 0.173648, 0.0, 0.984808       # Rotation from SDF (20 degrees pitch)
+                0.2, 0.0, 0.0,                    # Position from SDF
+                0.0, 0.2588, 0.0, 0.9659      # Rotation from SDF (20 degrees pitch)
             ],
             'camera_static_publish.topic': '/machine_1/camera/pose',
             'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
@@ -262,6 +323,7 @@ def generate_launch_description():
             # Camera info
             'camera.info_topic': "/camera/camera_info"
         }],
+        # arguments=['--ros-args', '--log-level', 'DEBUG'],  # ← Add this line
         output='screen'
     )
 
@@ -322,12 +384,12 @@ def generate_launch_description():
         parameters=[{
             **get_base_params(),
             'max_horizontal_speed': 1.0,
-            'max_vertical_speed': 0.5,
+            'max_vertical_speed': 0.8,
             'max_yaw_rate': 0.5,
-            'waypoint_tolerance': 0.15,
+            'waypoint_tolerance': 0.05,
             'yaw_p_gain': 0.3,
             'yaw_d_gain': 0.1,
-            'prediction_time': 0.5,
+            'prediction_time': 1.0,
             'enable_debug': True,
             'pure_tracking_mode': False,
             'cmd_vel_topic': '/X3/cmd_vel',
@@ -386,9 +448,9 @@ def generate_launch_description():
             yolo_detector_node,
         # ]),
         
-        TimerAction(period=5.0, actions=[
+        # TimerAction(period=12.0, actions=[
             projector_node,
-        ]),
+        # ]),
         
         # TimerAction(period=15.0, actions=[
             distributed_kf_node,

@@ -1,13 +1,13 @@
 //
 // Created by glawless on 23.05.17.
 // Migrated to ROS2
+// FIXED: Added proper clock synchronization and timestamp validation
 //
 
 #include <mrpt/math/distributions.h>
 #include <target_tracker_distributed_kf/DistributedKF3D.h>
+#include <ros2_utils/clock_sync.hpp>
 #include <cmath>
-
-
 
 namespace target_tracker_distributed_kf {
 
@@ -18,6 +18,19 @@ namespace target_tracker_distributed_kf {
     Hself((int) measurement_state_size, (int) state_size),
     Hother((int) measurement_state_size, (int) state_size),
     R((int) state_size, (int) state_size) {
+        
+        // CRITICAL: Declare use_sim_time parameter FIRST before anything else
+        if (!this->has_parameter("use_sim_time")) {
+            this->declare_parameter("use_sim_time", true);
+        }
+        
+        // Log sim time status for debugging
+        bool use_sim_time = this->get_parameter("use_sim_time").as_bool();
+        if (use_sim_time) {
+            RCLCPP_INFO(this->get_logger(), "Using simulation time");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Using system time");
+        }
         
         // Declare all parameters with default values
         this->declare_parameter("initialUncertaintyPosXY", initialUncertaintyPosXY);
@@ -107,6 +120,8 @@ namespace target_tracker_distributed_kf {
         // Initialize the filter
         initializeFilter();
         initializeSubscribers();
+        
+        RCLCPP_INFO(this->get_logger(), "DistributedKF3D constructor completed - ready for clock sync");
     }
 
     void DistributedKF3D::initializeSubscribers() {
@@ -176,6 +191,14 @@ namespace target_tracker_distributed_kf {
     }
 
     void DistributedKF3D::measurementsCallback(const PoseWithCovarianceStamped::SharedPtr msg, const bool isSelf, const int robot) {
+        
+        // CRITICAL: Validate timestamp before processing
+        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+                                 "Invalid timestamp in measurement message from robot %d", robot);
+            return;
+        }
+        
         if (detectBackwardsTimeJump()) {
             RCLCPP_WARN(this->get_logger(), "Backwardstimejump in cache - ignoring update");
             return;
@@ -392,6 +415,14 @@ namespace target_tracker_distributed_kf {
     }
 
     void DistributedKF3D::predictAndPublish(uav_msgs::msg::UAVPose::ConstSharedPtr pose) {
+        
+        // CRITICAL: Validate timestamp before processing
+        if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(pose->header.stamp))) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+                                 "Invalid timestamp in UAV pose message");
+            return;
+        }
+        
         if (state_cache_.empty())
             return;
 
@@ -610,4 +641,5 @@ namespace target_tracker_distributed_kf {
         time = this->get_clock()->now();
         return false;
     }
+
 }
