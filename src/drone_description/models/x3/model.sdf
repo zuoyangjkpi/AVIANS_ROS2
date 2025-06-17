@@ -1,6 +1,8 @@
 <sdf version='1.6'>
   <model name='X3'>
     <pose>0 0 0.053302 0 0 0</pose>
+
+    
     <link name='X3/base_link'>
       <pose frame=''>0 0 0 0 -0 0</pose>
       <inertial>
@@ -33,8 +35,28 @@
         </geometry>
       </visual>
 
-      <sensor name="camera_front" type="camera">
-        <pose>-0.2 0 0 0 0.3491 3.1415</pose>
+     
+    </link>
+
+
+
+    <link name='X3/camera_link'>
+      <pose frame=''>-0.2 0 0 0 0.3491 3.1415</pose>
+      <inertial>
+        <pose frame=''>0 0 0 0 0 0</pose>
+        <mass>0.001</mass>
+        <inertia>
+          <ixx>1e-6</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>1e-6</iyy>
+          <iyz>0</iyz>
+          <izz>1e-6</izz>
+        </inertia>
+      </inertial>
+
+       <sensor name="camera_front" type="camera">
+        <pose>0 0 0 0 0 0</pose>
         <always_on>1</always_on>
         <update_rate>30</update_rate>
         <topic>/camera/image_raw</topic>
@@ -69,29 +91,8 @@
             <camera_info_topic>/camera/camera_info</camera_info_topic>
         </camera>
         
-        <!-- Gazebo plugin -->
-        <plugin filename="gz-sim-camera-system" name="gz::sim::systems::Camera">
-            <topic_name>/camera/image_raw</topic_name>
-            <camera_info_topic>/camera/camera_info</camera_info_topic>
-            <frame_id>X3/camera_optical_frame</frame_id>
-        </plugin>
-    </sensor>
-    </link>
 
-    <link name='X3/camera_link'>
-      <pose frame=''>-0.2 0 0 0 0.3491 3.1415</pose>
-      <inertial>
-        <pose frame=''>0 0 0 0 0 0</pose>
-        <mass>0.001</mass>
-        <inertia>
-          <ixx>1e-6</ixx>
-          <ixy>0</ixy>
-          <ixz>0</ixz>
-          <iyy>1e-6</iyy>
-          <iyz>0</iyz>
-          <izz>1e-6</izz>
-        </inertia>
-      </inertial>
+    </sensor>
     </link>
 
     <link name='X3/camera_optical_frame'>

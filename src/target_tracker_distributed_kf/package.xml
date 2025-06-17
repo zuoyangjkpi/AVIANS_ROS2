@@ -19,7 +19,9 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>rcl_interfaces</depend>
   <depend>eigen3_cmake_module</depend>
-  
+  <depend>ros2_utils</depend>
+
+
   <build_depend>mrpt2</build_depend>
   <exec_depend>mrpt2</exec_depend>
   

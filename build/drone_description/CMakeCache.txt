@@ -487,6 +487,9 @@ rmw_implementation_DIR:PATH=/opt/ros/jazzy/share/rmw_implementation/cmake
 //The directory containing a CMake configuration file for rmw_implementation_cmake.
 rmw_implementation_cmake_DIR:PATH=/opt/ros/jazzy/share/rmw_implementation_cmake/cmake
 
+//The directory containing a CMake configuration file for ros2_utils.
+ros2_utils_DIR:PATH=/home/dell/drone/install/ros2_utils/share/ros2_utils/cmake
+
 //The directory containing a CMake configuration file for rosgraph_msgs.
 rosgraph_msgs_DIR:PATH=/opt/ros/jazzy/share/rosgraph_msgs/cmake
 

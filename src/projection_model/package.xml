@@ -23,7 +23,9 @@
   <depend>rcl_interfaces</depend>
   <build_depend>neural_network_msgs</build_depend>
   <exec_depend>neural_network_msgs</exec_depend> 
-  
+  <depend>ros2_utils</depend>
+
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
   

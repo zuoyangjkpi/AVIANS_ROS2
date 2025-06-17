@@ -71,7 +71,7 @@ namespace tf_from_uav_pose {
         std::string world_enu_frame_id_{"world_ENU"};
         std::string world_nwu_frame_id_{"world_NWU"};
         std::string camera_frame_id_{"xtion_depth_frame"};
-        std::string camera_rgb_optical_frame_id_{"xtion_depth_optical_frame"};
+        std::string camera_optical_frame_id_{"xtion_depth_optical_frame"};
 
         // Topic names
         std::string pose_topic_name_{"/machine_1/pose"};

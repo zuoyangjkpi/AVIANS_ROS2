@@ -22,6 +22,7 @@ find_package(OpenCV REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(pose_cov_ops_interface REQUIRED)
 find_package(rcl_interfaces REQUIRED)
+find_package(ros2_utils REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -49,6 +50,7 @@ ament_target_dependencies(${PROJECT_NAME}_node
   tf2_geometry_msgs
   pose_cov_ops_interface
   rcl_interfaces
+  ros2_utils
 )
 
 # Dependencies for the library
@@ -63,6 +65,7 @@ ament_target_dependencies(${PROJECT_NAME}
   tf2_geometry_msgs
   pose_cov_ops_interface
   rcl_interfaces
+  ros2_utils
 )
 
 # Link OpenCV libraries
@@ -113,6 +116,7 @@ ament_export_dependencies(
   tf2_geometry_msgs
   pose_cov_ops
   rcl_interfaces
+  ros2_utils
 )
 
 # Testing

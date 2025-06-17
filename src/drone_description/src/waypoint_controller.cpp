@@ -6,6 +6,9 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <Eigen/Dense>
+#include <ros2_utils/clock_sync.hpp>
+
+
 
 class waypoint_controller : public rclcpp::Node {
 public:
@@ -210,7 +213,9 @@ private:
 
 int main(int argc, char * argv[]) {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<waypoint_controller>());
+  auto node = std::make_shared<waypoint_controller>();
+  WAIT_FOR_CLOCK_DELAYED(node);
+  rclcpp::spin(node);
   rclcpp::shutdown();
   return 0;
 }

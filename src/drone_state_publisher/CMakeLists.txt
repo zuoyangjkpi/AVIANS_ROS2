@@ -13,6 +13,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(uav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(ros2_utils REQUIRED)
 
 # Include directories
 include_directories(include)
@@ -30,6 +31,7 @@ ament_target_dependencies(drone_state_publisher_node
   uav_msgs
   tf2
   tf2_geometry_msgs
+  ros2_utils
 )
 
 # Install targets

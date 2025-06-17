@@ -16,6 +16,7 @@ find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(neural_network_msgs REQUIRED)
+find_package(ros2_utils REQUIRED)
 
 
 include_directories(include)
@@ -45,6 +46,7 @@ ament_target_dependencies(yolo12_detector_node
   neural_network_msgs
   OpenCV
   rclcpp_components
+  ros2_utils
 )
 
 ament_export_include_directories(include)
@@ -62,6 +64,7 @@ ament_export_dependencies(
   cv_bridge
   nav_msgs
   OpenCV
+  ros2_utils
 )
 
 # Link ONNX Runtime libraries to your executable

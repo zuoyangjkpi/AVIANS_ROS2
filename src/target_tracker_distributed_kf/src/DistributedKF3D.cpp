@@ -7,6 +7,8 @@
 #include <target_tracker_distributed_kf/DistributedKF3D.h>
 #include <cmath>
 
+
+
 namespace target_tracker_distributed_kf {
 
     static const std::string world_frame{"world"};
@@ -164,7 +166,7 @@ namespace target_tracker_distributed_kf {
         // Put an initial unknown estimate in the cache
         std_msgs::msg::Header h;
         h.frame_id = frame_id;
-        h.stamp = this->now();
+        h.stamp = this->get_clock()->now();
         CacheElement first_element(h, state_size, true, 0);
         setUnknownInitial(first_element);
         first_element.frame_id = frame_id;
@@ -596,16 +598,16 @@ namespace target_tracker_distributed_kf {
         if (!using_sim_time)
             return false;
 
-        static auto time = this->now();
+        static auto time = this->get_clock()->now();
 
-        if (this->now() < time) {
+        if (this->get_clock()->now() < time) {
             // Jump backwards detected, reset interface
             RCLCPP_WARN(this->get_logger(), "Backwards jump in time detected, performing reset");
             initializeFilter();
-            time = this->now();
+            time = this->get_clock()->now();
             return true;
         }
-        time = this->now();
+        time = this->get_clock()->now();
         return false;
     }
 }

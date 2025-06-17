@@ -22,6 +22,8 @@
   <depend>rclcpp_components</depend>
   <build_depend>neural_network_msgs</build_depend>
   <exec_depend>neural_network_msgs</exec_depend> 
+  <depend>ros2_utils</depend>
+
 
 
 

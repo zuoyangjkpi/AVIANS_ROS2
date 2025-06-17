@@ -98,6 +98,7 @@ waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_typesupport_introspe
 waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_typesupport_introspection_cpp.so
 waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_typesupport_cpp.so
 waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_generator_py.so
+waypoint_controller: /opt/ros/jazzy/lib/librclcpp.so
 waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_typesupport_c.so
 waypoint_controller: /opt/ros/jazzy/lib/libnav_msgs__rosidl_generator_c.so
 waypoint_controller: /usr/lib/x86_64-linux-gnu/liborocos-kdl.so

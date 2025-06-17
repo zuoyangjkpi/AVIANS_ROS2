@@ -1,4 +1,6 @@
 #include "neural_network_detector/yolo12_detector_node.hpp"
+#include <ros2_utils/clock_sync.hpp>
+
 
 namespace yolo12_detector_node
 {
@@ -8,8 +10,8 @@ static const int color_channels = 3;
 YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
 : Node("yolo12_detector_node", options),
   feedback_received_(false),
-  last_feedback_time_(this->now()),
-  last_detection_time_(this->now())
+  last_feedback_time_(this->get_clock()->now()),
+  last_detection_time_(this->get_clock()->now())
 {
     // Initialize parameters
     initializeParameters();
@@ -555,7 +557,8 @@ int main(int argc, char** argv) {
         auto node = std::make_shared<yolo12_detector_node::YOLO12DetectorNode>(
             rclcpp::NodeOptions()
         );
-        
+        WAIT_FOR_CLOCK_DELAYED(node);
+
         RCLCPP_INFO(node->get_logger(), "Starting YOLO12 Detector Node...");
         rclcpp::spin(node);
     } catch (const std::exception& e) {

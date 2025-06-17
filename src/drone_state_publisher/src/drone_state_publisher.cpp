@@ -1,4 +1,6 @@
 #include "drone_state_publisher/drone_state_publisher.hpp"
+#include <ros2_utils/clock_sync.hpp>
+
 
 namespace drone_state_publisher {
 
@@ -138,6 +140,7 @@ void DroneStatePublisher::publishRawUAVPose() {
         uav_pose.poi.z = 0.0;
     }
     
+    uav_pose.header.frame_id = "world";
     uav_raw_pose_pub_->publish(uav_pose);
 }
 
@@ -196,6 +199,7 @@ void DroneStatePublisher::publishUAVPose() {
         uav_pose.poi.z = 0.0;
     }
     
+    uav_pose.header.frame_id = "world";
     uav_pose_pub_->publish(uav_pose);
 }
 
@@ -210,7 +214,7 @@ void DroneStatePublisher::publishTargetWaypoint() {
 
 geometry_msgs::msg::PoseStamped DroneStatePublisher::calculateOptimalViewingPose() {
     auto waypoint = geometry_msgs::msg::PoseStamped();
-    waypoint.header.stamp = this->now();
+    waypoint.header.stamp = this->get_clock()->now();
     waypoint.header.frame_id = "world";
     
     // Target position
@@ -269,6 +273,8 @@ int main(int argc, char** argv) {
     
     auto node = std::make_shared<drone_state_publisher::DroneStatePublisher>();
     
+
+    WAIT_FOR_CLOCK_DELAYED(node);
     RCLCPP_INFO(node->get_logger(), "Starting Drone State Publisher Node...");
     rclcpp::spin(node);
     

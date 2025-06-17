@@ -16,6 +16,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(ros2_utils REQUIRED)
 
 # Find MRPT
 find_package(mrpt-math REQUIRED)
@@ -45,6 +46,7 @@ ament_target_dependencies(${PROJECT_NAME}
   tf2
   tf2_geometry_msgs
   rcl_interfaces
+  ros2_utils
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -111,6 +113,7 @@ ament_export_dependencies(
   tf2
   tf2_geometry_msgs
   rcl_interfaces
+  ros2_utils
 )
 
 ament_export_include_directories(include)

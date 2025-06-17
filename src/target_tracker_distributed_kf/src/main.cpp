@@ -4,6 +4,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <target_tracker_distributed_kf/DistributedKF3D.h>
+#include <ros2_utils/clock_sync.hpp>
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
@@ -11,7 +12,9 @@ int main(int argc, char** argv) {
     auto node = std::make_shared<target_tracker_distributed_kf::DistributedKF3D>();
     
     RCLCPP_INFO(node->get_logger(), "DistributedKF3D node started");
-    
+
+    WAIT_FOR_CLOCK_DELAYED(node);
+
     rclcpp::spin(node);
     rclcpp::shutdown();
     

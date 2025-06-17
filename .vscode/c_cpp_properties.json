@@ -12,8 +12,9 @@
         "/home/dell/drone/install/drone_state_publisher/include/**",
         "/home/dell/drone/install/uav_msgs/include/**",
         "/home/dell/drone/install/projection_model/include/**",
-        "/home/dell/drone/install/pose_cov_ops_interface/include/**",
         "/home/dell/drone/install/neural_network_detector/include/**",
+        "/home/dell/drone/install/ros2_utils/include/**",
+        "/home/dell/drone/install/pose_cov_ops_interface/include/**",
         "/home/dell/drone/install/neural_network_msgs/include/**",
         "/opt/ros/jazzy/include/**",
         "/home/dell/drone/src/drone_description/include/**",
@@ -21,6 +22,7 @@
         "/home/dell/drone/src/neural_network_detector/include/**",
         "/home/dell/drone/src/pose_cov_ops_interface/include/**",
         "/home/dell/drone/src/projection_model/include/**",
+        "/home/dell/drone/src/ros2_utils/include/**",
         "/home/dell/drone/src/target_tracker_distributed_kf/include/**",
         "/home/dell/drone/src/tf_from_uav_pose/include/**",
         "/usr/include/**"

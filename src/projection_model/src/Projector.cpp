@@ -5,10 +5,12 @@
 
 #include <projection_model/Projector.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <ros2_utils/clock_sync.hpp>
+
 
 namespace model_distance_from_height {
 
-Projector::Projector() : Node("model_distance_from_height_node"), last_time_(this->now()) {
+Projector::Projector() : Node("model_distance_from_height_node"), last_time_(this->get_clock()->now()) {
   using namespace pose_cov_ops::interface;
 
   // Declare and get parameters
@@ -84,11 +86,15 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(thi
 
   // Interface PoseWithCovariance composition setup
   topics_ = {
-    topicSubInfo<int>(robot_topic, static_cast<int>(Poses::robot), 2000, 50,rclcpp::SystemDefaultsQoS()),
-    topicSubInfo<int>(offset_topic, static_cast<int>(Poses::gpsoffset), 2000, 50,rclcpp::SystemDefaultsQoS()),
-    topicSubInfo<int>(camera_topic, static_cast<int>(Poses::camera), 1, 1,rclcpp::SystemDefaultsQoS()),
-    topicSubInfo<int>(optical_topic, static_cast<int>(Poses::optical), 1, 1,rclcpp::SystemDefaultsQoS())
-  };
+    topicSubInfo<int>(robot_topic, static_cast<int>(Poses::robot), 2000, 50, 
+                     rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
+    topicSubInfo<int>(offset_topic, static_cast<int>(Poses::gpsoffset), 2000, 50, 
+                     rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
+    topicSubInfo<int>(camera_topic, static_cast<int>(Poses::camera), 1, 1, 
+                     rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable)),
+    topicSubInfo<int>(optical_topic, static_cast<int>(Poses::optical), 1, 1, 
+                     rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable))
+};
   
   // ROS2 subscribers
   detection_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
@@ -418,7 +424,7 @@ bool Projector::detectBackwardsTimeJump() {
   if (!using_sim_time)
     return false;
 
-  rclcpp::Time current_time = this->now();
+  rclcpp::Time current_time = this->get_clock()->now();
 
   if (current_time < last_time_) {
     // Jump backwards detected, reset interface
@@ -447,7 +453,12 @@ int main(int argc, char **argv)
 
   auto node = std::make_shared<model_distance_from_height::Projector>();
 
+
+  WAIT_FOR_CLOCK_DELAYED(node);
+
   node->init();  // Now safe to call shared_from_this()
+  
+  
 
   rclcpp::spin(node);
 

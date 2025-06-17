@@ -14,7 +14,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(uav_msgs REQUIRED)
-
+find_package(ros2_utils REQUIRED)
 # Note: MRPT dependencies removed to avoid compatibility issues
 
 # Include directories
@@ -34,6 +34,7 @@ ament_target_dependencies(tf_from_uav_pose_node
   tf2_ros
   tf2_geometry_msgs
   uav_msgs
+  ros2_utils
 )
 
 # Install targets

@@ -36,10 +36,17 @@ def generate_launch_description():
         neural_network_detector_dir, "YOLOs-CPP", "models", "coco.names"
     )
 
-    # Launch arguments
+    # IMPORTANT: Launch arguments - use_sim_time controls clock behavior
     declare_use_sim_time = DeclareLaunchArgument(
-        'use_sim_time', default_value='true',
-        description='Use simulation time for all nodes'
+        'use_sim_time', 
+        default_value='true',  # CRITICAL: Must be true for simulation
+        description='Use simulation time for all nodes - REQUIRED for proper clock sync'
+    )
+    
+    declare_clock_timeout = DeclareLaunchArgument(
+        'clock_timeout',
+        default_value='30.0',
+        description='Timeout in seconds for waiting for simulation clock'
     )
     
     declare_robot_id = DeclareLaunchArgument(
@@ -66,7 +73,7 @@ def generate_launch_description():
     )
 
     # =============================================================================
-    # 1. GAZEBO SIMULATION
+    # 1. GAZEBO SIMULATION - MUST START FIRST (publishes /clock)
     # =============================================================================
     
     gazebo = IncludeLaunchDescription(
@@ -76,16 +83,30 @@ def generate_launch_description():
         launch_arguments=[("gz_args", f"-v 4 -r {world_file}")]
     )
 
-    # ROS-Gazebo bridge
+    # ROS-Gazebo bridge - CRITICAL: This publishes /clock topic
     gz_ros2_bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         output='screen',
-        parameters=[{'config_file': config_file}]
+        parameters=[{
+            'config_file': config_file,
+            'use_sim_time': LaunchConfiguration('use_sim_time')  # ADDED: Clock sync
+        }]
     )
 
     # =============================================================================
-    # 2. DRONE STATE PUBLISHER (NEW - CRITICAL FOR PIPELINE)
+    # 2. ALL NODES MUST HAVE use_sim_time PARAMETER
+    # =============================================================================
+    
+    # Base parameters for ALL nodes (clock synchronization)
+    def get_base_params():
+        return {
+            'use_sim_time': LaunchConfiguration('use_sim_time'),  # CRITICAL
+            # Note: clock_timeout parameter handled by ClockSynchronizer class
+        }
+
+    # =============================================================================
+    # 3. DRONE STATE PUBLISHER (Foundation node)
     # =============================================================================
     
     drone_state_publisher_node = Node(
@@ -94,15 +115,15 @@ def generate_launch_description():
         name='drone_state_publisher',
         output='screen',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
-            'optimal_distance': 4.0,      # 4m from target
-            'optimal_height_offset': 7.0, # 2m above target  
-            'optimal_angle_offset': 0.0,  # 0° = directly behind target
+            **get_base_params(),  # ADDED: Clock sync parameters
+            'optimal_distance': 4.0,
+            'optimal_height_offset': 7.0,
+            'optimal_angle_offset': 0.0,
         }]
     )
 
     # =============================================================================
-    # 3. TF TRANSFORM PUBLISHER  
+    # 4. TF TRANSFORM PUBLISHER  
     # =============================================================================
     
     tf_from_uav_pose_node = Node(
@@ -111,9 +132,9 @@ def generate_launch_description():
         name='tf_from_uav_pose',
         output='screen',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            **get_base_params(),  # ADDED: Clock sync parameters
             
-            # Topic mapping - CORRECTED PARAMETER NAMES FROM CPP
+            # Topic mapping
             'pose_topic_name': '/machine_1/pose',
             'raw_pose_topic_name': '/machine_1/pose/raw', 
             'std_pose_topic_name': '/machine_1/pose/corr/std',
@@ -121,7 +142,7 @@ def generate_launch_description():
             'throttled_pose_topic_name': '/machine_1/throttledPose',
             'throttled_uav_pose_topic_name': '/machine_1/throttledUAVPose',
             
-            # Frame IDs - CORRECTED PARAMETER NAMES FROM CPP
+            # Frame IDs
             'machine_frame_id': 'machine_1',
             'world_frame_id': 'world', 
             'world_enu_frame_id': 'world_ENU',
@@ -129,7 +150,7 @@ def generate_launch_description():
             'camera_frame_id': 'xtion_depth_frame',
             'camera_rgb_optical_frame_id': 'xtion_depth_optical_frame',
             
-            # Offset and covariance parameters
+            # Other parameters
             'offset_x': 0.0,
             'offset_y': 0.0,
             'offset_z': 0.0,
@@ -139,11 +160,11 @@ def generate_launch_description():
             'throttle_rate': 10.0,
             'dont_publish_tfs': False,
             
-            # Camera static transform - CORRECTED PARAMETER NAMES FROM CPP
+            # Camera static transform
             'camera_static_publish.publish': True,
             'camera_static_publish.tf_parameters': [
-                -0.2, 0.0, 0.0,           # Position: 0.2m forward
-                -0.173665, 0.000008, 0.984805, 0.000046  # Quaternion from SDF
+                -0.2, 0.0, 0.0,
+                -0.173665, 0.000008, 0.984805, 0.000046
             ],
             'camera_static_publish.topic': '/machine_1/camera/pose',
             'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
@@ -151,7 +172,7 @@ def generate_launch_description():
     )
 
     # =============================================================================
-    # 4. NEURAL NETWORK DETECTION
+    # 5. NEURAL NETWORK DETECTION
     # =============================================================================
     
     yolo_detector_node = Node(
@@ -160,13 +181,13 @@ def generate_launch_description():
         name="yolo12_detector_node",
         output='screen',
         parameters=[{
-            "use_sim_time": LaunchConfiguration('use_sim_time'),
+            **get_base_params(),  # ADDED: Clock sync parameters
             'model_path': default_yolo_model_path,
             'labels_path': default_yolo_labels_path,
             'use_gpu': False,
             'confidence_threshold': 0.5,
             'iou_threshold': 0.3,
-            'desired_class': 0,  # Person class
+            'desired_class': 0,
             'desired_width': 300,
             'desired_height': 300,
             'aspect_ratio': 1.333333333,
@@ -175,23 +196,22 @@ def generate_launch_description():
             'max_update_force': True,
             'max_update_rate_hz': 4.0,
             'feedback_timeout_sec': 5.0,
-            # Variance parameters
             'var_const_x_min': 0.00387,
             'var_const_x_max': 0.00347,
             'var_const_y_min': 0.00144,
             'var_const_y_max': 0.00452,
         }],
         remappings=[
-            ('image_raw', '/camera/image_raw'),              # FROM: Gazebo camera
-            ('detections', '/person_detections'),            # TO: Projection model
+            ('image_raw', '/camera/image_raw'),
+            ('detections', '/person_detections'),
             ('detection_count', '/person_detection_count'),  
-            ('feedback', '/neural_network_feedback'),        # FROM: Projection model
+            ('feedback', '/neural_network_feedback'),
             ('debug_image', '/detection_debug_image'),
         ]
     )
 
     # =============================================================================
-    # 5. 3D PROJECTION MODEL
+    # 6. 3D PROJECTION MODEL
     # =============================================================================
     
     projector_node = Node(
@@ -199,9 +219,8 @@ def generate_launch_description():
         executable='projection_model_node',
         name='model_distance_from_height_node',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            **get_base_params(),  # ADDED: Clock sync parameters
             
-            # Topics
             'projected_object_topic': "/machine_1/object_detections/projected_to_world",
             'camera_debug_topic': "/machine_1/object_detections/camera_debug",
             'detections_topic': "/person_detections",
@@ -209,26 +228,21 @@ def generate_launch_description():
             'offset_topic': "/machine_1/target_tracker/offset",
             'feedback_topic': "/neural_network_feedback",
             
-            # UPDATED: Use SDF-defined frames directly
             'topics.robot': "/machine_1/pose/raww/std",
             'topics.camera': "/machine_1/camera/pose",
-            # REMOVED: optical topic - projection model will use direct TF lookups to X3/camera_optical_frame
             
-            # Model parameters
             'height_model_mean': 1.8,
             'height_model_var': 1.0,
             'uncertainty_scale_head': 1.0,
             'uncertainty_scale_feet': 1.0,
             
-            # Camera info
             'camera.info_topic': "/camera/camera_info"
         }],
         output='screen'
     )
 
-
     # =============================================================================
-    # 6. DISTRIBUTED KALMAN FILTER TRACKER
+    # 7. DISTRIBUTED KALMAN FILTER TRACKER
     # =============================================================================
     
     distributed_kf_node = Node(
@@ -236,7 +250,7 @@ def generate_launch_description():
         executable='distributed_kf_node',
         name='distributed_kf_3d',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            **get_base_params(),  # ADDED: Clock sync parameters
             'robotID': LaunchConfiguration('robot_id'),
             'numRobots': LaunchConfiguration('num_robots'),
             
@@ -259,25 +273,21 @@ def generate_launch_description():
             'noiseVelZVar': 0.5,
             'noiseOffZVar': 0.02,
             
-            # Bias parameters
             'posGlobalOffsetBiasX': 0.0,
             'posGlobalOffsetBiasY': 0.0,
             'posGlobalOffsetBiasZ': 0.0,
             
-            # Decay parameters
             'velocityDecayTime': 3.0,
             'offsetDecayTime': 30.0,
             'falsePositiveThresholdSigma': 6.0,
             
-            # Topics
-            'pub_topic': '/machine_1/target_tracker/pose',     # TO: Projection model & Drone state
-            'velPub_topic': '/machine_1/target_tracker/twist', # TO: Drone state
-            'offset_topic': '/machine_1/target_tracker/offset', # TO: Projection model & Drone state
-            'pose_topic': '/machine_1/pose',                   # FROM: Drone state publisher
-            'measurement_topic_suffix_self': '/machine_1/object_detections/projected_to_world', # FROM: Projection model
+            'pub_topic': '/machine_1/target_tracker/pose',
+            'velPub_topic': '/machine_1/target_tracker/twist',
+            'offset_topic': '/machine_1/target_tracker/offset',
+            'pose_topic': '/machine_1/pose',
+            'measurement_topic_suffix_self': '/machine_1/object_detections/projected_to_world',
             'measurement_topic_suffix': 'object_detections/projected_to_world',
             
-            # Filter parameters
             'reset_time_threshold': 10.0,
             'cache_size': 40,
         }],
@@ -285,7 +295,7 @@ def generate_launch_description():
     )
 
     # =============================================================================
-    # 7. DRONE WAYPOINT CONTROLLER
+    # 8. DRONE WAYPOINT CONTROLLER
     # =============================================================================
     
     waypoint_controller = Node(
@@ -294,7 +304,7 @@ def generate_launch_description():
         name='waypoint_controller',
         output='screen',
         parameters=[{
-            'use_sim_time': LaunchConfiguration('use_sim_time'),
+            **get_base_params(),  # ADDED: Clock sync parameters
             'max_horizontal_speed': 1.0,
             'max_vertical_speed': 0.5,
             'max_yaw_rate': 0.5,
@@ -304,36 +314,36 @@ def generate_launch_description():
             'prediction_time': 0.5,
             'enable_debug': True,
             'pure_tracking_mode': False,
-            'cmd_vel_topic': '/X3/cmd_vel',     # TO: Gazebo via bridge
-            'odom_topic': '/X3/odom',           # FROM: Gazebo via bridge
+            'cmd_vel_topic': '/X3/cmd_vel',
+            'odom_topic': '/X3/odom',
         }],
         remappings=[
-            ('/target_waypoint', '/target_waypoint'),  # FROM: Drone state publisher
+            ('/target_waypoint', '/target_waypoint'),
         ]
     )
 
     # =============================================================================
-    # 8. STATIC TRANSFORMS - CONNECT GAZEBO TO ROS FRAMES
+    # 9. STATIC TRANSFORMS AND VISUALIZATION
     # =============================================================================
     
-    # Connect Gazebo camera frame to ROS TF tree
     gazebo_camera_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         arguments=[
-            "0", "0", "0",  # No translation offset
-            "0", "0", "0",  # No rotation offset  
-            "xtion_depth_optical_frame",  # Parent (ROS frame)
-            "X3/X3/base_link/camera_front"  # Child (Gazebo frame)
+            "0", "0", "0",
+            "0", "0", "0",
+            "xtion_depth_optical_frame",
+            "X3/X3/base_link/camera_front"
         ],
+        parameters=[get_base_params()],  # ADDED: Clock sync
         output="screen"
     )
     
-    # Original static transform
     static_tf = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         arguments=["0", "0", "0", "0", "0", "0", "world", "base_link"],
+        parameters=[get_base_params()],  # ADDED: Clock sync
         output="screen"
     )
 
@@ -342,16 +352,18 @@ def generate_launch_description():
         executable="rviz2",
         name="rviz2",
         arguments=["-d", rviz_config],
+        parameters=[get_base_params()],  # ADDED: Clock sync
         output="screen"
     )
 
     # =============================================================================
-    # LAUNCH SEQUENCE WITH PROPER TIMING
+    # 10. IMPORTANT: ADJUSTED TIMING FOR CLOCK SYNCHRONIZATION
     # =============================================================================
     
     return LaunchDescription([
         # Launch arguments
         declare_use_sim_time,
+        declare_clock_timeout,
         declare_robot_id,
         declare_num_robots,
         
@@ -360,39 +372,64 @@ def generate_launch_description():
         gallium_env,
         gazebo_resource_path,
         
-        # 1. Start Gazebo simulation first
+        # 1. Start Gazebo simulation FIRST (publishes /clock)
         gazebo,
         gz_ros2_bridge,
         
-        # 2. Start TF and drone state (foundation nodes)
-        TimerAction(period=3.0, actions=[
+        # 2. INCREASED DELAYS - Nodes need more time for clock sync
+        TimerAction(period=5.0, actions=[  # INCREASED from 3.0
             tf_from_uav_pose_node,
             drone_state_publisher_node
         ]),
         
-        # 3. Start detection pipeline
-        TimerAction(period=5.0, actions=[
+        TimerAction(period=8.0, actions=[  # INCREASED from 5.0
             yolo_detector_node
         ]),
         
-        # 4. Start projection and tracking
-        TimerAction(period=7.0, actions=[
+        TimerAction(period=12.0, actions=[  # INCREASED from 7.0
             projector_node
         ]),
         
-        TimerAction(period=9.0, actions=[
+        TimerAction(period=15.0, actions=[  # INCREASED from 9.0
             distributed_kf_node
         ]),
         
-        # 5. Start drone control
-        TimerAction(period=11.0, actions=[
+        TimerAction(period=18.0, actions=[  # INCREASED from 11.0
             waypoint_controller
         ]),
         
-        # 6. Start visualization and TF connections
-        TimerAction(period=13.0, actions=[
-            gazebo_camera_tf,  # CRITICAL: Connect Gazebo camera to ROS TF tree
+        TimerAction(period=20.0, actions=[  # INCREASED from 13.0
+            gazebo_camera_tf,
             static_tf,
             rviz_node
         ])
     ])
+
+
+# =============================================================================
+# KEY CHANGES SUMMARY:
+# =============================================================================
+
+"""
+1. **Added get_base_params() function**
+   - Ensures ALL nodes get use_sim_time parameter
+   - Centralizes clock sync configuration
+
+2. **Increased Timer Delays**
+   - More time for nodes to wait for clock synchronization
+   - Prevents startup race conditions
+
+3. **Added use_sim_time to ALL nodes**
+   - Even static transforms and visualization tools
+   - Critical for consistent time handling
+
+4. **Added launch arguments**
+   - clock_timeout for configurable timeout
+   - Better control over timing behavior
+
+5. **Bridge gets use_sim_time too**
+   - Ensures bridge is also time-synchronized
+   - May help with /clock topic publishing
+
+CRITICAL: Every node that uses time MUST have use_sim_time: true in simulation!
+"""

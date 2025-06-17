@@ -7,6 +7,9 @@
 #include <tf_from_uav_pose/tf_from_uav_pose.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <ros2_utils/clock_sync.hpp>
+
+
 
 namespace tf_from_uav_pose {
 
@@ -60,7 +63,7 @@ void TfFromUAVPose::initializeParameters() {
     this->declare_parameter("world_enu_frame_id", world_enu_frame_id_);
     this->declare_parameter("world_nwu_frame_id", world_nwu_frame_id_);
     this->declare_parameter("camera_frame_id", camera_frame_id_);
-    this->declare_parameter("camera_rgb_optical_frame_id", camera_rgb_optical_frame_id_);
+    this->declare_parameter("camera_rgb_optical_frame_id", camera_optical_frame_id_);
     
     // Declare offset and covariance parameters
     this->declare_parameter("offset_x", offset_[0]);
@@ -93,7 +96,7 @@ void TfFromUAVPose::initializeParameters() {
     world_enu_frame_id_ = this->get_parameter("world_enu_frame_id").as_string();
     world_nwu_frame_id_ = this->get_parameter("world_nwu_frame_id").as_string();
     camera_frame_id_ = this->get_parameter("camera_frame_id").as_string();
-    camera_rgb_optical_frame_id_ = this->get_parameter("camera_rgb_optical_frame_id").as_string();
+    camera_optical_frame_id_ = this->get_parameter("camera_rgb_optical_frame_id").as_string();
     
     offset_[0] = this->get_parameter("offset_x").as_double();
     offset_[1] = this->get_parameter("offset_y").as_double();
@@ -134,7 +137,7 @@ void TfFromUAVPose::setupStaticTransforms() {
     tf_world_enu_.header.frame_id = world_enu_frame_id_;
     tf_world_enu_.child_frame_id = world_frame_id_;
     tf2::Quaternion q_enu;
-    q_enu.setEuler(M_PI, 0, M_PI_2);
+    q_enu.setEuler(M_PI, 0, M_PI_2);  // Changed from (0, 0, M_PI_2)
     q_enu.normalize();
     tf_world_enu_.transform.rotation = tf2::toMsg(q_enu);
 
@@ -143,23 +146,32 @@ void TfFromUAVPose::setupStaticTransforms() {
     tf_world_nwu_.header.frame_id = world_frame_id_;
     tf_world_nwu_.child_frame_id = world_nwu_frame_id_;
     tf2::Quaternion q_nwu;
-    q_nwu.setEuler(0, M_PI, 0);
+    q_nwu.setEuler(0, M_PI, 0);  // Changed from (0, 0, 0)
     tf_world_nwu_.transform.rotation = tf2::toMsg(q_nwu);
 
-    // REMOVED: Optical frame creation (now handled by SDF)
-    // The SDF defines X3/camera_optical_frame directly
-    
-    // Collect static transforms (removed optical frame)
-    std::vector<geometry_msgs::msg::TransformStamped> static_tfs{tf_world_nwu_, tf_world_enu_};
+    // TF from camera to rgb optical link
+    tf_cam_rgb_.header.stamp = tf_world_enu_.header.stamp;
+    tf_cam_rgb_.header.frame_id = camera_frame_id_;
+    tf_cam_rgb_.child_frame_id = camera_optical_frame_id_;
+    tf2::Quaternion q_cr;
+    q_cr.setEuler(M_PI_2, 0, M_PI_2);
+    tf_cam_rgb_.transform.rotation = tf2::toMsg(q_cr);
+
+    // Collect static transforms
+    std::vector<geometry_msgs::msg::TransformStamped> static_tfs{tf_world_nwu_, tf_world_enu_, tf_cam_rgb_};
 
     // Setup camera transforms if requested
     if (publish_camera_to_robot_tf_and_pose_) {
         setupCameraTransforms();
-        static_tfs.push_back(camera_transform_);
     }
 
     // Broadcast all static tfs
     if (!dont_publish_tfs_ && static_tf_broadcaster_) {
+        // Add camera transform if configured
+        if (publish_camera_to_robot_tf_and_pose_) {
+            static_tfs.push_back(camera_transform_);
+        }
+        
         static_tf_broadcaster_->sendTransform(static_tfs);
         RCLCPP_INFO(this->get_logger(), "Published %zu static transforms", static_tfs.size());
     }
@@ -200,9 +212,15 @@ void TfFromUAVPose::setupCameraTransforms() {
     cam_rob_pose_.pose.pose.position.z = tf_cam_rob_msg.transform.translation.z;
     cam_rob_pose_.pose.pose.orientation = tf_cam_rob_msg.transform.rotation;
 
-    // Setup RGB camera pose message - FIX TIMESTAMP  
+    // FIX: Properly initialize RGB camera pose
     rgb_cam_pose_.header = tf_cam_rgb_.header;
-    rgb_cam_pose_.header.stamp = this->get_clock()->now();  // ADDED: Current timestamp
+    rgb_cam_pose_.header.frame_id = camera_frame_id_;  // Ensure correct frame
+    rgb_cam_pose_.header.stamp = this->get_clock()->now();
+    
+    // Initialize position (was missing)
+    rgb_cam_pose_.pose.pose.position.x = 0.0;
+    rgb_cam_pose_.pose.pose.position.y = 0.0;
+    rgb_cam_pose_.pose.pose.position.z = 0.0;
     rgb_cam_pose_.pose.pose.orientation = tf_cam_rgb_.transform.rotation;
 
     RCLCPP_INFO(this->get_logger(), "Camera to robot transform and poses configured");
@@ -227,23 +245,31 @@ void TfFromUAVPose::initializePublishers() {
     throttled_uav_pose_pub_ = this->create_publisher<uav_msgs::msg::UAVPose>(
         throttled_uav_pose_topic_name_, 10);
 
-    // SIMPLIFIED: Camera pose publishers (since SDF handles optical frame)
-    if (publish_camera_to_robot_tf_and_pose_) {
+    // Camera pose publishers if enabled
+   if (publish_camera_to_robot_tf_and_pose_) {
         std::string camera_pose_topic = this->get_parameter("camera_static_publish.topic").as_string();
+        std::string cam_rgb_pose_topic = this->get_parameter("camera_static_publish.pose_optical_topic").as_string();
         
         camera_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             camera_pose_topic, rclcpp::QoS(1).transient_local());
+        cam_rgb_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
+            cam_rgb_pose_topic, rclcpp::QoS(1).transient_local());
 
-        // OPTIONAL: Timer to republish camera pose with current timestamps
-        // Only needed if projection model requires time-synchronized camera poses
-        camera_pose_timer_ = this->create_wall_timer(
+         // FIX: Timer to continuously publish camera poses with updated timestamps
+            camera_pose_timer_ = this->create_wall_timer(
             std::chrono::milliseconds(100),  // 10 Hz
             [this]() {
                 if (camera_pose_pub_) {
                     cam_rob_pose_.header.stamp = this->get_clock()->now();
                     camera_pose_pub_->publish(cam_rob_pose_);
                 }
+                if (cam_rgb_pose_pub_) {
+                    rgb_cam_pose_.header.stamp = this->get_clock()->now();
+                    cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+                }
             });
+            
+        RCLCPP_INFO(this->get_logger(), "Camera pose publishers and timer configured");
     }
 
     RCLCPP_INFO(this->get_logger(), "Publishers initialized");
@@ -433,6 +459,9 @@ int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
 
     auto node = std::make_shared<tf_from_uav_pose::TfFromUAVPose>();
+    
+    WAIT_FOR_CLOCK_DELAYED(node);
+
 
     rclcpp::spin(node);
 
