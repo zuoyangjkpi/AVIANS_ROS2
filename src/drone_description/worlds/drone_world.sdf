@@ -124,27 +124,27 @@ You can use the velocity controller and command linear velocity and yaw angular 
             </waypoint>
             <waypoint>
                 <time>8</time>
-                <pose>7.0 0 1.0 0 0 0</pose>
+                <pose>-7.0 0 1.0 0 0 0</pose>
             </waypoint>
             <waypoint>
                 <time>8.5</time>
-                <pose>7 0 1.0 0 0 1.57</pose>
+                <pose>-7 0 1.0 0 0 1.57</pose>
             </waypoint>
             <waypoint>
                 <time>16</time>
-                <pose>7 7 1.0 0 0 1.57</pose>
+                <pose>-7 -7 1.0 0 0 1.57</pose>
             </waypoint>
             <waypoint>
                 <time>16.5</time>
-                <pose>7 7 1.0 0 0 3.142</pose>
+                <pose>-7 -7 1.0 0 0 3.142</pose>
             </waypoint>
             <waypoint>
                 <time>24</time>
-                <pose>0 7 1 0 0 3.142</pose>
+                <pose>0 -7 1 0 0 3.142</pose>
             </waypoint>
             <waypoint>
                 <time>24.5</time>
-                <pose>0 7 1 0 0 -1.57</pose>
+                <pose>0 -7 1 0 0 -1.57</pose>
             </waypoint>
             <waypoint>
                 <time>32</time>

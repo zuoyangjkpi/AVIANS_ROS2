@@ -112,34 +112,21 @@ def generate_launch_description():
         output="screen"
     )
 
-    # tf_from_uav_pose_node = Node(
-    #     package='tf_from_uav_pose',
-    #     executable='tf_from_uav_pose_node',
-    #     name='tf_from_uav_pose',
-    #     output='screen',
-    #     parameters=[{
-    #         **get_base_params(),
-            
-    #         # Topic mapping
-    #         'pose_topic_name': '/machine_1/pose',
-    #         'raw_pose_topic_name': '/machine_1/pose/raw', 
-    #         'std_pose_topic_name': '/machine_1/pose/corr/std',
-    #         'std_raw_pose_topic_name': '/machine_1/pose/raww/std',
-            
-    #         # FIXED: Frame IDs to match static transforms above
-    #         'machine_frame_id': 'machine_1',                      # Matches base_to_machine_tf
-    #         'world_frame_id': 'world',
-    #         'camera_frame_id': 'machine_1_camera_link',           # Matches camera_link_tf  
-    #         'camera_rgb_optical_frame_id': 'machine_1_camera_rgb_optical_link',  # Matches optical_frame_tf
-            
-    #         # Camera static transform (from machine_1 to camera)
-    #         'dont_publish_tfs': False, 
-    #         'camera_static_publish.publish': True,
-    #         'camera_static_publish.tf_parameters': [0.18, 0.0, -0.07, 0.0, -0.38, 0.0, 0.924],
-    #         'camera_static_publish.topic': '/machine_1/camera/pose',
-    #         'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
-    #     }]
-    # )
+    tf_from_uav_pose_node = Node(
+        package='tf_from_uav_pose',
+        executable='tf_from_uav_pose_node',
+        name='tf_from_uav_pose',
+        parameters=[
+            # # Load ALL parameters from YAML file
+            # LaunchConfiguration('config_file'),
+            # Only override essential launch-time parameters
+            {
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+            }
+        ],
+        output='screen',
+        emulate_tty=True,
+    )
 
     # YOLO12 Detector Node - starts early since it's independent
     yolo_detector_node = Node(
@@ -272,7 +259,7 @@ def generate_launch_description():
         #declare_use_sim_time,
         # tf_from_uav_pose_node,
         # TF node starts immediately
-        # tf_from_uav_pose_node,
+        tf_from_uav_pose_node,
         # distributed_kf_node,
         projector_node,
         yolo_detector_node,

@@ -484,7 +484,7 @@ def generate_launch_description():
             drone_state_publisher_node,
             yolo_detector_node,
             projector_node,
-            distributed_kf_node,
+            # distributed_kf_node,
             improved_waypoint_controller,
 
         ]),

@@ -92,16 +92,19 @@ void Projector::init() {
   camera_info_sub_.reset();
   RCLCPP_INFO(this->get_logger(), "Camera model initialized successfully");
 
+  rclcpp::QoS qos_profile(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
+  qos_profile.keep_last(1);
+  qos_profile.reliable();
+  qos_profile.transient_local();
+
   // Setup interface configuration
   topics_ = {
     pose_cov_ops::interface::topicSubInfo<int>(robot_topic_, static_cast<int>(Poses::robot), 2000, 50, 
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
     pose_cov_ops::interface::topicSubInfo<int>(offset_topic_, static_cast<int>(Poses::gpsoffset), 2000, 50, 
                      rclcpp::QoS(50).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    pose_cov_ops::interface::topicSubInfo<int>(camera_topic_, static_cast<int>(Poses::camera), 2000, 50, 
-                     rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable)),
-    pose_cov_ops::interface::topicSubInfo<int>(optical_topic_, static_cast<int>(Poses::optical), 2000, 50, 
-                     rclcpp::QoS(1).reliability(rclcpp::ReliabilityPolicy::Reliable))
+    pose_cov_ops::interface::topicSubInfo<int>(camera_topic_, static_cast<int>(Poses::camera), 1, 1, qos_profile),
+    pose_cov_ops::interface::topicSubInfo<int>(optical_topic_, static_cast<int>(Poses::optical), 1, 1, qos_profile)
   };
 
   // NOW it's safe to call shared_from_this() - Initialize interface
