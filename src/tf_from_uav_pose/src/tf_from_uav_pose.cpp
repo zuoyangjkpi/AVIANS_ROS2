@@ -331,23 +331,23 @@ void TfFromUAVPose::initializePublishers() {
 
         // Create a timer for periodic republishing to ensure pose_cov_ops_interface compatibility
         // This ensures the cache always has fresh data available
-        camera_pose_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(1000),  // 1 Hz - low frequency, just for cache reliability
-            [this]() {
-                auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
-                if (current_time.nanoseconds() > 0) {
-                    if (camera_pose_pub_ && camera_pose_pub_->get_subscription_count() > 0) {
-                        cam_rob_pose_.header.stamp = current_time;
-                        camera_pose_pub_->publish(cam_rob_pose_);
-                        RCLCPP_DEBUG(this->get_logger(), "Republished camera pose for cache reliability");
-                    }
-                    if (cam_rgb_pose_pub_ && cam_rgb_pose_pub_->get_subscription_count() > 0) {
-                        rgb_cam_pose_.header.stamp = current_time;
-                        cam_rgb_pose_pub_->publish(rgb_cam_pose_);
-                        RCLCPP_DEBUG(this->get_logger(), "Republished camera RGB optical pose for cache reliability");
-                    }
-                }
-            });
+        // camera_pose_timer_ = this->create_wall_timer(
+        //     std::chrono::milliseconds(1000),  // 1 Hz - low frequency, just for cache reliability
+        //     [this]() {
+        //         auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
+        //         if (current_time.nanoseconds() > 0) {
+        //             if (camera_pose_pub_ && camera_pose_pub_->get_subscription_count() > 0) {
+        //                 cam_rob_pose_.header.stamp = current_time;
+        //                 camera_pose_pub_->publish(cam_rob_pose_);
+        //                 RCLCPP_DEBUG(this->get_logger(), "Republished camera pose for cache reliability");
+        //             }
+        //             if (cam_rgb_pose_pub_ && cam_rgb_pose_pub_->get_subscription_count() > 0) {
+        //                 rgb_cam_pose_.header.stamp = current_time;
+        //                 cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+        //                 RCLCPP_DEBUG(this->get_logger(), "Republished camera RGB optical pose for cache reliability");
+        //             }
+        //         }
+        //     });
             
         RCLCPP_INFO(this->get_logger(), "Camera pose publishers configured (initial publish + periodic updates for cache reliability)");
     }

@@ -14,7 +14,7 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(rcl
 
   // CRITICAL: Declare use_sim_time parameter FIRST
   if (!this->has_parameter("use_sim_time")) {
-    this->declare_parameter("use_sim_time", false);
+    this->declare_parameter("use_sim_time", true);
   }
 
   // Declare and get parameters
