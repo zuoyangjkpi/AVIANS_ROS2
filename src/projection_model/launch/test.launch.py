@@ -59,8 +59,6 @@ def generate_launch_description():
         description='Use simulation time for all nodes'
     )
 
-    use_sim_time = LaunchConfiguration('use_sim_time')
-
     # TF from UAV Pose (ROS2) - MOST IMPORTANT
    
 
@@ -97,55 +95,66 @@ def generate_launch_description():
     # )
 
     # RViz2
+    
+
+    def get_base_params():
+        return {
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }
+
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
+          parameters=[{
+            **get_base_params()
+          }],
         output="screen"
     )
 
-    tf_from_uav_pose_node = Node(
-          package='tf_from_uav_pose_ros2',
-        executable='tf_from_uav_pose_node',
-        name='tf_from_uav_pose',
-        output='screen',
-        parameters=[{
-            'use_sim_time': use_sim_time,
+    # tf_from_uav_pose_node = Node(
+    #     package='tf_from_uav_pose',
+    #     executable='tf_from_uav_pose_node',
+    #     name='tf_from_uav_pose',
+    #     output='screen',
+    #     parameters=[{
+    #         **get_base_params(),
             
-            # Topic mapping for your system
-            'pose_topic_name': '/machine_1/pose',  # From ROS1 bridge
-            'raw_pose_topic_name': '/machine_1/pose/raw',  # From ROS1 bridge
-            'std_pose_topic_name': '/machine_1/pose/corr/std',
-            'std_raw_pose_topic_name': '/machine_1/pose/raww/std',
+    #         # Topic mapping
+    #         'pose_topic_name': '/machine_1/pose',
+    #         'raw_pose_topic_name': '/machine_1/pose/raw', 
+    #         'std_pose_topic_name': '/machine_1/pose/corr/std',
+    #         'std_raw_pose_topic_name': '/machine_1/pose/raww/std',
             
-            # Frame IDs - FIXED TO MATCH YOUR ACTUAL SYSTEM
-            'machine_frame_id': 'machine_1',
-            'world_frame_id': 'world',
-            'camera_frame_id': 'xtion_depth_frame',  # Changed to match your system
-            'camera_rgb_optical_frame_id': 'xtion_depth_optical_frame',  # Changed to match YOLO
+    #         # FIXED: Frame IDs to match static transforms above
+    #         'machine_frame_id': 'machine_1',                      # Matches base_to_machine_tf
+    #         'world_frame_id': 'world',
+    #         'camera_frame_id': 'machine_1_camera_link',           # Matches camera_link_tf  
+    #         'camera_rgb_optical_frame_id': 'machine_1_camera_rgb_optical_link',  # Matches optical_frame_tf
             
-            # Camera static transform (CRITICAL for projection model)
-            'camera_static_publish.publish': True,
-            'camera_static_publish.tf_parameters': [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            'camera_static_publish.topic': '/machine_1/camera/pose',
-            'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
-        }]
-    )
+    #         # Camera static transform (from machine_1 to camera)
+    #         'dont_publish_tfs': False, 
+    #         'camera_static_publish.publish': True,
+    #         'camera_static_publish.tf_parameters': [0.18, 0.0, -0.07, 0.0, -0.38, 0.0, 0.924],
+    #         'camera_static_publish.topic': '/machine_1/camera/pose',
+    #         'camera_static_publish.pose_optical_topic': '/machine_1/camera/pose_optical'
+    #     }]
+    # )
 
     # YOLO12 Detector Node - starts early since it's independent
     yolo_detector_node = Node(
         package="neural_network_detector",
-        executable="yolo12_detector_node",
+        executable="yolo12_detector_node", 
         name="yolo12_detector_node",
         output='screen',
         parameters=[{
-            "use_sim_time": True,
-            'model_path': LaunchConfiguration('yolo_model_path'),
-            'labels_path': LaunchConfiguration('yolo_labels_path'),
+            **get_base_params(),
+            'model_path': default_yolo_model_path,
+            'labels_path': default_yolo_labels_path,
             'use_gpu': False,
-            'confidence_threshold': 0.5,
+            'confidence_threshold': 0.3,  # LOWERED for more detections
             'iou_threshold': 0.3,
-            'desired_class': 0,
+            'desired_class': 0,  # Person class
             'desired_width': 300,
             'desired_height': 300,
             'aspect_ratio': 1.333333333,
@@ -165,17 +174,15 @@ def generate_launch_description():
             ('detection_count', '/person_detection_count'),  
             ('feedback', '/neural_network_feedback'),
             ('debug_image', '/detection_debug_image'),
-        ],
-        condition=conditions.IfCondition(LaunchConfiguration('use_person_tracking'))
+        ]
     )
-
     # Create the projector node - waits for bridge topics
     projector_node = Node(
         package='projection_model',
         executable='projection_model_node',
         name='model_distance_from_height_node',
         parameters=[{
-            'use_sim_time': True, 
+            **get_base_params(),
             'projected_object_topic': "/machine_1/object_detections/projected_to_world",
             'camera_debug_topic': "/machine_1/object_detections/camera_debug",
             'detections_topic': "/person_detections",
@@ -195,7 +202,7 @@ def generate_launch_description():
             'camera.info_topic': "/machine_1/video/camera_info"
         }],
         output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO']
+        # arguments=['--ros-args', '--log-level', 'INFO']
     )
 
     # Distributed Kalman Filter Node - starts last
@@ -237,7 +244,7 @@ def generate_launch_description():
             'offsetDecayTime': 30.0,
             
             # False positive threshold
-            'falsePositiveThresholdSigma': 6.0,
+            'falsePositiveThresholdSigma': 10.0,
             
             # Topics
             'pub_topic': '/machine_1/target_tracker/pose',
@@ -263,13 +270,15 @@ def generate_launch_description():
         declare_use_sim_time,
         
         #declare_use_sim_time,
-        
+        # tf_from_uav_pose_node,
         # TF node starts immediately
         # tf_from_uav_pose_node,
-        
+        # distributed_kf_node,
+        projector_node,
+        yolo_detector_node,
         # Other nodes with delays
-        TimerAction(period=2.0, actions=[yolo_detector_node]),
-        TimerAction(period=5.0, actions=[projector_node]),
+        # TimerAction(period=2.0, actions=[yolo_detector_node]),
+        # TimerAction(period=5.0, actions=[projector_node]),
         # TimerAction(period=8.0, actions=[distributed_kf_node]),
                  
         rviz_node

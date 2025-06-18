@@ -1,10 +1,10 @@
 //
 // tf_from_uav_pose_ros2.cpp
 // ROS2 migration of tf_from_uav_poses_node
-// Migrated by Assistant on 16.06.25
+// Migrated to maintain exact functionality with proper sim time handling
 //
 
-#include <tf_from_uav_pose/tf_from_uav_pose.hpp>
+#include "tf_from_uav_pose/tf_from_uav_pose.hpp"
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <ros2_utils/clock_sync.hpp>
@@ -15,7 +15,7 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
     
     // CRITICAL: Declare use_sim_time parameter FIRST
     if (!this->has_parameter("use_sim_time")) {
-        this->declare_parameter("use_sim_time", false);
+        this->declare_parameter("use_sim_time", true);
     }
     
     // Initialize parameters first
@@ -27,13 +27,14 @@ TfFromUAVPose::TfFromUAVPose() : Node("tf_from_uav_pose") {
                    pose_topic_name_.c_str(), world_frame_id_.c_str(), machine_frame_id_.c_str());
         
         tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-         rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1))
-                      .transient_local()
-                      .reliable();
+        
+        rclcpp::QoS qos = rclcpp::QoS(rclcpp::KeepLast(1))
+                         .transient_local()
+                         .reliable();
     
         static_tf_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(
             *this,  // The node reference
-            qos      // QoS settings
+            qos     // QoS settings
         );
     } else {
         RCLCPP_INFO(this->get_logger(), "Requested to not publish TFs - Publishing only poses!");
@@ -62,67 +63,67 @@ void TfFromUAVPose::initializeParameters() {
         RCLCPP_INFO(this->get_logger(), "Using system time");
     }
     
-    // Declare topic name parameters
-    this->declare_parameter("pose_topic_name", pose_topic_name_);
-    this->declare_parameter("raw_pose_topic_name", raw_pose_topic_name_);
-    this->declare_parameter("std_pose_topic_name", std_pose_topic_name_);
-    this->declare_parameter("std_raw_pose_topic_name", std_raw_pose_topic_name_);
-    this->declare_parameter("throttled_pose_topic_name", throttled_pose_topic_name_);
-    this->declare_parameter("throttled_uav_pose_topic_name", throttled_uav_pose_topic_name_);
+    // Declare topic name parameters (matching ROS1 exactly)
+    this->declare_parameter("poseTopicName", pose_topic_name_);
+    this->declare_parameter("rawPoseTopicName", raw_pose_topic_name_);
+    this->declare_parameter("stdPoseTopicName", std_pose_topic_name_);
+    this->declare_parameter("stdRawPoseTopicName", std_raw_pose_topic_name_);
+    this->declare_parameter("throttledPoseTopicName", throttled_pose_topic_name_);
+    this->declare_parameter("throttledUAVPoseTopicName", throttled_uav_pose_topic_name_);
     
-    // Declare frame ID parameters
-    this->declare_parameter("machine_frame_id", machine_frame_id_);
-    this->declare_parameter("world_frame_id", world_frame_id_);
-    this->declare_parameter("world_enu_frame_id", world_enu_frame_id_);
-    this->declare_parameter("world_nwu_frame_id", world_nwu_frame_id_);
-    this->declare_parameter("camera_frame_id", camera_frame_id_);
-    this->declare_parameter("camera_rgb_optical_frame_id", camera_optical_frame_id_);
+    // Declare frame ID parameters (matching ROS1 exactly)
+    this->declare_parameter("machineFrameID", machine_frame_id_);
+    this->declare_parameter("worldFrameID", world_frame_id_);
+    this->declare_parameter("worldENUFrameID", world_enu_frame_id_);
+    this->declare_parameter("worldNWUFrameID", world_nwu_frame_id_);
+    this->declare_parameter("cameraFrameID", camera_frame_id_);
+    this->declare_parameter("cameraRGBOpticalFrameID", camera_optical_frame_id_);
     
-    // Declare offset and covariance parameters
-    this->declare_parameter("offset_x", offset_[0]);
-    this->declare_parameter("offset_y", offset_[1]);
-    this->declare_parameter("offset_z", offset_[2]);
-    this->declare_parameter("covariance_x", added_covariance_[0]);
-    this->declare_parameter("covariance_y", added_covariance_[1]);
-    this->declare_parameter("covariance_z", added_covariance_[2]);
+    // Declare offset and covariance parameters (matching ROS1 exactly)
+    this->declare_parameter("offsetX", offset_[0]);
+    this->declare_parameter("offsetY", offset_[1]);
+    this->declare_parameter("offsetZ", offset_[2]);
+    this->declare_parameter("covarianceX", added_covariance_[0]);
+    this->declare_parameter("covarianceY", added_covariance_[1]);
+    this->declare_parameter("covarianceZ", added_covariance_[2]);
     
-    // Other parameters
-    this->declare_parameter("throttle_rate", throttle_rate_);
-    this->declare_parameter("dont_publish_tfs", dont_publish_tfs_);
+    // Other parameters (matching ROS1 exactly)
+    this->declare_parameter("throttleRate", throttle_rate_);
+    this->declare_parameter("dontPublishTFs", dont_publish_tfs_);
     
-    // Camera static publishing parameters
-    this->declare_parameter("camera_static_publish.publish", publish_camera_to_robot_tf_and_pose_);
-    this->declare_parameter("camera_static_publish.tf_parameters", camera_tf_parameters_);
-    this->declare_parameter("camera_static_publish.topic", std::string("/machine_1/camera/pose"));
-    this->declare_parameter("camera_static_publish.pose_optical_topic", std::string("/machine_1/camera/pose_optical"));
+    // Camera static publishing parameters (matching ROS1 exactly)
+    this->declare_parameter("cameraStaticPublish.publish", publish_camera_to_robot_tf_and_pose_);
+    this->declare_parameter("cameraStaticPublish.TFParameters", camera_tf_parameters_);
+    this->declare_parameter("cameraStaticPublish.topic", std::string("/machine_1/camera/pose"));
+    this->declare_parameter("cameraStaticPublish.pose_optical_topic", std::string("/machine_1/camera/pose_optical"));
 
     // Get parameter values
-    pose_topic_name_ = this->get_parameter("pose_topic_name").as_string();
-    raw_pose_topic_name_ = this->get_parameter("raw_pose_topic_name").as_string();
-    std_pose_topic_name_ = this->get_parameter("std_pose_topic_name").as_string();
-    std_raw_pose_topic_name_ = this->get_parameter("std_raw_pose_topic_name").as_string();
-    throttled_pose_topic_name_ = this->get_parameter("throttled_pose_topic_name").as_string();
-    throttled_uav_pose_topic_name_ = this->get_parameter("throttled_uav_pose_topic_name").as_string();
+    pose_topic_name_ = this->get_parameter("poseTopicName").as_string();
+    raw_pose_topic_name_ = this->get_parameter("rawPoseTopicName").as_string();
+    std_pose_topic_name_ = this->get_parameter("stdPoseTopicName").as_string();
+    std_raw_pose_topic_name_ = this->get_parameter("stdRawPoseTopicName").as_string();
+    throttled_pose_topic_name_ = this->get_parameter("throttledPoseTopicName").as_string();
+    throttled_uav_pose_topic_name_ = this->get_parameter("throttledUAVPoseTopicName").as_string();
     
-    machine_frame_id_ = this->get_parameter("machine_frame_id").as_string();
-    world_frame_id_ = this->get_parameter("world_frame_id").as_string();
-    world_enu_frame_id_ = this->get_parameter("world_enu_frame_id").as_string();
-    world_nwu_frame_id_ = this->get_parameter("world_nwu_frame_id").as_string();
-    camera_frame_id_ = this->get_parameter("camera_frame_id").as_string();
-    camera_optical_frame_id_ = this->get_parameter("camera_rgb_optical_frame_id").as_string();
+    machine_frame_id_ = this->get_parameter("machineFrameID").as_string();
+    world_frame_id_ = this->get_parameter("worldFrameID").as_string();
+    world_enu_frame_id_ = this->get_parameter("worldENUFrameID").as_string();
+    world_nwu_frame_id_ = this->get_parameter("worldNWUFrameID").as_string();
+    camera_frame_id_ = this->get_parameter("cameraFrameID").as_string();
+    camera_optical_frame_id_ = this->get_parameter("cameraRGBOpticalFrameID").as_string();
     
-    offset_[0] = this->get_parameter("offset_x").as_double();
-    offset_[1] = this->get_parameter("offset_y").as_double();
-    offset_[2] = this->get_parameter("offset_z").as_double();
-    added_covariance_[0] = this->get_parameter("covariance_x").as_double();
-    added_covariance_[1] = this->get_parameter("covariance_y").as_double();
-    added_covariance_[2] = this->get_parameter("covariance_z").as_double();
+    offset_[0] = this->get_parameter("offsetX").as_double();
+    offset_[1] = this->get_parameter("offsetY").as_double();
+    offset_[2] = this->get_parameter("offsetZ").as_double();
+    added_covariance_[0] = this->get_parameter("covarianceX").as_double();
+    added_covariance_[1] = this->get_parameter("covarianceY").as_double();
+    added_covariance_[2] = this->get_parameter("covarianceZ").as_double();
     
-    throttle_rate_ = this->get_parameter("throttle_rate").as_double();
-    dont_publish_tfs_ = this->get_parameter("dont_publish_tfs").as_bool();
+    throttle_rate_ = this->get_parameter("throttleRate").as_double();
+    dont_publish_tfs_ = this->get_parameter("dontPublishTFs").as_bool();
     
-    publish_camera_to_robot_tf_and_pose_ = this->get_parameter("camera_static_publish.publish").as_bool();
-    camera_tf_parameters_ = this->get_parameter("camera_static_publish.tf_parameters").as_double_array();
+    publish_camera_to_robot_tf_and_pose_ = this->get_parameter("cameraStaticPublish.publish").as_bool();
+    camera_tf_parameters_ = this->get_parameter("cameraStaticPublish.TFParameters").as_double_array();
 
     RCLCPP_INFO(this->get_logger(), "Parameters initialized:");
     RCLCPP_INFO(this->get_logger(), "  Offset: [%.3f, %.3f, %.3f]", offset_[0], offset_[1], offset_[2]);
@@ -242,6 +243,20 @@ void TfFromUAVPose::updateTimestampsAfterClockSync() {
         RCLCPP_INFO(this->get_logger(), "Re-broadcasted %zu static transforms with synced timestamps", 
                    static_tfs.size());
     }
+    
+    // Publish camera poses IMMEDIATELY after clock sync (initial publish, matching ROS1)
+    if (publish_camera_to_robot_tf_and_pose_) {
+        if (camera_pose_pub_) {
+            cam_rob_pose_.header.stamp = current_time;
+            camera_pose_pub_->publish(cam_rob_pose_);
+            RCLCPP_INFO(this->get_logger(), "Published initial camera pose (latched + periodic updates)");
+        }
+        if (cam_rgb_pose_pub_) {
+            rgb_cam_pose_.header.stamp = current_time;
+            cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+            RCLCPP_INFO(this->get_logger(), "Published initial camera RGB optical pose (latched + periodic updates)");
+        }
+    }
 }
 
 void TfFromUAVPose::initializePublishers() {
@@ -262,34 +277,38 @@ void TfFromUAVPose::initializePublishers() {
     throttled_uav_pose_pub_ = this->create_publisher<uav_msgs::msg::UAVPose>(
         throttled_uav_pose_topic_name_, 10);
 
-    // Camera pose publishers if enabled
-   if (publish_camera_to_robot_tf_and_pose_) {
-        std::string camera_pose_topic = this->get_parameter("camera_static_publish.topic").as_string();
-        std::string cam_rgb_pose_topic = this->get_parameter("camera_static_publish.pose_optical_topic").as_string();
+    // Camera pose publishers if enabled (matching ROS1 with  reliability)
+    if (publish_camera_to_robot_tf_and_pose_) {
+        std::string camera_pose_topic = this->get_parameter("cameraStaticPublish.topic").as_string();
+        std::string cam_rgb_pose_topic = this->get_parameter("cameraStaticPublish.pose_optical_topic").as_string();
         
+        // Create publishers with transient_local QoS (equivalent to ROS1 latched=true)
         camera_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-            camera_pose_topic, rclcpp::QoS(1).transient_local());
+            camera_pose_topic, rclcpp::QoS(1).transient_local().reliable());
         cam_rgb_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
-            cam_rgb_pose_topic, rclcpp::QoS(1).transient_local());
+            cam_rgb_pose_topic, rclcpp::QoS(1).transient_local().reliable());
 
-        // Timer to continuously publish camera poses with updated timestamps
+        // Create a timer for periodic republishing to ensure pose_cov_ops_interface compatibility
+        // This ensures the cache always has fresh data available
         camera_pose_timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(100),  // 10 Hz
+            std::chrono::milliseconds(1000),  // 1 Hz - low frequency, just for cache reliability
             [this]() {
                 auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
                 if (current_time.nanoseconds() > 0) {
-                    if (camera_pose_pub_) {
+                    if (camera_pose_pub_ && camera_pose_pub_->get_subscription_count() > 0) {
                         cam_rob_pose_.header.stamp = current_time;
                         camera_pose_pub_->publish(cam_rob_pose_);
+                        RCLCPP_DEBUG(this->get_logger(), "Republished camera pose for cache reliability");
                     }
-                    if (cam_rgb_pose_pub_) {
+                    if (cam_rgb_pose_pub_ && cam_rgb_pose_pub_->get_subscription_count() > 0) {
                         rgb_cam_pose_.header.stamp = current_time;
                         cam_rgb_pose_pub_->publish(rgb_cam_pose_);
+                        RCLCPP_DEBUG(this->get_logger(), "Republished camera RGB optical pose for cache reliability");
                     }
                 }
             });
             
-        RCLCPP_INFO(this->get_logger(), "Camera pose publishers and timer configured");
+        RCLCPP_INFO(this->get_logger(), "Camera pose publishers configured (initial publish + periodic updates for cache reliability)");
     }
 
     RCLCPP_INFO(this->get_logger(), "Publishers initialized");
@@ -342,7 +361,7 @@ void TfFromUAVPose::poseCallback(const uav_msgs::msg::UAVPose::SharedPtr msg) {
     // Publish std pose msg
     std_pose_pub_->publish(std_pose_);
 
-    // Handle throttled publishing
+    // Handle throttled publishing (matching ROS1 exactly)
     rclcpp::Duration time_diff = rclcpp::Time(msg->header.stamp) - rclcpp::Time(throttled_pose_.header.stamp);
     if (time_diff.seconds() > 0 && (1.0 / time_diff.seconds()) <= throttle_rate_) {
         // Copy contents to throttle pose msg
@@ -401,19 +420,19 @@ rcl_interfaces::msg::SetParametersResult TfFromUAVPose::parametersCallback(
     RCLCPP_INFO(this->get_logger(), "Received parameter update request");
 
     for (const auto & param : parameters) {
-        if (param.get_name() == "offset_x") {
+        if (param.get_name() == "offsetX") {
             offset_[0] = param.as_double();
-        } else if (param.get_name() == "offset_y") {
+        } else if (param.get_name() == "offsetY") {
             offset_[1] = param.as_double();
-        } else if (param.get_name() == "offset_z") {
+        } else if (param.get_name() == "offsetZ") {
             offset_[2] = param.as_double();
-        } else if (param.get_name() == "covariance_x") {
+        } else if (param.get_name() == "covarianceX") {
             added_covariance_[0] = param.as_double();
-        } else if (param.get_name() == "covariance_y") {
+        } else if (param.get_name() == "covarianceY") {
             added_covariance_[1] = param.as_double();
-        } else if (param.get_name() == "covariance_z") {
+        } else if (param.get_name() == "covarianceZ") {
             added_covariance_[2] = param.as_double();
-        } else if (param.get_name() == "throttle_rate") {
+        } else if (param.get_name() == "throttleRate") {
             throttle_rate_ = param.as_double();
         } else if (param.get_name() == "use_sim_time") {
             bool use_sim_time = param.as_bool();
@@ -432,7 +451,7 @@ void uavCovariance_to_rosCovariance(const uav_msgs::msg::UAVPose::SharedPtr uav_
                                     geometry_msgs::msg::PoseWithCovariance &std_pose_cov) {
     
     // MRPT-free implementation: Direct covariance mapping
-    // This avoids all MRPT compatibility issues
+    // This avoids all MRPT compatibility issues by implementing a simplified conversion
     
     // Initialize covariance matrix to zero
     std::fill(std_pose_cov.covariance.begin(), std_pose_cov.covariance.end(), 0.0);
@@ -470,7 +489,7 @@ void uavCovariance_to_rosCovariance(const uav_msgs::msg::UAVPose::SharedPtr uav_
         
     } else {
         // Fallback: use reasonable default uncertainties
-        RCLCPP_WARN_ONCE(rclcpp::get_logger("tf_from_uav_pose"), 
+        RCLCPP_WARN_ONCE(rclcpp::get_logger("tf_from_uav_pose_ros2"), 
                          "UAV covariance array too small, using default uncertainties");
         
         // Default position uncertainties (m^2)
@@ -485,7 +504,7 @@ void uavCovariance_to_rosCovariance(const uav_msgs::msg::UAVPose::SharedPtr uav_
     }
 }
 
-} // namespace tf_from_uav_pose
+} // namespace tf_from_uav_pose_ros2
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);

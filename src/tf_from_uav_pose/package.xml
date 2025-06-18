@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypes="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tf_from_uav_pose_ros2</name>
+  <name>tf_from_uav_pose</name>
   <version>1.0.0</version>
   <description>ROS2 migration of tf_from_uav_pose - publishes TF transforms and pose messages from UAV pose data</description>
 
@@ -19,11 +19,8 @@
   <depend>tf2_geometry_msgs</depend>
   <depend>ros2_utils</depend>
 
-
-  <!-- UAV messages - you'll need to adapt this based on your ROS2 UAV message package -->
+  <!-- UAV messages -->
   <depend>uav_msgs</depend>
-
-  <!-- Note: MRPT dependencies removed to avoid compatibility issues -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

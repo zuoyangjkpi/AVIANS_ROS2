@@ -1,12 +1,12 @@
-tf_from_uav_pose:
+tf_from_uav_pose_ros2:
   ros__parameters:
     # Topic names
-    poseTopicName: "machine_1/pose"
-    rawPoseTopicName: "machine_1/pose/raw"
-    stdPoseTopicName: "machine_1/pose/corr/std"
-    stdRawPoseTopicName: "machine_1/pose/raww/std"
-    throttledPoseTopicName: "machine_1/throttledPose"
-    throttledUAVPoseTopicName: "machine_1/throttledUAVPose"
+    poseTopicName: "/machine_1/pose"
+    rawPoseTopicName: "/machine_1/pose/raw"
+    stdPoseTopicName: "/machine_1/pose/corr/std"
+    stdRawPoseTopicName: "/machine_1/pose/raww/std"
+    throttledPoseTopicName: "/machine_1/throttledPose"
+    throttledUAVPoseTopicName: "/machine_1/throttledUAVPose"
     
     # Frame IDs
     machineFrameID: "machine_1"
@@ -30,7 +30,7 @@ tf_from_uav_pose:
     
     # Camera static publishing configuration
     cameraStaticPublish:
-      publish: true
-      topic: "machine_1/camera/pose"
-      pose_optical_topic: "machine_1/camera/pose_optical"
-      TFParameters: [-0.2, 0.0, 0.0, -0.173665, 0.0, 0.984805, 0.000046]  # [x, y, z, qx, qy, qz, qw]
+      publish: false
+      topic: "camera/pose"
+      pose_optical_topic: "camera/pose_optical"
+      TFParameters: [0.18, 0.0, -0.07, 0.0, -0.38, 0.0, 0.924]  # [x, y, z, qx, qy, qz, qw]

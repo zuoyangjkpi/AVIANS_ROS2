@@ -11,57 +11,30 @@ def generate_launch_description():
     config_dir = os.path.join(pkg_dir, 'config')
     default_config_file = os.path.join(config_dir, 'tf_from_uav_pose_params.yaml')
 
-    # Declare launch arguments
+    # Declare launch arguments (for optional overrides via separate launch files)
     config_file_arg = DeclareLaunchArgument(
         'config_file',
         default_value=default_config_file,
         description='Full path to the ROS2 parameters file to use'
     )
 
-    pose_topic_arg = DeclareLaunchArgument(
-        'pose_topic',
-        default_value='machine_1/pose',
-        description='Topic name for UAV pose input'
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='true',
+        description='Use simulation time'
     )
 
-    raw_pose_topic_arg = DeclareLaunchArgument(
-        'raw_pose_topic', 
-        default_value='machine_1/pose/raw',
-        description='Topic name for raw UAV pose input'
-    )
-
-    world_frame_arg = DeclareLaunchArgument(
-        'world_frame',
-        default_value='world',
-        description='World frame ID'
-    )
-
-    machine_frame_arg = DeclareLaunchArgument(
-        'machine_frame',
-        default_value='machine_1', 
-        description='Machine/UAV base frame ID'
-    )
-
-    dont_publish_tfs_arg = DeclareLaunchArgument(
-        'dont_publish_tfs',
-        default_value='false',
-        description='Set to true to disable TF publishing'
-    )
-
-    # Node
+    # Node with proper parameter loading - YAML file contains all topic configurations
     tf_from_uav_pose_node = Node(
         package='tf_from_uav_pose',
         executable='tf_from_uav_pose_node',
         name='tf_from_uav_pose',
         parameters=[
-            LaunchConfiguration('config_file'),
+            # # Load ALL parameters from YAML file
+            # LaunchConfiguration('config_file'),
+            # Only override essential launch-time parameters
             {
-                "use_sim_time":True,
-                'poseTopicName': LaunchConfiguration('pose_topic'),
-                'rawPoseTopicName': LaunchConfiguration('raw_pose_topic'),
-                'worldFrameID': LaunchConfiguration('world_frame'),
-                'machineFrameID': LaunchConfiguration('machine_frame'),
-                'dontPublishTFs': LaunchConfiguration('dont_publish_tfs'),
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
             }
         ],
         output='screen',
@@ -70,10 +43,6 @@ def generate_launch_description():
 
     return LaunchDescription([
         config_file_arg,
-        pose_topic_arg,
-        raw_pose_topic_arg,
-        world_frame_arg,
-        machine_frame_arg,
-        dont_publish_tfs_arg,
+        use_sim_time_arg,
         tf_from_uav_pose_node
     ])

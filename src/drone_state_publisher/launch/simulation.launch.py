@@ -377,26 +377,66 @@ def generate_launch_description():
     # 8. DRONE WAYPOINT CONTROLLER
     # =============================================================================
     
-    waypoint_controller = Node(
-        package='drone_description',
-        executable='waypoint_controller',
-        name='waypoint_controller',
-        output='screen',
-        parameters=[{
-            **get_base_params(),
-            'max_horizontal_speed': 1.0,
-            'max_vertical_speed': 0.8,
-            'max_yaw_rate': 0.5,
-            'waypoint_tolerance': 0.05,
-            'yaw_p_gain': 0.3,
-            'yaw_d_gain': 0.1,
-            'prediction_time': 1.0,
-            'enable_debug': True,
-            'pure_tracking_mode': False,
-            'cmd_vel_topic': '/X3/cmd_vel',
-            'odom_topic': '/X3/odom',
-        }]
-    )
+    # waypoint_controller = Node(
+    #     package='drone_description',
+    #     executable='waypoint_controller',
+    #     name='waypoint_controller',
+    #     output='screen',
+    #     parameters=[{
+    #         **get_base_params(),
+    #         'max_horizontal_speed': 1.0,
+    #         'max_vertical_speed': 0.8,
+    #         'max_yaw_rate': 0.5,
+    #         'waypoint_tolerance': 0.05,
+    #         'yaw_p_gain': 0.3,
+    #         'yaw_d_gain': 0.1,
+    #         'prediction_time': 1.0,
+    #         'enable_debug': True,
+    #         'pure_tracking_mode': False,
+    #         'cmd_vel_topic': '/X3/cmd_vel',
+    #         'odom_topic': '/X3/odom',
+    #     }]
+    # )
+
+    improved_waypoint_controller = Node(
+    package='drone_description',
+    executable='waypoint_controller',  # New executable name
+    name='improved_waypoint_controller',
+    output='screen',
+    parameters=[{
+        **get_base_params(),
+        
+        # Basic control limits
+        'max_horizontal_speed': 0.8,
+        'max_vertical_speed': 0.5,
+        'max_yaw_rate': 0.3,
+        'waypoint_tolerance': 0.15,
+        
+        # Position PID gains
+        'pos_kp': 1.2,
+        'pos_ki': 0.1,
+        'pos_kd': 0.3,
+        
+        # Yaw PID gains
+        'yaw_kp': 0.8,
+        'yaw_ki': 0.05,
+        'yaw_kd': 0.15,
+        
+        # Advanced control parameters
+        'prediction_time': 0.5,
+        'command_filter_alpha': 0.7,
+        'approach_distance': 1.0,
+        'min_speed_factor': 0.1,
+        
+        # Modes and debug
+        'pure_tracking_mode': False,
+        'enable_debug': True,
+        
+        # Topics
+        'cmd_vel_topic': '/X3/cmd_vel',
+        'odom_topic': '/X3/odom',
+    }]
+)
 
     # =============================================================================
     # 9. VISUALIZATION
@@ -445,7 +485,7 @@ def generate_launch_description():
             yolo_detector_node,
             projector_node,
             distributed_kf_node,
-            waypoint_controller,
+            improved_waypoint_controller,
 
         ]),
         

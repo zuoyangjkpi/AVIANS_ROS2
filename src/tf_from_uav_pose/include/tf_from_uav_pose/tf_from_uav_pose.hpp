@@ -1,11 +1,11 @@
 //
 // tf_from_uav_pose_ros2.hpp
 // ROS2 migration of tf_from_uav_poses_node
-// Migrated by Assistant on 16.06.25
+// Migrated to maintain exact functionality with proper sim time handling
 //
 
-#ifndef TF_FROM_UAV_POSE_HPP
-#define TF_FROM_UAV_POSE_HPP
+#ifndef TF_FROM_UAV_POSE_H
+#define TF_FROM_UAV_POSE_H
 
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/transform_broadcaster.h>
@@ -17,8 +17,6 @@
 
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-// Note: MRPT dependencies removed to avoid compatibility issues
 
 namespace tf_from_uav_pose {
 
@@ -45,8 +43,8 @@ namespace tf_from_uav_pose {
         std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
         std::unique_ptr<tf2_ros::StaticTransformBroadcaster> static_tf_broadcaster_;
 
+        // Timer for camera pose publishing (for pose_cov_ops_interface cache reliability)
         rclcpp::TimerBase::SharedPtr camera_pose_timer_;
-
 
         // Message storage
         geometry_msgs::msg::PoseWithCovarianceStamped std_pose_, std_raw_pose_, cam_rob_pose_, rgb_cam_pose_;
@@ -59,21 +57,21 @@ namespace tf_from_uav_pose {
         // Parameter callback handle
         rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_callback_handle_;
 
-        // Parameters
+        // Parameters (matching ROS1 exactly)
         std::vector<double> offset_{0.0, 0.0, 0.0};
         std::vector<double> added_covariance_{0.0, 0.0, 0.0};
         double throttle_rate_{10.0};
         bool dont_publish_tfs_{false};
 
-        // Frame IDs
+        // Frame IDs (with ROS2 naming conventions)
         std::string machine_frame_id_{"machine_1"};
         std::string world_frame_id_{"world"};
         std::string world_enu_frame_id_{"world_ENU"};
         std::string world_nwu_frame_id_{"world_NWU"};
-        std::string camera_frame_id_{"xtion_depth_frame"};
-        std::string camera_optical_frame_id_{"xtion_depth_optical_frame"};
+        std::string camera_frame_id_{"machine_1_camera_link"};
+        std::string camera_optical_frame_id_{"machine_1_camera_rgb_optical_link"};
 
-        // Topic names
+        // Topic names (configurable)
         std::string pose_topic_name_{"/machine_1/pose"};
         std::string raw_pose_topic_name_{"/machine_1/pose/raw"};
         std::string std_pose_topic_name_{"/machine_1/pose/corr/std"};
@@ -81,18 +79,18 @@ namespace tf_from_uav_pose {
         std::string throttled_pose_topic_name_{"/machine_1/throttledPose"};
         std::string throttled_uav_pose_topic_name_{"/machine_1/throttledUAVPose"};
 
-        // Camera static publishing
+        // Camera static publishing parameters
         bool publish_camera_to_robot_tf_and_pose_{true};
-        std::vector<double> camera_tf_parameters_;
-        geometry_msgs::msg::TransformStamped camera_transform_;  // Store camera transform
+        std::vector<double> camera_tf_parameters_{0.18, 0.0, -0.07, 0.0, -0.38, 0.0, 0.924};
+        geometry_msgs::msg::TransformStamped camera_transform_;
 
     public:
         TfFromUAVPose();
 
-        // NEW: Method to update timestamps after clock sync
+        // Method to update timestamps after clock sync
         void updateTimestampsAfterClockSync();
 
-        // Parameter callback
+        // Parameter callback (replaces dynamic reconfigure)
         rcl_interfaces::msg::SetParametersResult parametersCallback(
             const std::vector<rclcpp::Parameter> & parameters);
 
@@ -109,4 +107,4 @@ namespace tf_from_uav_pose {
     };
 }
 
-#endif // TF_FROM_UAV_POSE_HPP
+#endif // TF_FROM_UAV_POSE_H
