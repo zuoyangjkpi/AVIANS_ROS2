@@ -1,21 +1,5 @@
-# Sample configuration file for DistributedKF3D ROS2 node
-distributed_kf_3d:
+distributed_kf3d:
   ros__parameters:
-    # Use simulation time - set to true for simulation, false for real robot
-    use_sim_time: true
-    
-    # Robot configuration
-    robotID: 1
-    numRobots: 3
-    
-    # Topics
-    pub_topic: "target_tracker/pose"
-    velPub_topic: "target_tracker/twist"
-    offset_topic: "target_tracker/offset"
-    pose_topic: "pose"
-    measurement_topic_suffix_self: "/target_measurements"
-    measurement_topic_suffix: "target_measurements"
-    
     # Initial uncertainty parameters
     initialUncertaintyPosXY: 100.0
     initialUncertaintyPosZ: 10.0
@@ -25,28 +9,35 @@ distributed_kf_3d:
     initialUncertaintyOffsetZ: 3.0
     
     # Process noise parameters
-    noisePosXVar: 0.01
-    noiseVelXVar: 0.01
-    noiseOffXVar: 0.01
-    noisePosYVar: 0.01
-    noiseVelYVar: 0.01
-    noiseOffYVar: 0.01
-    noisePosZVar: 0.01
-    noiseVelZVar: 0.01
-    noiseOffZVar: 0.01
+    noisePosXVar: 0.0
+    noisePosYVar: 0.0
+    noisePosZVar: 0.0
+    noiseVelXVar: 0.5
+    noiseVelYVar: 0.5
+    noiseVelZVar: 0.1
+    noiseOffXVar: 0.02
+    noiseOffYVar: 0.02
+    noiseOffZVar: 0.02
     
-    # Global offset bias parameters
+    # Global offset bias
     posGlobalOffsetBiasX: 0.0
     posGlobalOffsetBiasY: 0.0
     posGlobalOffsetBiasZ: 0.0
     
-    # Decay time parameters
-    velocityDecayTime: 3.0
+    # Decay times
+    velocityDecayTime: 6.0
     offsetDecayTime: 30.0
     
-    # False positive detection
-    falsePositiveThresholdSigma: 6.0
+    # False positive threshold
+    falsePositiveThresholdSigma: 2.0
     
-    # Filter parameters
+    # Time threshold for filter reset
     reset_time_threshold: 10.0
-    cache_size: 20
+    
+    # Cache configuration
+    cache_size: 40
+    
+    # Publishing topics
+    pub_topic: "target_tracker/pose"
+    velPub_topic: "target_tracker/twist"
+    offset_topic: "target_tracker/offset"

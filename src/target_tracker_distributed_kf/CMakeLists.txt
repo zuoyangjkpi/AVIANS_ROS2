@@ -19,7 +19,7 @@ find_package(Eigen3 REQUIRED)
 find_package(ros2_utils REQUIRED)
 
 # Find MRPT
-find_package(mrpt-math REQUIRED)
+# find_package(mrpt-math REQUIRED)
 
 # Include directories
 include_directories(
@@ -50,7 +50,7 @@ ament_target_dependencies(${PROJECT_NAME}
 )
 
 target_link_libraries(${PROJECT_NAME}
-  mrpt::math
+  # mrpt::math
   Eigen3::Eigen
 )
 

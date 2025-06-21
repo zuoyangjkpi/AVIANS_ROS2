@@ -1,16 +1,33 @@
-#!/usr/bin/env python3
-
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
+import os
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
+    # Get the launch directory
+    pkg_dir = get_package_share_directory('target_tracker_distributed_kf')
+    config_dir = os.path.join(pkg_dir, 'config')
+    default_config_file = os.path.join(config_dir, 'tracker_params.yaml')
+    
     # Declare launch arguments
+    use_sim_time_arg = DeclareLaunchArgument(
+        'use_sim_time',
+        default_value='true',
+        description='Use simulation time'
+    )
+    
+    config_file_arg = DeclareLaunchArgument(
+        'config_file',
+        default_value=default_config_file,
+        description='Full path to the ROS2 parameters file'
+    )
+    
     robot_id_arg = DeclareLaunchArgument(
         'robot_id',
         default_value='1',
-        description='Robot ID for this instance'
+        description='Robot ID for distributed tracking'
     )
     
     num_robots_arg = DeclareLaunchArgument(
@@ -19,73 +36,53 @@ def generate_launch_description():
         description='Total number of robots in the system'
     )
     
-    use_sim_time_arg = DeclareLaunchArgument(
-        'use_sim_time',
-        default_value='true',
-        description='Use simulation time'
+    # Topics configuration
+    pose_topic_arg = DeclareLaunchArgument(
+        'pose_topic',
+        default_value='/machine_1/pose',
+        description='UAV pose topic'
     )
-
+    
+    measurement_topic_self_arg = DeclareLaunchArgument(
+        'measurement_topic_self',
+        default_value='/machine_1/object_detections/projected_to_world',
+        description='Self measurement topic'
+    )
+    
+    measurement_topic_suffix_arg = DeclareLaunchArgument(
+        'measurement_topic_suffix',
+        default_value='object_detections/projected_to_world_network',
+        description='Measurement topic suffix for other robots'
+    )
+    
     # Create the node
     distributed_kf_node = Node(
         package='target_tracker_distributed_kf',
         executable='distributed_kf_node',
-        name='distributed_kf_3d',
+        name='distributed_kf3d',
         parameters=[
+            LaunchConfiguration('config_file'),
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'robotID': LaunchConfiguration('robot_id'),
                 'numRobots': LaunchConfiguration('num_robots'),
-                
-                # Initial uncertainty parameters
-                'initialUncertaintyPosXY': 100.0,
-                'initialUncertaintyPosZ': 10.0,
-                'initialUncertaintyVelXY': 1.0,
-                'initialUncertaintyVelZ': 0.5,
-                'initialUncertaintyOffsetXY': 1.0,
-                'initialUncertaintyOffsetZ': 3.0,
-                
-                # Noise parameters
-                'noisePosXVar': 0.0,
-                'noiseVelXVar': 0.5,
-                'noiseOffXVar': 0.02,
-                'noisePosYVar': 0.0,
-                'noiseVelYVar': 0.5,
-                'noiseOffYVar': 0.02,
-                'noisePosZVar': 0.0,
-                'noiseVelZVar': 0.5,
-                'noiseOffZVar': 0.02,
-                
-                # Bias parameters
-                'posGlobalOffsetBiasX': 0.0,
-                'posGlobalOffsetBiasY': 0.0,
-                'posGlobalOffsetBiasZ': 0.0,
-                
-                # Decay parameters
-                'velocityDecayTime': 3.0,
-                'offsetDecayTime': 30.0,
-                
-                # False positive threshold
-                'falsePositiveThresholdSigma': 2.0,
-                
-                # Topics
-                'pub_topic': '/machine_1/target_tracker/pose',
-                'velPub_topic': '/machine_1/target_tracker/twist',
-                'offset_topic': '/machine_1/target_tracker/offset',
-                'pose_topic': '/machine_1/pose',
-                'measurement_topic_suffix_self': '/machine_1/object_detections/projected_to_world',
-                'measurement_topic_suffix': 'object_detections/projected_to_world',
-                
-                # Other parameters
-                'reset_time_threshold': 10.0,
-                'cache_size': 40,
+                'pose_topic': LaunchConfiguration('pose_topic'),
+                'measurement_topic_suffix_self': LaunchConfiguration('measurement_topic_self'),
+                'measurement_topic_suffix': LaunchConfiguration('measurement_topic_suffix'),
             }
         ],
-        output='screen'
+        output='screen',
+        emulate_tty=True,
+        arguments=['--ros-args', '--log-level', 'INFO']
     )
-
+    
     return LaunchDescription([
+        use_sim_time_arg,
+        config_file_arg,
         robot_id_arg,
         num_robots_arg,
-        use_sim_time_arg,
+        pose_topic_arg,
+        measurement_topic_self_arg,
+        measurement_topic_suffix_arg,
         distributed_kf_node
     ])

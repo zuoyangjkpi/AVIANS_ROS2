@@ -31,7 +31,7 @@ def generate_launch_description():
         name='tf_from_uav_pose',
         parameters=[
             # # Load ALL parameters from YAML file
-            # LaunchConfiguration('config_file'),
+            LaunchConfiguration('config_file'),
             # Only override essential launch-time parameters
             {
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
