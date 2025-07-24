@@ -19,7 +19,7 @@ DistributedKF3D::DistributedKF3D() :
     Hother((int) measurement_state_size, (int) state_size),
     R((int) state_size, (int) state_size) {
     
-    // CRITICAL: Declare use_sim_time parameter FIRST
+    // Declare use_sim_time parameter FIRST
     if (!this->has_parameter("use_sim_time")) {
         this->declare_parameter("use_sim_time", true);
     }

@@ -5,8 +5,8 @@
   <version>1.0.0</version>
   <description>Distributed Kalman Filter for 3D target tracking - ROS2 version</description>
   
-  <maintainer email="maintainer@example.com">Your Name</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="mohmedsayed0990@gmail.com">Mohamed Abdelmawgoud</maintainer>
+  <license>Apache-2.0</license>
   
   <buildtool_depend>ament_cmake</buildtool_depend>
   

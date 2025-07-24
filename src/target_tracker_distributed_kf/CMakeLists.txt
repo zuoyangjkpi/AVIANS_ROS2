@@ -27,7 +27,6 @@ include_directories(
   ${EIGEN3_INCLUDE_DIR}
 )
 
-# Create the library
 add_library(${PROJECT_NAME} SHARED
   src/DistributedKF3D.cpp
 )
@@ -54,7 +53,6 @@ target_link_libraries(${PROJECT_NAME}
   Eigen3::Eigen
 )
 
-# Create the executable
 add_executable(distributed_kf_node src/main.cpp)
 
 target_link_libraries(distributed_kf_node
@@ -65,7 +63,6 @@ ament_target_dependencies(distributed_kf_node
   rclcpp
 )
 
-# Install targets
 install(TARGETS
   ${PROJECT_NAME}
   EXPORT export_${PROJECT_NAME}
@@ -79,19 +76,16 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install header files
 install(DIRECTORY include/
   DESTINATION include/
 )
 
-# Install launch files if any
 install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}/
   OPTIONAL
 )
 
-# Install config files if any
 install(DIRECTORY
   config
   DESTINATION share/${PROJECT_NAME}/

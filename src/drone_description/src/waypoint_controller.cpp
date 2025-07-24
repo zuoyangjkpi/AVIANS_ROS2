@@ -8,7 +8,6 @@
 #include <Eigen/Dense>
 #include <ros2_utils/clock_sync.hpp>
 
-// PID controller class for 3D position control
 class PIDController3D {
 public:
     PIDController3D() = default;
@@ -104,7 +103,6 @@ private:
 class improved_waypoint_controller : public rclcpp::Node {
 public:
     improved_waypoint_controller() : Node("improved_waypoint_controller") {
-        // CRITICAL: Declare use_sim_time parameter FIRST
         if (!this->has_parameter("use_sim_time")) {
             this->declare_parameter("use_sim_time", false);
         }
@@ -334,7 +332,7 @@ private:
         
         geometry_msgs::msg::Twist cmd;
 
-        // **IMPROVED POSITION CONTROL**
+        // IMPROVED POSITION CONTROL
         if (distance > tolerance) {
             // Calculate desired velocity using PID
             Eigen::Vector3d desired_velocity_world = position_pid_.compute(position_error, dt);
@@ -381,7 +379,7 @@ private:
             cmd.linear.z = -current_velocity.z() * 0.1;
         }
 
-        // **IMPROVED YAW CONTROL** with PID
+        // IMPROVED YAW CONTROL with PID
         double desired_yaw = current_target_yaw_;
         
         // For tracking mode, point toward target velocity direction

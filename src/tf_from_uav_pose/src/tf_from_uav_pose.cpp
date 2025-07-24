@@ -10,6 +10,7 @@
 #include <ros2_utils/clock_sync.hpp>
 #include <cmath>
 #include <array>
+#include <Eigen/Dense>
 
 
 namespace tf_from_uav_pose {
@@ -66,7 +67,7 @@ void TfFromUAVPose::initializeParameters() {
         RCLCPP_INFO(this->get_logger(), "Using system time");
     }
     
-    // Declare topic name parameters (matching ROS1 exactly)
+    // Declare topic name parameters 
     this->declare_parameter("poseTopicName", pose_topic_name_);
     this->declare_parameter("rawPoseTopicName", raw_pose_topic_name_);
     this->declare_parameter("stdPoseTopicName", std_pose_topic_name_);
@@ -74,7 +75,7 @@ void TfFromUAVPose::initializeParameters() {
     this->declare_parameter("throttledPoseTopicName", throttled_pose_topic_name_);
     this->declare_parameter("throttledUAVPoseTopicName", throttled_uav_pose_topic_name_);
     
-    // Declare frame ID parameters (matching ROS1 exactly)
+    // Declare frame ID parameters 
     this->declare_parameter("machineFrameID", machine_frame_id_);
     this->declare_parameter("worldFrameID", world_frame_id_);
     this->declare_parameter("worldENUFrameID", world_enu_frame_id_);
@@ -82,7 +83,7 @@ void TfFromUAVPose::initializeParameters() {
     this->declare_parameter("cameraFrameID", camera_frame_id_);
     this->declare_parameter("cameraRGBOpticalFrameID", camera_optical_frame_id_);
     
-    // Declare offset and covariance parameters (matching ROS1 exactly)
+    // Declare offset and covariance parameters 
     this->declare_parameter("offsetX", offset_[0]);
     this->declare_parameter("offsetY", offset_[1]);
     this->declare_parameter("offsetZ", offset_[2]);
@@ -90,11 +91,11 @@ void TfFromUAVPose::initializeParameters() {
     this->declare_parameter("covarianceY", added_covariance_[1]);
     this->declare_parameter("covarianceZ", added_covariance_[2]);
     
-    // Other parameters (matching ROS1 exactly)
+    // Other parameters 
     this->declare_parameter("throttleRate", throttle_rate_);
     this->declare_parameter("dontPublishTFs", dont_publish_tfs_);
     
-    // Camera static publishing parameters (matching ROS1 exactly)
+    // Camera static publishing parameters 
     this->declare_parameter("cameraStaticPublish.publish", publish_camera_to_robot_tf_and_pose_);
     this->declare_parameter("cameraStaticPublish.TFParameters", camera_tf_parameters_);
     this->declare_parameter("cameraStaticPublish.topic", std::string("/machine_1/camera/pose"));
@@ -328,26 +329,6 @@ void TfFromUAVPose::initializePublishers() {
             camera_pose_topic, rclcpp::QoS(1).transient_local().reliable());
         cam_rgb_pose_pub_ = this->create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>(
             cam_rgb_pose_topic, rclcpp::QoS(1).transient_local().reliable());
-
-        // Create a timer for periodic republishing to ensure pose_cov_ops_interface compatibility
-        // This ensures the cache always has fresh data available
-        // camera_pose_timer_ = this->create_wall_timer(
-        //     std::chrono::milliseconds(1000),  // 1 Hz - low frequency, just for cache reliability
-        //     [this]() {
-        //         auto current_time = ros2_utils::ClockSynchronizer::getSafeTime(shared_from_this());
-        //         if (current_time.nanoseconds() > 0) {
-        //             if (camera_pose_pub_ && camera_pose_pub_->get_subscription_count() > 0) {
-        //                 cam_rob_pose_.header.stamp = current_time;
-        //                 camera_pose_pub_->publish(cam_rob_pose_);
-        //                 RCLCPP_DEBUG(this->get_logger(), "Republished camera pose for cache reliability");
-        //             }
-        //             if (cam_rgb_pose_pub_ && cam_rgb_pose_pub_->get_subscription_count() > 0) {
-        //                 rgb_cam_pose_.header.stamp = current_time;
-        //                 cam_rgb_pose_pub_->publish(rgb_cam_pose_);
-        //                 RCLCPP_DEBUG(this->get_logger(), "Republished camera RGB optical pose for cache reliability");
-        //             }
-        //         }
-        //     });
             
         RCLCPP_INFO(this->get_logger(), "Camera pose publishers configured (initial publish + periodic updates for cache reliability)");
     }
@@ -402,7 +383,7 @@ void TfFromUAVPose::poseCallback(const uav_msgs::msg::UAVPose::SharedPtr msg) {
     // Publish std pose msg
     std_pose_pub_->publish(std_pose_);
 
-    // Handle throttled publishing (matching ROS1 exactly)
+    // Handle throttled publishing 
     rclcpp::Duration time_diff = rclcpp::Time(msg->header.stamp) - rclcpp::Time(throttled_pose_.header.stamp);
     if (time_diff.seconds() > 0 && (1.0 / time_diff.seconds()) <= throttle_rate_) {
         // Copy contents to throttle pose msg
@@ -500,98 +481,127 @@ rcl_interfaces::msg::SetParametersResult TfFromUAVPose::parametersCallback(
  * 4. Maintains mathematical correctness
  */
 
-void uavCovariance_to_rosCovariance(const uav_msgs::msg::UAVPose::SharedPtr uav_msg,
+// Helper function to convert quaternion to rotation matrix
+Eigen::Matrix3d quaternionToRotationMatrix(double w, double x, double y, double z) {
+    Eigen::Matrix3d R;
+    double w2 = w * w;
+    double x2 = x * x;
+    double y2 = y * y;
+    double z2 = z * z;
+    
+    R << w2 + x2 - y2 - z2, 2 * (x * y - w * z), 2 * (x * z + w * y),
+         2 * (x * y + w * z), w2 - x2 + y2 - z2, 2 * (y * z - w * x),
+         2 * (x * z - w * y), 2 * (y * z + w * x), w2 - x2 - y2 + z2;
+    
+    return R;
+}
+
+// Helper function to compute Jacobian from quaternion to Euler angles
+Eigen::Matrix3d quaternionToEulerJacobian(double w, double x, double y, double z) {
+    // This computes the Jacobian matrix J such that d(euler) = J * d(quaternion)
+    // where euler = [roll, pitch, yaw] and quaternion = [x, y, z, w]
+    // This is a simplified version - you may need to adjust based on your specific Euler convention
+    
+    double x2 = x * x;
+    double y2 = y * y;
+    double z2 = z * z;
+    
+    // Compute some intermediate values
+    double sinr_cosp = 2 * (w * x + y * z);
+    double cosr_cosp = 1 - 2 * (x2 + y2);
+    double sinp = 2 * (w * y - z * x);
+    double siny_cosp = 2 * (w * z + x * y);
+    double cosy_cosp = 1 - 2 * (y2 + z2);
+    
+    Eigen::Matrix3d J;
+    
+    // Jacobian computation (this is an approximation - exact computation is more complex)
+    // Roll derivatives
+    double denom1 = sinr_cosp * sinr_cosp + cosr_cosp * cosr_cosp;
+    J(0, 0) = 2 * (w * cosr_cosp + x * sinr_cosp) / denom1; // d(roll)/d(x)
+    J(0, 1) = 2 * (z * cosr_cosp + y * sinr_cosp) / denom1; // d(roll)/d(y)
+    J(0, 2) = 2 * (y * cosr_cosp - z * sinr_cosp) / denom1; // d(roll)/d(z)
+    
+    // Pitch derivatives
+    double denom2 = sqrt(1 - sinp * sinp);
+    J(1, 0) = -2 * z / denom2; // d(pitch)/d(x)
+    J(1, 1) = 2 * w / denom2;  // d(pitch)/d(y)
+    J(1, 2) = -2 * x / denom2; // d(pitch)/d(z)
+    
+    // Yaw derivatives
+    double denom3 = siny_cosp * siny_cosp + cosy_cosp * cosy_cosp;
+    J(2, 0) = 2 * (y * cosy_cosp + x * siny_cosp) / denom3; // d(yaw)/d(x)
+    J(2, 1) = 2 * (x * cosy_cosp - y * siny_cosp) / denom3; // d(yaw)/d(y)
+    J(2, 2) = 2 * (w * cosy_cosp + z * siny_cosp) / denom3; // d(yaw)/d(z)
+    
+    return J;
+}
+
+void uavCovariance_to_rosCovariance(std::shared_ptr<uav_msgs::msg::UAVPose> uav_msg,
                                     geometry_msgs::msg::PoseWithCovariance &std_pose_cov) {
     
-    // CRITICAL: Normalize quaternion to prevent MRPT errors downstream
-    // This is what the original MRPT code was doing automatically
-    auto& q = std_pose_cov.pose.orientation;
-    double norm = sqrt(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
+    // Extract intermediate 7x7 covariance matrix (pos + quaternion)
+    Eigen::Matrix<double, 7, 7> intermediate = Eigen::Matrix<double, 7, 7>::Zero();
+    int order[]{0, 1, 2, 7, 8, 9, 6}; // pos_north, pos_east, pos_down, q_x, q_y, q_z, q_w
     
-    if (norm < 1e-6) {
-        RCLCPP_WARN_ONCE(rclcpp::get_logger("tf_from_uav_pose"), 
-                         "Invalid quaternion with near-zero norm, using identity quaternion");
-        q.w = 1.0; q.x = 0.0; q.y = 0.0; q.z = 0.0;
-    } else {
-        // Normalize quaternion
-        q.w /= norm;
-        q.x /= norm;
-        q.y /= norm;
-        q.z /= norm;
+    for (int x = 0; x < 7; x++) {
+        for (int y = 0; y < 7; y++) {
+            intermediate(x, y) = uav_msg->covariance[order[x] * 10 + order[y]];
+        }
     }
     
-    // Initialize covariance matrix to zero
-    std::fill(std_pose_cov.covariance.begin(), std_pose_cov.covariance.end(), 0.0);
+    // Set the pose
+    std_pose_cov.pose.position.x = uav_msg->position.x;
+    std_pose_cov.pose.position.y = uav_msg->position.y;
+    std_pose_cov.pose.position.z = uav_msg->position.z;
+    std_pose_cov.pose.orientation.w = uav_msg->orientation.w;
+    std_pose_cov.pose.orientation.x = uav_msg->orientation.x;
+    std_pose_cov.pose.orientation.y = uav_msg->orientation.y;
+    std_pose_cov.pose.orientation.z = uav_msg->orientation.z;
     
-    if (uav_msg->covariance.size() < 100) {
-        RCLCPP_WARN_ONCE(rclcpp::get_logger("tf_from_uav_pose"), 
-                         "UAV covariance array too small, using default uncertainties");
-        
-        // Default position uncertainties (m^2)
-        std_pose_cov.covariance[0]  = 0.1;  // x variance
-        std_pose_cov.covariance[7]  = 0.1;  // y variance  
-        std_pose_cov.covariance[14] = 0.1;  // z variance
-        
-        // Default orientation uncertainties (rad^2)
-        std_pose_cov.covariance[21] = 0.01; // roll variance
-        std_pose_cov.covariance[28] = 0.01; // pitch variance
-        std_pose_cov.covariance[35] = 0.01; // yaw variance
-        return;
+    // Convert quaternion covariance to Euler covariance using Jacobian
+    // Extract position covariance (3x3)
+    Eigen::Matrix3d pos_cov = intermediate.block<3, 3>(0, 0);
+    
+    // Extract quaternion covariance (4x4) - note: ordered as [x, y, z, w] in intermediate
+    Eigen::Matrix4d quat_cov = intermediate.block<4, 4>(3, 3);
+    
+    // Extract position-quaternion cross-covariance (3x4)
+    Eigen::Matrix<double, 3, 4> pos_quat_cov = intermediate.block<3, 4>(0, 3);
+    
+    // Compute Jacobian from quaternion to Euler angles (3x3)
+    // Note: We only use the first 3 components of quaternion (x, y, z) for the transformation
+    Eigen::Matrix3d J = quaternionToEulerJacobian(uav_msg->orientation.w, uav_msg->orientation.x,
+                                                   uav_msg->orientation.y, uav_msg->orientation.z);
+    
+    // Transform quaternion covariance to Euler covariance
+    // We need to handle the fact that quaternion has 4 components but Euler has 3
+    // Use only the first 3x3 block of quaternion covariance (x, y, z components)
+    Eigen::Matrix3d quat_xyz_cov = quat_cov.block<3, 3>(0, 0);
+    Eigen::Matrix3d euler_cov = J * quat_xyz_cov * J.transpose();
+    
+    // Transform position-quaternion cross-covariance
+    Eigen::Matrix<double, 3, 3> pos_euler_cov = pos_quat_cov.block<3, 3>(0, 0) * J.transpose();
+    
+    // Build the final 6x6 covariance matrix for ROS
+    Eigen::Matrix<double, 6, 6> final_cov = Eigen::Matrix<double, 6, 6>::Zero();
+    
+    // Position covariance
+    final_cov.block<3, 3>(0, 0) = pos_cov;
+    
+    // Euler angle covariance
+    final_cov.block<3, 3>(3, 3) = euler_cov;
+    
+    // Cross-covariance terms
+    final_cov.block<3, 3>(0, 3) = pos_euler_cov;
+    final_cov.block<3, 3>(3, 0) = pos_euler_cov.transpose();
+    
+    // Convert to ROS covariance array (row-major order)
+    for (int i = 0; i < 6; i++) {
+        for (int j = 0; j < 6; j++) {
+            std_pose_cov.covariance[i * 6 + j] = final_cov(i, j);
+        }
     }
-    
-    // UAV covariance matrix format (10x10):
-    // [0-2]: position (north, east, down) = (x, y, z)
-    // [3-5]: velocity  
-    // [6-9]: quaternion (w, x, y, z)
-    
-    // Map position covariances directly (same coordinate frame assumption)
-    std_pose_cov.covariance[0]  = uav_msg->covariance[0];   // x-x (north-north)
-    std_pose_cov.covariance[1]  = uav_msg->covariance[1];   // x-y (north-east)  
-    std_pose_cov.covariance[2]  = uav_msg->covariance[2];   // x-z (north-down)
-    std_pose_cov.covariance[6]  = uav_msg->covariance[10];  // y-x (east-north)
-    std_pose_cov.covariance[7]  = uav_msg->covariance[11];  // y-y (east-east)
-    std_pose_cov.covariance[8]  = uav_msg->covariance[12];  // y-z (east-down)
-    std_pose_cov.covariance[12] = uav_msg->covariance[20];  // z-x (down-north)
-    std_pose_cov.covariance[13] = uav_msg->covariance[21];  // z-y (down-east)
-    std_pose_cov.covariance[14] = uav_msg->covariance[22];  // z-z (down-down)
-    
-    // Convert quaternion covariance to Euler angle covariance
-    // This is the mathematically correct transformation that MRPT was doing
-    
-    // Extract quaternion variances from UAV covariance matrix
-    double qw_var = uav_msg->covariance[66]; // q_w variance (index 6,6 in 10x10)
-    double qx_var = uav_msg->covariance[77]; // q_x variance (index 7,7 in 10x10)  
-    double qy_var = uav_msg->covariance[88]; // q_y variance (index 8,8 in 10x10)
-    double qz_var = uav_msg->covariance[99]; // q_z variance (index 9,9 in 10x10)
-    
-    // For small angle approximations, we can use a simplified transformation
-    // This is a reasonable approximation for most robotics applications
-    // where orientation uncertainties are typically small
-    
-    // The exact transformation requires the full Jacobian, but for practical
-    // purposes, this approximation works well and matches MRPT's behavior
-    // for typical use cases
-    
-    // Roll variance approximation
-    // Roll is primarily affected by qx and qw variations
-    std_pose_cov.covariance[21] = 4.0 * (qx_var + qw_var);
-    
-    // Pitch variance approximation  
-    // Pitch is primarily affected by qy and qw variations
-    std_pose_cov.covariance[28] = 4.0 * (qy_var + qw_var);
-    
-    // Yaw variance approximation
-    // Yaw is primarily affected by qz and qw variations  
-    std_pose_cov.covariance[35] = 4.0 * (qz_var + qw_var);
-    
-    // Set cross-correlations between position and orientation to zero
-    // This is a simplification, but matches the original MRPT behavior
-    // for most practical applications
-    
-    RCLCPP_DEBUG(rclcpp::get_logger("tf_from_uav_pose"), 
-                "Converted covariances - pos: [%.3e, %.3e, %.3e], orient: [%.3e, %.3e, %.3e]",
-                std_pose_cov.covariance[0], std_pose_cov.covariance[7], std_pose_cov.covariance[14],
-                std_pose_cov.covariance[21], std_pose_cov.covariance[28], std_pose_cov.covariance[35]);
 }
 
 } // namespace tf_from_uav_pose_ros2

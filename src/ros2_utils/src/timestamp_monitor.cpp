@@ -75,13 +75,13 @@ public:
         
         // CRITICAL: Declare use_sim_time parameter FIRST
         if (!this->has_parameter("use_sim_time")) {
-            this->declare_parameter("use_sim_time", false);
+            this->declare_parameter("use_sim_time", true);
         }
         
         // Parameters
         this->declare_parameter("analysis_window_sec", analysis_window_sec_);
         this->declare_parameter("sync_tolerance_ms", sync_tolerance_ms_);
-        this->declare_parameter("reference_topic", std::string("/camera/image_raw"));
+        this->declare_parameter("reference_topic", std::string("/firefly_1/xtion/rgb/image_raw"));
         this->declare_parameter("log_to_file", log_to_file_);
         this->declare_parameter("show_detailed_stats", show_detailed_stats_);
         this->declare_parameter("log_file_path", std::string("/tmp/timestamp_analysis.csv"));
@@ -140,9 +140,9 @@ private:
         
         // Camera topics
         image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-            "/camera/image_raw", 10,
+            "/firefly_1/xtion/rgb/image_raw", 10,
             [this](const sensor_msgs::msg::Image::SharedPtr msg) {
-                recordMessage("/camera/image_raw", "sensor_msgs/Image", msg->header);
+                recordMessage("/firefly_1/xtion/rgb/image_raw", "sensor_msgs/Image", msg->header);
             });
         
         camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
@@ -199,15 +199,15 @@ private:
         
         // Detection pipeline topics
         detection_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
-            "/person_detections", 10,
+            "/machine_1/detections", 10,
             [this](const neural_network_msgs::msg::NeuralNetworkDetectionArray::SharedPtr msg) {
-                recordMessage("/person_detections", "NeuralNetworkDetectionArray", msg->header);
+                recordMessage("/machine_1/detections", "NeuralNetworkDetectionArray", msg->header);
             });
             
         feedback_sub_ = this->create_subscription<neural_network_msgs::msg::NeuralNetworkFeedback>(
-            "/neural_network_feedback", 10,
+            "/machine_1/neural_network_feedback", 10,
             [this](const neural_network_msgs::msg::NeuralNetworkFeedback::SharedPtr msg) {
-                recordMessage("/neural_network_feedback", "NeuralNetworkFeedback", msg->header);
+                recordMessage("/machine_1/neural_network_feedback", "NeuralNetworkFeedback", msg->header);
             });
         
         // Tracking topics

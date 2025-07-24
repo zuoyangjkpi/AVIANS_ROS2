@@ -12,7 +12,7 @@
 #include "det/YOLO12.hpp"
 #include "cv/extensions/projection.h"
 
-// Include custom message types (assuming they're in a package called 'neural_network_msgs')
+// Custom message
 #include "neural_network_msgs/msg/neural_network_detection.hpp"
 #include "neural_network_msgs/msg/neural_network_detection_array.hpp"
 #include "neural_network_msgs/msg/neural_network_feedback.hpp"
@@ -21,29 +21,20 @@
 namespace yolo12_detector_node
 {
 
-/**
- * @brief ROS2 node that performs object detection using YOLO12
- */
 class YOLO12DetectorNode : public rclcpp::Node
 {
 public:
-    /**
-     * @brief Constructor
-     */
+ 
     explicit YOLO12DetectorNode(const rclcpp::NodeOptions & options);
 
-    /**
-     * @brief Destructor
-     */
+  
     ~YOLO12DetectorNode() = default;
 
-    /**
-     * @brief Update timestamps after clock synchronization
-     */
+   
     void updateTimestampsAfterClockSync();
 
 private:
-    // ROS2 Publishers and Subscribers
+    // Publishers and Subscribers
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
     rclcpp::Subscription<neural_network_msgs::msg::NeuralNetworkFeedback>::SharedPtr feedback_sub_;
     
@@ -77,7 +68,7 @@ private:
     float var_const_y_min_;
     float var_const_y_max_;
 
-    // Buffer management (like ROS1 version)
+    // Buffer management 
     size_t length_final_img_;
     std::unique_ptr<uint8_t[]> buffer_final_img_;
     std::unique_ptr<uint8_t[]> buffer_results_;

@@ -99,7 +99,7 @@ public:
         }
     }
     
-    // NEW: Method to validate timestamps before critical operations
+    // Method to validate timestamps before critical operations
     static bool validateTimestamp(rclcpp::Node::SharedPtr node, const rclcpp::Time& timestamp) {
         if (timestamp.nanoseconds() == 0) {
             RCLCPP_WARN(node->get_logger(), "Invalid timestamp detected (zero time)");

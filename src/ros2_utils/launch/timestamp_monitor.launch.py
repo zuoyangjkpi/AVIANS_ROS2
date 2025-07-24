@@ -29,7 +29,7 @@ def generate_launch_description():
             'log_file_path': LaunchConfiguration('log_file_path'),
             'log_to_file': True,
             'sync_tolerance_ms': 100.0,
-            'reference_topic': '/camera/image_raw',
+            'reference_topic': '/firefly_1/xtion/rgb/image_raw',
             'analysis_window_sec': 10.0,
             'show_detailed_stats': False
         }]

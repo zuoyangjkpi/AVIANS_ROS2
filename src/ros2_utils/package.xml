@@ -5,7 +5,7 @@
   <version>1.0.0</version>
   <description>Shared utilities for ROS2 nodes including clock synchronization</description>
   
-  <maintainer email="your.email@example.com">Your Name</maintainer>
+  <maintainer email="mohmedsayed0990@gmail.com">Mohamed Abdelmawgoud</maintainer>
   <license>Apache-2.0</license>
   
   <buildtool_depend>ament_cmake</buildtool_depend>

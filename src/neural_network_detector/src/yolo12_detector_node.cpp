@@ -1,5 +1,6 @@
 #include "neural_network_detector/yolo12_detector_node.hpp"
 #include <ros2_utils/clock_sync.hpp>
+#include <chrono>
 
 
 namespace yolo12_detector_node
@@ -13,10 +14,7 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
   last_feedback_time_(this->get_clock()->now()),
   last_detection_time_(this->get_clock()->now())
 {
-
-
-
-      // CRITICAL: Declare use_sim_time parameter FIRST
+    // Declare use_sim_time parameter FIRST
     if (!this->has_parameter("use_sim_time")) {
         this->declare_parameter("use_sim_time", true);
     }
@@ -231,7 +229,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
         // Crop the image
         cv::Mat cropped = mat_img(crop_area);
 
-        // Resize to desired resolution using pre-allocated buffer (like ROS1)
+        // Resize to desired resolution using pre-allocated buffer 
         const int sizes[2] = {desired_resolution_.height, desired_resolution_.width}; // y comes first
         cv::Mat resized(2, sizes, CV_8UC3, buffer_final_img_.get());
         cv::resize(cropped, resized, resized.size(), 0, 0, cv::INTER_LINEAR);
@@ -242,9 +240,18 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
                        desired_resolution_.height / static_cast<float>(cropped.rows)),
             cv::Point2i(0, 0));
 
+
+
+        auto start = std::chrono::high_resolution_clock::now();
+
         // Run YOLO detection on resized image
         std::vector<Detection> detections = yolo_detector_->detect(
             resized, confidence_threshold_, iou_threshold_);
+
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        RCLCPP_INFO(this->get_logger(), "Inference latency: %ld ms", duration_ms);
 
         // Create detection array message
         neural_network_msgs::msg::NeuralNetworkDetectionArray detection_array_msg;
@@ -341,7 +348,6 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
                 continue; // Skip this detection
             }
 
-            // Rest of your variance calculation code remains the same...
             detection_msg.variance_xmin = var_const_x_min_ * crop_area.width * crop_area.width;
             detection_msg.variance_xmax = var_const_x_max_ * crop_area.width * crop_area.width;
             detection_msg.variance_ymin = var_const_y_min_ * crop_area.height * crop_area.height;
@@ -375,7 +381,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             }
         }
 
-        // Publish detection array if not empty (like ROS1)
+        // Publish detection array if not empty 
         if (!detection_array_msg.detections.empty()) {
             detection_pub_->publish(detection_array_msg);
         }
@@ -388,7 +394,7 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
 
         // Publish debug image if enabled and has subscribers
         if (publish_debug_image_ && debug_image_pub_.getNumSubscribers() > 0) {
-            // Rectangle on the original image - zoom level in green (like ROS1)
+            // Rectangle on the original image - zoom level in green 
             cv::rectangle(mat_img, crop_area, cv::Scalar(50, 255, 50), 5);
 
             // Draw feedback debug info if available 
@@ -488,7 +494,7 @@ cv::Rect YOLO12DetectorNode::getCropArea(
                 proj_crop << cv::Point2i(original_resolution.width, crop_length));
         }
     } else {
-        // Target visible - crop around feedback region (same logic as ROS1)
+        // Target visible - crop around feedback region 
         // Clamp bounds
         int16_t ymin = std::max<int16_t>(feedback.ymin, 0);
         int16_t ymax = std::min<int16_t>(feedback.ymax, original_resolution.height);

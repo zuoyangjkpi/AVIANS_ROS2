@@ -106,5 +106,9 @@
     },
     "C_Cpp.default.cppStandard": "c++20",
     "files.autoSave": "onWindowChange",
-    "cmake.sourceDirectory": "/home/dell/drone/src/drone_description"
+    "cmake.sourceDirectory": "/home/dell/drone/src/drone_description",
+    "cSpell.words": [
+        "Eigen",
+        "rclcpp"
+    ]
 }
