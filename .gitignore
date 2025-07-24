@@ -1,4 +1,9 @@
-/build/
-/install/
-/log/
+# Example entries
+build/
+install/
+log/
+frames_2025-06-17_22.43.34.gv
+frames_2025-06-17_22.43.34.pdf
+frames_2025-06-17_22.55.54.gv
+frames_2025-06-17_22.55.54.pdf
 yolo12n.pt
