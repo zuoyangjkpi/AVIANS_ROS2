@@ -1,0 +1,3 @@
+[submodule "src/neural_network_detector/third_party/YOLOs-CPP"]
+	path = src/neural_network_detector/third_party/YOLOs-CPP
+	url = https://github.com/Geekgineer/YOLOs-CPP.git
