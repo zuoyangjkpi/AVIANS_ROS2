@@ -1,119 +1,75 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.22)
 project(neural_network_detector)
-
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
+ add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(rclcpp_components REQUIRED)
 find_package(neural_network_msgs REQUIRED)
-find_package(ros2_utils REQUIRED)
 
+# ONNX Runtime
+set(ONNXRUNTIME_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1)
+set(ONNXRUNTIME_INCLUDE_DIRS ${ONNXRUNTIME_ROOT_PATH}/include)
+set(ONNXRUNTIME_LIB ${ONNXRUNTIME_ROOT_PATH}/lib/libonnxruntime.so.1.20.1)
 
-include_directories(include)
-include_directories(third_party/YOLOs-CPP/include)  # Add YOLO include path
-include_directories(third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include)  # Add ONNX include path
-
-# Define ONNX Runtime paths
-set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1")
-set(ONNXRUNTIME_LIB "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.1.20.1")
-
-# Verify the library exists
-if(NOT EXISTS "${ONNXRUNTIME_LIB}")
-    message(FATAL_ERROR "ONNX Runtime library not found at: ${ONNXRUNTIME_LIB}")
+# Check if ONNX Runtime exists
+if(NOT EXISTS ${ONNXRUNTIME_LIB})
+ message(FATAL_ERROR "ONNX Runtime library not found at: 
+${ONNXRUNTIME_LIB}")
 endif()
 
+# Include directories
+include_directories(
+ include
+ ${ONNXRUNTIME_INCLUDE_DIRS}
+ third_party/YOLOs-CPP/include
+)
+
+# YOLO12 detector node
 add_executable(yolo12_detector_node 
-src/yolo12_detector_node.cpp
+ src/yolo12_detector_node.cpp
+ third_party/YOLOs-CPP/src/YOLO12.cpp
 )
-
 ament_target_dependencies(yolo12_detector_node
-  rclcpp
-  std_msgs
-  sensor_msgs
-  geometry_msgs
-  cv_bridge
-  image_transport
-  neural_network_msgs
-  OpenCV
-  rclcpp_components
-  ros2_utils
+ rclcpp
+ sensor_msgs
+ geometry_msgs
+ cv_bridge
+ OpenCV
+ neural_network_msgs
 )
-
-ament_export_include_directories(include)
-ament_export_libraries(yolo12_detector_node_component)
-ament_export_dependencies(
-  rclcpp
-  rclcpp_components
-  geometry_msgs
-  sensor_msgs
-  std_msgs
-  neural_network_msgs
-  tf2_ros
-  tf2
-  tf2_geometry_msgs
-  cv_bridge
-  nav_msgs
-  OpenCV
-  ros2_utils
+target_link_libraries(yolo12_detector_node
+ ${ONNXRUNTIME_LIB}
 )
-
-# Link ONNX Runtime libraries to your executable
-target_link_libraries(yolo12_detector_node 
-    "${ONNXRUNTIME_LIB}"
+# Neural network detector node (original)
+add_executable(neural_network_detector_node 
+src/neural_network_detector_node.cpp)
+ament_target_dependencies(neural_network_detector_node
+ rclcpp
+ sensor_msgs
+ geometry_msgs
+ cv_bridge
+ OpenCV
+ neural_network_msgs
 )
-
-# Set RPATH so the executable can find the library at runtime
-set_target_properties(yolo12_detector_node PROPERTIES
-    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/lib"
-    BUILD_WITH_INSTALL_RPATH FALSE
-    INSTALL_RPATH_USE_LINK_PATH TRUE
-)
-
-target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
-
-
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  set(ament_cmake_copyright_FOUND TRUE)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()
-
-# Install the executable
+# Install targets
 install(TARGETS
-  yolo12_detector_node
-  DESTINATION lib/${PROJECT_NAME}
+ yolo12_detector_node
+ neural_network_detector_node
+ DESTINATION lib/${PROJECT_NAME}
 )
-
-# Install ONNX Runtime library
-install(FILES
-  "${ONNXRUNTIME_LIB}"
-  DESTINATION lib/${PROJECT_NAME}/lib
-  RENAME libonnxruntime.so.1
+# Install config files
+install(DIRECTORY config/
+ DESTINATION share/${PROJECT_NAME}/config/
 )
-
-# Install YOLO models and labels
-install(DIRECTORY
-  third_party/
-  DESTINATION share/${PROJECT_NAME}/
-  FILES_MATCHING 
-  PATTERN "*.onnx"
-  PATTERN "*.names"
-  PATTERN "*.txt"
-)
-
-install(DIRECTORY include/
-  DESTINATION include
-)
-
+if(BUILD_TESTING)
+ find_package(ament_lint_auto REQUIRED)
+ ament_lint_auto_find_test_dependencies()
+endif()
 ament_package()
