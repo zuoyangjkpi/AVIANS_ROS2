@@ -48,9 +48,15 @@ ament_target_dependencies(${PROJECT_NAME}
   ros2_utils
 )
 
+# target_link_libraries(${PROJECT_NAME}
+#   # mrpt::math
+#   Eigen3::Eigen
+# )
+
 target_link_libraries(${PROJECT_NAME}
   # mrpt::math
   Eigen3::Eigen
+  curl
 )
 
 add_executable(distributed_kf_node src/main.cpp)

@@ -60,10 +60,18 @@ if(BUILD_TESTING)
     test/test_pose_cov_ops_interface.cpp
   )
 
+  # target_link_libraries(test_pose_cov_ops
+  # ${PROJECT_NAME}
+  # rclcpp::rclcpp
+  # )
+
+
   target_link_libraries(test_pose_cov_ops
   ${PROJECT_NAME}
   rclcpp::rclcpp
+  curl
 )
+
 install(TARGETS test_pose_cov_ops
   DESTINATION lib/${PROJECT_NAME}
 )

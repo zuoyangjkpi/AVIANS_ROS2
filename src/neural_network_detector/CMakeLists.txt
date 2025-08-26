@@ -79,7 +79,12 @@ set_target_properties(yolo12_detector_node PROPERTIES
     INSTALL_RPATH_USE_LINK_PATH TRUE
 )
 
-target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
+# target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
+target_link_libraries(yolo12_detector_node 
+    "${ONNXRUNTIME_LIB}"
+    curl
+    ${OpenCV_LIBS}
+)
 
 
 if(BUILD_TESTING)
