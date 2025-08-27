@@ -29,10 +29,10 @@ def generate_launch_description():
     rviz_config = os.path.join(drone_description, "config", "drone.rviz")
     
     # YOLO model paths
-    default_yolo_model_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/yolo12n.onnx"
+    default_yolo_model_path = os.path.join(
         neural_network_detector_dir, "YOLOs-CPP", "models", "yolo12n.onnx"
     )
-    default_yolo_labels_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/quantized_models/coco.names"
+    default_yolo_labels_path = os.path.join(
         neural_network_detector_dir, "YOLOs-CPP", "models", "coco.names"
     )
 
