@@ -18,22 +18,38 @@ find_package(rclcpp_components REQUIRED)
 find_package(neural_network_msgs REQUIRED)
 find_package(ros2_utils REQUIRED)
 
+# -----------------------------
+# third_party roots / ONNX Runtime (GPU 1.22.0 via stable symlink)
+# -----------------------------
+set(THIRD_PARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP")
 
-include_directories(include)
-include_directories(third_party/YOLOs-CPP/include)  # Add YOLO include path
-include_directories(third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1/include)  # Add ONNX include path
+# 使用你创建的稳定软链接：
+#   third_party/YOLOs-CPP/onnxruntime -> onnxruntime-linux-x64-gpu-1.22.0
+set(ONNXRUNTIME_ROOT "${THIRD_PARTY_DIR}/onnxruntime")
+set(ONNXRUNTIME_INCLUDE_DIR "${ONNXRUNTIME_ROOT}/include")
 
-# Define ONNX Runtime paths
-set(ONNXRUNTIME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/YOLOs-CPP/onnxruntime-linux-x64-1.20.1")
-set(ONNXRUNTIME_LIB "${ONNXRUNTIME_ROOT}/lib/libonnxruntime.so.1.20.1")
+find_library(ONNXRUNTIME_LIB
+  NAMES onnxruntime libonnxruntime
+  PATHS "${ONNXRUNTIME_ROOT}/lib"
+  NO_DEFAULT_PATH
+  REQUIRED)
 
-# Verify the library exists
 if(NOT EXISTS "${ONNXRUNTIME_LIB}")
-    message(FATAL_ERROR "ONNX Runtime library not found at: ${ONNXRUNTIME_LIB}")
+  message(FATAL_ERROR "ONNX Runtime library not found at: ${ONNXRUNTIME_LIB}")
 endif()
 
-add_executable(yolo12_detector_node 
-src/yolo12_detector_node.cpp
+# -----------------------------
+# Sources / Target
+# -----------------------------
+add_executable(yolo12_detector_node
+  src/yolo12_detector_node.cpp
+)
+
+target_include_directories(yolo12_detector_node PRIVATE
+  include
+  ${THIRD_PARTY_DIR}/include           # YOLO 自带头文件（如果有的话）
+  ${ONNXRUNTIME_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ament_target_dependencies(yolo12_detector_node
@@ -49,76 +65,60 @@ ament_target_dependencies(yolo12_detector_node
   ros2_utils
 )
 
-ament_export_include_directories(include)
-ament_export_libraries(yolo12_detector_node_component)
-ament_export_dependencies(
-  rclcpp
-  rclcpp_components
-  geometry_msgs
-  sensor_msgs
-  std_msgs
-  neural_network_msgs
-  tf2_ros
-  tf2
-  tf2_geometry_msgs
-  cv_bridge
-  nav_msgs
-  OpenCV
-  ros2_utils
+target_link_libraries(yolo12_detector_node
+  ${ONNXRUNTIME_LIB}
+  curl
+  ${OpenCV_LIBS}
 )
 
-# Link ONNX Runtime libraries to your executable
-target_link_libraries(yolo12_detector_node 
-    "${ONNXRUNTIME_LIB}"
-)
-
-# Set RPATH so the executable can find the library at runtime
+# 运行时 RPATH：
+#   - 构建时：从 third_party 里的 ORT 目录找 provider .so
+#   - 安装后：可执行旁的 lib/ 目录（$ORIGIN = install/lib/${PROJECT_NAME}）
 set_target_properties(yolo12_detector_node PROPERTIES
-    INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/lib"
-    BUILD_WITH_INSTALL_RPATH FALSE
-    INSTALL_RPATH_USE_LINK_PATH TRUE
+  BUILD_RPATH   "${ONNXRUNTIME_ROOT}/lib"
+  INSTALL_RPATH "\$ORIGIN/lib"
 )
 
-# target_link_libraries(yolo12_detector_node "${cpp_typesupport_target}")
-target_link_libraries(yolo12_detector_node 
-    "${ONNXRUNTIME_LIB}"
-    curl
-    ${OpenCV_LIBS}
+# -----------------------------
+# Install
+# -----------------------------
+# 可执行文件
+install(TARGETS
+  yolo12_detector_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
+# 安装 ORT 核心及 provider 动态库到可执行旁的 lib/ 子目录
+install(DIRECTORY "${ONNXRUNTIME_ROOT}/lib/"
+  DESTINATION "lib/${PROJECT_NAME}/lib"
+  FILES_MATCHING
+    PATTERN "libonnxruntime*.so*"
+    PATTERN "libonnxruntime_providers_*.so*"
+)
 
+# 模型 / 标签等
+install(DIRECTORY
+  third_party/
+  DESTINATION share/${PROJECT_NAME}/
+  FILES_MATCHING
+    PATTERN "*.onnx"
+    PATTERN "*.names"
+    PATTERN "*.txt"
+)
+
+# 头文件（如需）
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+# -----------------------------
+# Testing
+# -----------------------------
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-# Install the executable
-install(TARGETS
-  yolo12_detector_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Install ONNX Runtime library
-install(FILES
-  "${ONNXRUNTIME_LIB}"
-  DESTINATION lib/${PROJECT_NAME}/lib
-  RENAME libonnxruntime.so.1
-)
-
-# Install YOLO models and labels
-install(DIRECTORY
-  third_party/
-  DESTINATION share/${PROJECT_NAME}/
-  FILES_MATCHING 
-  PATTERN "*.onnx"
-  PATTERN "*.names"
-  PATTERN "*.txt"
-)
-
-install(DIRECTORY include/
-  DESTINATION include
-)
 
 ament_package()

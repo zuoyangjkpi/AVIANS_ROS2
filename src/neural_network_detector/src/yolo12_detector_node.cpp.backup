@@ -38,7 +38,7 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     // Create subscribers
     image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-        "camera/image_raw", 
+        "image_raw", 
         rclcpp::QoS(1).best_effort(),
         std::bind(&YOLO12DetectorNode::imageCallback, this, std::placeholders::_1));
     
@@ -49,10 +49,10 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     // Create publishers
     detection_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
-        "person_detections", rclcpp::QoS(10));
+        "detections", rclcpp::QoS(10));
     
     detection_count_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>(
-        "person_detection_count", rclcpp::QoS(10));
+        "detection_count", rclcpp::QoS(10));
 
     
      if (publish_debug_image_) {
