@@ -10,10 +10,11 @@ import numpy as np
 import math
 import time
 
-from geometry_msgs.msg import Twist, PoseStamped
+from geometry_msgs.msg import Twist, PoseStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Header
-from neural_network_msgs.msg import NeuralNetworkDetectionArray, NeuralNetworkDetection, BoundingBox2D, Point2D
+from neural_network_msgs.msg import NeuralNetworkDetectionArray, NeuralNetworkDetection
+import tf2_ros
 
 class NMPCTestNode(Node):
     """Test node for NMPC tracker"""
@@ -31,6 +32,9 @@ class NMPCTestNode(Node):
         self.person_position = np.array([0.0, 0.0, 0.0])
         self.drone_position = np.array([3.0, 3.0, 2.0])
         self.drone_velocity = np.array([0.0, 0.0, 0.0])
+        
+        # TF broadcaster
+        self.tf_broadcaster = tf2_ros.TransformBroadcaster(self)
         
         # Publishers
         self.detection_pub = self.create_publisher(
@@ -63,6 +67,7 @@ class NMPCTestNode(Node):
         self.detection_timer = self.create_timer(0.1, self.publish_detection)  # 10 Hz
         self.odom_timer = self.create_timer(0.05, self.publish_odometry)  # 20 Hz
         self.enable_timer = self.create_timer(1.0, self.publish_enable)  # 1 Hz
+        self.tf_timer = self.create_timer(0.05, self.publish_transforms)  # 20 Hz
         
         self.get_logger().info(f"NMPC Test Node started - Mode: {self.test_mode}")
         self.get_logger().info("Publishing simulated person detections and drone odometry")
@@ -124,8 +129,8 @@ class NMPCTestNode(Node):
         
         # Create person detection
         detection = NeuralNetworkDetection()
-        detection.class_name = "person"
-        detection.confidence = 0.85 + 0.1 * np.random.random()  # 0.85-0.95 confidence
+        detection.object_class = 1  # Assuming 1 represents "person" class
+        detection.detection_score = 0.85 + 0.1 * np.random.random()  # 0.85-0.95 confidence
         
         # Simulate bounding box based on distance
         distance = np.linalg.norm(self.person_position - self.drone_position)
@@ -145,13 +150,28 @@ class NMPCTestNode(Node):
             center_x = np.clip(center_x, bbox_width/2, 1.0 - bbox_width/2)
             center_y = np.clip(center_y, bbox_height/2, 1.0 - bbox_height/2)
             
-            # Create bounding box
-            detection.bbox = BoundingBox2D()
-            detection.bbox.center = Point2D()
-            detection.bbox.center.x = center_x
-            detection.bbox.center.y = center_y
-            detection.bbox.size_x = bbox_width
-            detection.bbox.size_y = bbox_height
+            # Convert center/size to min/max coordinates (assuming normalized coordinates 0-1)
+            # If using pixel coordinates, multiply by image width/height
+            image_width = 640  # Assumed image width
+            image_height = 480  # Assumed image height
+            
+            # Convert normalized coordinates to pixel coordinates
+            xmin = int((center_x - bbox_width/2) * image_width)
+            xmax = int((center_x + bbox_width/2) * image_width)
+            ymin = int((center_y - bbox_height/2) * image_height)
+            ymax = int((center_y + bbox_height/2) * image_height)
+            
+            # Set bounding box coordinates
+            detection.xmin = xmin
+            detection.xmax = xmax
+            detection.ymin = ymin
+            detection.ymax = ymax
+            
+            # Set variance values (optional, for uncertainty estimation)
+            detection.variance_xmin = 1.0
+            detection.variance_xmax = 1.0
+            detection.variance_ymin = 1.0
+            detection.variance_ymax = 1.0
             
             detection_array.detections.append(detection)
         
@@ -208,6 +228,48 @@ class NMPCTestNode(Node):
         enable_msg = Bool()
         enable_msg.data = True
         self.enable_pub.publish(enable_msg)
+    
+    def publish_transforms(self):
+        """Publish TF transforms for simulation"""
+        now = self.get_clock().now().to_msg()
+        
+        # Publish world -> X3/base_link transform (drone position)
+        drone_transform = TransformStamped()
+        drone_transform.header.stamp = now
+        drone_transform.header.frame_id = "world"
+        drone_transform.child_frame_id = "X3/base_link"
+        
+        drone_transform.transform.translation.x = float(self.drone_position[0])
+        drone_transform.transform.translation.y = float(self.drone_position[1])
+        drone_transform.transform.translation.z = float(self.drone_position[2])
+        
+        # Assume level flight (no rotation)
+        drone_transform.transform.rotation.x = 0.0
+        drone_transform.transform.rotation.y = 0.0
+        drone_transform.transform.rotation.z = 0.0
+        drone_transform.transform.rotation.w = 1.0
+        
+        # Publish X3/base_link -> camera_link transform (camera mounted on drone)
+        # Assume camera is mounted 0.1m forward and 0.05m down from drone center
+        camera_transform = TransformStamped()
+        camera_transform.header.stamp = now
+        camera_transform.header.frame_id = "X3/base_link"
+        camera_transform.child_frame_id = "camera_link"
+        
+        camera_transform.transform.translation.x = 0.1  # Forward
+        camera_transform.transform.translation.y = 0.0  # No lateral offset
+        camera_transform.transform.translation.z = -0.05  # Slightly down
+        
+        # Camera pointing forward and slightly down (15 degrees)
+        # This is a simplified quaternion for 15 degree pitch down
+        pitch_angle = -15.0 * math.pi / 180.0  # Convert to radians
+        camera_transform.transform.rotation.x = math.sin(pitch_angle / 2.0)
+        camera_transform.transform.rotation.y = 0.0
+        camera_transform.transform.rotation.z = 0.0
+        camera_transform.transform.rotation.w = math.cos(pitch_angle / 2.0)
+        
+        # Send both transforms
+        self.tf_broadcaster.sendTransform([drone_transform, camera_transform])
     
     def set_test_mode(self, mode: str):
         """Change test mode"""

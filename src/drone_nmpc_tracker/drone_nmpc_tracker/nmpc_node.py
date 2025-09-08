@@ -211,15 +211,15 @@ class NMPCTrackerNode(Node):
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
             
-            # Find person detections
+            # Find person detections (object_class = 1 for person)
             person_detections = []
             for detection in msg.detections:
-                if detection.class_name == "person" and detection.confidence > 0.5:
+                if detection.object_class == 1 and detection.detection_score > 0.5:
                     person_detections.append(detection)
             
             if person_detections:
                 # Use the detection with highest confidence
-                best_detection = max(person_detections, key=lambda d: d.confidence)
+                best_detection = max(person_detections, key=lambda d: d.detection_score)
                 
                 # Convert detection to 3D position
                 person_position = self._detection_to_3d_position(best_detection)
@@ -234,7 +234,7 @@ class NMPCTrackerNode(Node):
                     self.last_person_detection_time = current_time
                     
                     self.get_logger().debug(
-                        f"Person detected at: {person_position}, confidence: {best_detection.confidence:.2f}"
+                        f"Person detected at: {person_position}, confidence: {best_detection.detection_score:.2f}"
                     )
             
         except Exception as e:
@@ -261,7 +261,7 @@ class NMPCTrackerNode(Node):
             # Simple depth estimation based on detection size
             # This is a simplified approach - in practice, you might use stereo vision,
             # depth camera, or other methods for better depth estimation
-            detection_height = detection.bbox.size_y
+            detection_height = abs(detection.ymax - detection.ymin)
             estimated_depth = self._estimate_depth_from_bbox_size(detection_height)
             
             # Convert pixel coordinates to world coordinates
@@ -269,8 +269,15 @@ class NMPCTrackerNode(Node):
             # For now, use a simplified projection model
             
             # Center of bounding box in normalized coordinates
-            center_x = (detection.bbox.center.x - 0.5) * 2.0  # [-1, 1]
-            center_y = (detection.bbox.center.y - 0.5) * 2.0  # [-1, 1]
+            # Assuming detection coordinates are in pixels, convert to normalized [0,1] then to [-1,1]
+            image_width = 640  # Assumed image width
+            image_height = 480  # Assumed image height
+            
+            center_x_norm = ((detection.xmin + detection.xmax) / 2.0) / image_width
+            center_y_norm = ((detection.ymin + detection.ymax) / 2.0) / image_height
+            
+            center_x = (center_x_norm - 0.5) * 2.0  # [-1, 1]
+            center_y = (center_y_norm - 0.5) * 2.0  # [-1, 1]
             
             # Project to 3D (simplified)
             # Assume camera points forward with some downward tilt
@@ -295,11 +302,14 @@ class NMPCTrackerNode(Node):
         """Estimate depth based on bounding box size"""
         # Simple inverse relationship: larger bbox = closer person
         # This assumes average person height of 1.7m
-        # and that bbox_height is normalized (0-1)
+        # bbox_height is now in pixels, normalize it first
         
-        if bbox_height > 0.01:  # Avoid division by zero
+        image_height = 480  # Assumed image height
+        normalized_height = bbox_height / image_height
+        
+        if normalized_height > 0.01:  # Avoid division by zero
             # Empirical relationship - tune based on your camera setup
-            estimated_depth = 0.3 / bbox_height  # meters
+            estimated_depth = 0.3 / normalized_height  # meters
             return np.clip(estimated_depth, 2.0, 20.0)  # Reasonable range
         else:
             return 10.0  # Default distance

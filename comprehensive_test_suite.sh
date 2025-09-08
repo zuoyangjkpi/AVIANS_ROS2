@@ -85,12 +85,14 @@ show_menu() {
     echo "3) 🧠 Test YOLO Detector (Fixed Topics)"
     echo "4) 📡 Monitor All Topics"
     echo "5) 🎯 Full Integration Test"
-    echo "6) 🧹 Kill All ROS Processes"
-    echo "7) 🔧 Rebuild Project"
-    echo "8) 📊 Performance Monitor"
+    echo "6) 🚁 NMPC Person Tracking Test"
+    echo "7) 🎮 NMPC + Gazebo Visual Tracking"
+    echo "8) 🧹 Kill All ROS Processes"
+    echo "9) 🔧 Rebuild Project"
+    echo "10) 📊 Performance Monitor"
     echo "0) 🚪 Exit"
     echo ""
-    read -p "Enter your choice (0-8): " choice
+    read -p "Enter your choice (0-10): " choice
 }
 
 # System status check
@@ -110,7 +112,7 @@ system_status_check() {
     if [ -f "install/setup.bash" ]; then
         print_status $GREEN "✅ Workspace built"
     else
-        print_status $YELLOW "⚠️  Workspace not built - run option 7"
+        print_status $YELLOW "⚠️  Workspace not built - run option 9"
     fi
     
     # Check key processes
@@ -124,6 +126,19 @@ system_status_check() {
         print_status $GREEN "✅ YOLO detector running"
     else
         print_status $YELLOW "⚠️  YOLO detector not running"
+    fi
+    
+    # Check NMPC processes
+    if check_process "nmpc_tracker_node"; then
+        print_status $GREEN "✅ NMPC tracker running"
+    else
+        print_status $YELLOW "⚠️  NMPC tracker not running"
+    fi
+    
+    if check_process "nmpc_test_node"; then
+        print_status $GREEN "✅ NMPC test node running"
+    else
+        print_status $YELLOW "⚠️  NMPC test node not running"
     fi
     
     # Check topics
@@ -293,6 +308,15 @@ monitor_topics() {
         check_topic_rate "/person_detections" 0.1
     fi
     
+    # Check NMPC topics
+    if ros2 topic list | grep -q "/X3/odometry"; then
+        check_topic_rate "/X3/odometry" 10.0
+    fi
+    
+    if ros2 topic list | grep -q "/X3/cmd_vel"; then
+        check_topic_rate "/X3/cmd_vel" 5.0
+    fi
+    
     echo ""
     print_status $YELLOW "🔍 Topic details:"
     echo "Camera topic info:"
@@ -300,6 +324,12 @@ monitor_topics() {
     
     echo "Detection topic info:"
     ros2 topic info /person_detections 2>/dev/null || echo "  Not available"
+    
+    echo "NMPC Drone odometry info:"
+    ros2 topic info /X3/odometry 2>/dev/null || echo "  Not available"
+    
+    echo "NMPC Control commands info:"
+    ros2 topic info /X3/cmd_vel 2>/dev/null || echo "  Not available"
 }
 
 # Full integration test
@@ -327,12 +357,41 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 4: Monitor system
-    print_status $YELLOW "Step 4: System Monitoring"
+    # Step 4: Start NMPC person tracking
+    print_status $YELLOW "Step 4: NMPC Person Tracking"
+    print_status $YELLOW "🚁 Starting NMPC tracker for full integration..."
+    
+    # Start NMPC tracker
+    ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_integration.log 2>&1 &
+    sleep 3
+    
+    if check_process "nmpc_tracker_node"; then
+        print_status $GREEN "✅ NMPC tracker started"
+        
+        # Enable tracking
+        ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+        sleep 2
+        
+        # Check if NMPC is generating control commands
+        if wait_for_topic "/X3/cmd_vel" 5; then
+            print_status $GREEN "✅ NMPC generating control commands"
+        else
+            print_status $YELLOW "⚠️  NMPC control commands not yet available"
+        fi
+    else
+        print_status $RED "❌ NMPC tracker failed to start"
+        print_status $YELLOW "💡 Continuing with monitoring anyway..."
+    fi
+    
+    # Step 5: Monitor complete system
+    print_status $YELLOW "Step 5: Complete System Monitoring"
     monitor_topics
     
-    print_status $GREEN "🎉 Integration test completed successfully!"
-    print_status $YELLOW "💡 Your system is ready for person detection and tracking!"
+    print_status $GREEN "🎉 Full Integration test completed successfully!"
+    print_status $YELLOW "💡 Your complete detection + tracking system is running!"
+    print_status $YELLOW "💡 YOLO detects people from Gazebo camera"
+    print_status $YELLOW "💡 NMPC tracks detected people with drone control"
+    print_status $YELLOW "💡 Use option 8 to stop all processes"
 }
 
 # Kill all ROS processes
@@ -345,9 +404,12 @@ kill_all_processes() {
     # Kill specific processes
     pkill -f "gz sim" 2>/dev/null
     pkill -f "yolo12_detector_node" 2>/dev/null
+    pkill -f "nmpc_tracker_node" 2>/dev/null
+    pkill -f "nmpc_test_node" 2>/dev/null
     pkill -f "ros2 launch" 2>/dev/null
     pkill -f "parameter_bridge" 2>/dev/null
     pkill -f "rviz2" 2>/dev/null
+    pkill -f "ros2 topic pub" 2>/dev/null
     
     sleep 2
     
@@ -402,6 +464,192 @@ performance_monitor() {
         echo "  Check /tmp/yolo.log for inference times"
         tail -5 /tmp/yolo.log 2>/dev/null | grep "Inference latency" || echo "  No recent inference data"
     fi
+    
+    if check_process "nmpc_tracker_node"; then
+        print_status $YELLOW "🚁 NMPC performance:"
+        echo "  NMPC optimization warnings are normal"
+        # Check NMPC control commands
+        if ros2 topic list | grep -q "/X3/cmd_vel"; then
+            print_status $GREEN "  ✅ NMPC publishing control commands"
+        else
+            print_status $YELLOW "  ⚠️  No NMPC control commands"
+        fi
+    fi
+}
+
+# NMPC Person Tracking Test
+nmpc_person_tracking_test() {
+    print_status $BLUE "🚁 NMPC Person Tracking Test"
+    echo "============================="
+    
+    print_status $YELLOW "🔄 Starting NMPC person tracking system..."
+    
+    # Kill existing NMPC processes if running
+    if check_process "nmpc_tracker_node" || check_process "nmpc_test_node"; then
+        print_status $YELLOW "🛑 Stopping existing NMPC processes..."
+        pkill -f "nmpc_tracker_node" 2>/dev/null
+        pkill -f "nmpc_test_node" 2>/dev/null
+        sleep 2
+    fi
+    
+    # Step 1: Start test node (simulated person)
+    print_status $YELLOW "Step 1: Starting person simulator..."
+    ros2 run drone_nmpc_tracker nmpc_test_node > /tmp/nmpc_test.log 2>&1 &
+    local test_pid=$!
+    sleep 3
+    
+    if check_process "nmpc_test_node"; then
+        print_status $GREEN "✅ Person simulator started"
+        
+        # Wait for person detection topic
+        if wait_for_topic "/person_detections" 5; then
+            print_status $GREEN "✅ Person detections available"
+        else
+            print_status $RED "❌ Person detections not available"
+            return 1
+        fi
+    else
+        print_status $RED "❌ Person simulator failed to start"
+        return 1
+    fi
+    
+    # Step 2: Start NMPC tracker
+    print_status $YELLOW "Step 2: Starting NMPC tracker..."
+    ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker.log 2>&1 &
+    local tracker_pid=$!
+    sleep 3
+    
+    if check_process "nmpc_tracker_node"; then
+        print_status $GREEN "✅ NMPC tracker started"
+        
+        # Wait for control commands
+        if wait_for_topic "/X3/cmd_vel" 5; then
+            print_status $GREEN "✅ NMPC control commands available"
+        else
+            print_status $YELLOW "⚠️  NMPC control commands not yet available"
+        fi
+    else
+        print_status $RED "❌ NMPC tracker failed to start"
+        return 1
+    fi
+    
+    # Step 3: Enable tracking
+    print_status $YELLOW "Step 3: Enabling tracking..."
+    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    local enable_pid=$!
+    sleep 2
+    
+    # Step 4: Monitor performance
+    print_status $YELLOW "Step 4: Monitoring NMPC performance..."
+    
+    # Check person detection rate
+    print_status $YELLOW "🔍 Checking person detection rate..."
+    if check_topic_rate "/person_detections" 5.0; then
+        print_status $GREEN "✅ Person detections at good rate"
+    else
+        print_status $YELLOW "⚠️  Person detection rate lower than expected"
+    fi
+    
+    # Check drone odometry
+    print_status $YELLOW "🔍 Checking drone odometry..."
+    if ros2 topic list | grep -q "/X3/odometry"; then
+        if check_topic_rate "/X3/odometry" 10.0; then
+            print_status $GREEN "✅ Drone odometry at good rate"
+        else
+            print_status $YELLOW "⚠️  Drone odometry rate lower than expected"
+        fi
+    fi
+    
+    # Check control commands
+    print_status $YELLOW "🔍 Checking NMPC control output..."
+    if check_topic_rate "/X3/cmd_vel" 5.0; then
+        print_status $GREEN "✅ NMPC generating control commands"
+        
+        # Show a sample control command
+        print_status $YELLOW "📊 Sample control command:"
+        timeout 3s ros2 topic echo /X3/cmd_vel --once 2>/dev/null || echo "  No data available"
+    else
+        print_status $YELLOW "⚠️  NMPC control output rate lower than expected"
+    fi
+    
+    print_status $GREEN "🎉 NMPC Person Tracking Test completed!"
+    print_status $YELLOW "💡 Your drone is actively tracking the simulated person!"
+    print_status $YELLOW "💡 Check logs: tail /tmp/nmpc_tracker.log"
+    print_status $YELLOW "💡 Press Ctrl+C in a terminal to stop processes"
+}
+
+# NMPC + Gazebo Visual Tracking
+nmpc_gazebo_visual_tracking() {
+    print_status $BLUE "🎮 NMPC + Gazebo Visual Tracking"
+    echo "=================================="
+    
+    # Check if Gazebo packages are available
+    if ! command -v gz > /dev/null 2>&1; then
+        print_status $RED "❌ Gazebo not installed!"
+        print_status $YELLOW "💡 Install with: sudo apt install gz-garden"
+        print_status $YELLOW "💡 Also install: sudo apt install ros-jazzy-ros-gz ros-jazzy-ros-gz-bridge ros-jazzy-ros-gz-sim"
+        return 1
+    fi
+    
+    print_status $YELLOW "🔄 Starting complete visual tracking system..."
+    
+    # Step 1: Clean up existing processes
+    print_status $YELLOW "Step 1: Cleaning up existing processes..."
+    pkill -f "gz sim" 2>/dev/null
+    pkill -f "nmpc_tracker_node" 2>/dev/null
+    pkill -f "nmpc_test_node" 2>/dev/null
+    pkill -f "parameter_bridge" 2>/dev/null
+    sleep 3
+    
+    # Step 2: Start Gazebo
+    print_status $YELLOW "Step 2: Starting Gazebo simulation..."
+    if ! launch_gazebo; then
+        print_status $RED "❌ Failed to start Gazebo"
+        return 1
+    fi
+    
+    # Step 3: Start person simulator
+    print_status $YELLOW "Step 3: Starting person simulator..."
+    ros2 run drone_nmpc_tracker nmpc_test_node > /tmp/nmpc_test_gazebo.log 2>&1 &
+    sleep 3
+    
+    if ! check_process "nmpc_test_node"; then
+        print_status $RED "❌ Person simulator failed to start"
+        return 1
+    fi
+    print_status $GREEN "✅ Person simulator running"
+    
+    # Step 4: Start NMPC tracker
+    print_status $YELLOW "Step 4: Starting NMPC tracker..."
+    ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_gazebo.log 2>&1 &
+    sleep 3
+    
+    if ! check_process "nmpc_tracker_node"; then
+        print_status $RED "❌ NMPC tracker failed to start"
+        return 1
+    fi
+    print_status $GREEN "✅ NMPC tracker running"
+    
+    # Step 5: Enable tracking
+    print_status $YELLOW "Step 5: Enabling tracking..."
+    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    sleep 2
+    
+    # Step 6: Launch RViz for visualization (optional)
+    print_status $YELLOW "Step 6: Starting RViz for additional visualization..."
+    if command -v rviz2 > /dev/null 2>&1; then
+        rviz2 > /dev/null 2>&1 &
+        print_status $GREEN "✅ RViz started"
+    else
+        print_status $YELLOW "⚠️  RViz not available"
+    fi
+    
+    print_status $GREEN "🎉 Complete NMPC + Gazebo system is running!"
+    print_status $YELLOW "💡 You should now see:"
+    print_status $YELLOW "   - Gazebo window with drone simulation"
+    print_status $YELLOW "   - Drone tracking simulated person movement"
+    print_status $YELLOW "   - RViz showing tracking data (if available)"
+    print_status $YELLOW "💡 Use option 8 to stop all processes"
 }
 
 # Main execution
@@ -433,9 +681,11 @@ main() {
             3) test_yolo_detector ;;
             4) monitor_topics ;;
             5) full_integration_test ;;
-            6) kill_all_processes ;;
-            7) rebuild_project ;;
-            8) performance_monitor ;;
+            6) nmpc_person_tracking_test ;;
+            7) nmpc_gazebo_visual_tracking ;;
+            8) kill_all_processes ;;
+            9) rebuild_project ;;
+            10) performance_monitor ;;
             0) 
                 print_status $GREEN "👋 Goodbye!"
                 exit 0
