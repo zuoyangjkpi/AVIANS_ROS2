@@ -253,7 +253,7 @@
     <!-- 🔧 修复：重新排序插件，先加载速度控制器 -->
     <include>
       <uri>model://x3</uri>
-      <pose>2 2 3 0 0 -0.7854</pose>
+      <pose>3 0 2.5 0 0.2 3.14159</pose>
       
       <!-- 速度控制器插件 - 放在最前面 -->
       <plugin filename="gz-sim-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">

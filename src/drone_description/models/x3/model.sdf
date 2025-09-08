@@ -390,5 +390,21 @@
         <use_parent_model_frame>1</use_parent_model_frame>
       </axis>
     </joint>
+
+    <!-- Simple velocity controller plugin for basic movement -->
+    <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+      <initial_linear>0 0 0</initial_linear>
+      <initial_angular>0 0 0</initial_angular>
+    </plugin>
+
+    <!-- Odometry publisher plugin -->
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <dimensions>3</dimensions>
+      <odom_frame>X3/odom</odom_frame>
+      <robot_base_frame>X3/base_link</robot_base_frame>
+      <odom_topic>odometry</odom_topic>
+      <odom_publish_frequency>50</odom_publish_frequency>
+    </plugin>
+
   </model>
 </sdf>

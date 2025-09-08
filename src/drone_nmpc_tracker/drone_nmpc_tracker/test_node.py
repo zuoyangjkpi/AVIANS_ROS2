@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
 Test node for NMPC Drone Person Tracker
 Provides simulated person detections and drone state for testing

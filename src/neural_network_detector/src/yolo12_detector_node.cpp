@@ -98,8 +98,8 @@ void YOLO12DetectorNode::updateTimestampsAfterClockSync() {
 void YOLO12DetectorNode::initializeParameters()
 {
     // Declare and get parameters
-    this->declare_parameter<std::string>("model_path", "../YOLOs-CPP/models/yolo12n.onnx");
-    this->declare_parameter<std::string>("labels_path", "../YOLOs-CPP/models/coco.names");
+    this->declare_parameter<std::string>("model_path", "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_detector/share/neural_network_detector/YOLOs-CPP/models/yolo12n.onnx");
+    this->declare_parameter<std::string>("labels_path", "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_detector/share/neural_network_detector/YOLOs-CPP/models/coco.names");
     this->declare_parameter<bool>("use_gpu", false);
     this->declare_parameter<float>("confidence_threshold", 0.5f);
     this->declare_parameter<float>("iou_threshold", 0.45f);

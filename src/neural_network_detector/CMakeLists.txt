@@ -45,6 +45,10 @@ add_executable(yolo12_detector_node
   src/yolo12_detector_node.cpp
 )
 
+# add_executable(detection_visualizer_node
+#   src/detection_visualizer_node.cpp
+# )
+
 target_include_directories(yolo12_detector_node PRIVATE
   include
   ${THIRD_PARTY_DIR}/include           # YOLO 自带头文件（如果有的话）
@@ -71,6 +75,24 @@ target_link_libraries(yolo12_detector_node
   ${OpenCV_LIBS}
 )
 
+# target_include_directories(detection_visualizer_node PRIVATE
+#   include
+# )
+# 
+# ament_target_dependencies(detection_visualizer_node
+#   rclcpp
+#   std_msgs
+#   sensor_msgs
+#   cv_bridge
+#   image_transport
+#   neural_network_msgs
+#   OpenCV
+# )
+# 
+# target_link_libraries(detection_visualizer_node
+#   ${OpenCV_LIBS}
+# )
+
 # 运行时 RPATH：
 #   - 构建时：从 third_party 里的 ORT 目录找 provider .so
 #   - 安装后：可执行旁的 lib/ 目录（$ORIGIN = install/lib/${PROJECT_NAME}）
@@ -85,6 +107,7 @@ set_target_properties(yolo12_detector_node PROPERTIES
 # 可执行文件
 install(TARGETS
   yolo12_detector_node
+  # detection_visualizer_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
