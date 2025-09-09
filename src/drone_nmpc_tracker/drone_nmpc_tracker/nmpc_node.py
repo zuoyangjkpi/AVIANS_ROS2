@@ -125,7 +125,7 @@ class NMPCTrackerNode(Node):
         sensor_qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=1
+            depth=10  # Increase queue depth
         )
         
         # Drone state subscriber (odometry)
@@ -149,7 +149,7 @@ class NMPCTrackerNode(Node):
             Bool,
             '/nmpc/enable',
             self.enable_callback,
-            sensor_qos
+            sensor_qos  # Use sensor_qos for consistency
         )
         
         self.get_logger().info("Subscribers initialized")

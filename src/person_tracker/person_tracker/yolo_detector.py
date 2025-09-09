@@ -39,8 +39,7 @@ class YOLODetectorNode(Node):
         # ROS2 Publishers and Subscribers
         self.image_subscriber = self.create_subscription(
             Image,
-            # '/firefly_1/xtion/rgb/Image_raw',  # Adjust topic name to match your Gazebo camera
-            'camera/image_raw',
+            '/camera/image_raw',  # 修复话题名称，确保与Gazebo相机发布的话题一致
             self.image_callback,
             10
         )

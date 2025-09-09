@@ -90,7 +90,11 @@ def generate_launch_description():
         package="person_tracker",
         executable="yolo_detector",
         name="yolo_detector",
-        output="screen"
+        output="screen",
+        remappings=[
+            ('/camera/image_raw', '/camera/image_raw'),
+            ('/target_waypoint', '/target_waypoint')
+        ]
     )
 
     return LaunchDescription([

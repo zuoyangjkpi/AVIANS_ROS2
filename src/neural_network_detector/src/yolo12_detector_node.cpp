@@ -38,7 +38,7 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     // Create subscribers
     image_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-        "camera/image_raw", 
+        "/camera/image_raw", 
         rclcpp::QoS(1).best_effort(),
         std::bind(&YOLO12DetectorNode::imageCallback, this, std::placeholders::_1));
     

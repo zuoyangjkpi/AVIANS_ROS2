@@ -39,7 +39,7 @@ wait_for_topic() {
     print_status $YELLOW "⏳ Waiting for topic: $topic_name"
     
     while [ $count -lt $timeout ]; do
-        if ros2 topic list | grep -q "$topic_name"; then
+        if /opt/ros/jazzy/bin/ros2 topic list | grep -q "$topic_name"; then
             print_status $GREEN "✅ Topic $topic_name is available"
             return 0
         fi
@@ -59,7 +59,7 @@ check_topic_rate() {
     print_status $YELLOW "📊 Checking data rate for: $topic_name"
     
     # Use timeout to limit the check to 5 seconds
-    local rate_output=$(timeout 5s ros2 topic hz "$topic_name" 2>/dev/null | tail -1)
+    local rate_output=$(timeout 5s /opt/ros/jazzy/bin/ros2 topic hz "$topic_name" 2>/dev/null | tail -1)
     
     if [[ $rate_output == *"average rate"* ]]; then
         local rate=$(echo "$rate_output" | grep -o '[0-9]*\.[0-9]*' | head -1)
@@ -245,14 +245,18 @@ test_yolo_detector() {
     
     print_status $YELLOW "🚀 Starting YOLO detector..."
     
-    # Start YOLO with fixed topics
-    ros2 run neural_network_detector yolo12_detector_node \
+    # Start YOLO with fixed topics - ensure ROS2 environment is sourced
+    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
+    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
+    source install/setup.bash
+    
+    /opt/ros/jazzy/bin/ros2 run neural_network_detector yolo12_detector_node \
         --ros-args \
         -p "model_path:=$model_path" \
         -p "labels_path:=$labels_path" \
         -p "use_gpu:=false" \
         -p "confidence_threshold:=0.5" \
-        -p "desired_class:=0" \
+        -p "desired_class:=1" \
         -p "max_update_rate_hz:=1.0" > /tmp/yolo.log 2>&1 &
     
     local yolo_pid=$!
@@ -357,15 +361,35 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 2: Start YOLO detector
+    # Step 2: Start YOLO detector and detection visualizer
     print_status $YELLOW "Step 2/5: Starting YOLO detector..."
     if ! test_yolo_detector; then
         print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
+    # Start C++ detection visualizer node
+    print_status $YELLOW "Step 2.1/5: Starting detection visualizer..."
+    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
+    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
+    source install/setup.bash
+    
+    /opt/ros/jazzy/bin/ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
+    local viz_pid=$!
+    sleep 2
+    
+    if check_process "detection_visualizer_node"; then
+        print_status $GREEN "✅ Detection visualizer started successfully"
+    else
+        print_status $RED "❌ Detection visualizer failed to start"
+    fi
+    
     # Step 3: Start NMPC test node
     print_status $YELLOW "Step 3/5: Starting NMPC test node..."
-    ros2 run drone_nmpc_tracker nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
+    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
+    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
+    source install/setup.bash
+    
+    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
     local test_pid=$!
     sleep 3
     
@@ -378,7 +402,7 @@ full_integration_test() {
     
     # Step 4: Start NMPC tracker
     print_status $YELLOW "Step 4/5: Starting NMPC tracker..."
-    ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
+    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
     
@@ -391,7 +415,7 @@ full_integration_test() {
     
     # Step 5: Enable tracking
     print_status $YELLOW "Step 5/5: Enabling drone tracking..."
-    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    /opt/ros/jazzy/bin/ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
     # System status verification
@@ -424,6 +448,13 @@ full_integration_test() {
         print_status $RED "  ❌ Drone control commands not available"
     fi
     
+    # 添加检测图像话题检查
+    if wait_for_topic "/detection_image" 5; then
+        print_status $GREEN "  ✅ Detection image available"
+    else
+        print_status $RED "  ❌ Detection image not available"
+    fi
+    
     print_status $BLUE "========================================"
     print_status $GREEN "🎯 System functionality verification:"
     
@@ -444,6 +475,13 @@ full_integration_test() {
         print_status $GREEN "  ✅ NMPC is publishing control commands"
     else
         print_status $YELLOW "  ⚠️  NMPC control command data rate is low"
+    fi
+    
+    # 添加检测图像话题数据速率检查
+    if check_topic_rate "/detection_image" 1.0; then
+        print_status $GREEN "  ✅ Detection images are being published"
+    else
+        print_status $YELLOW "  ⚠️  Detection image data rate is low"
     fi
     
     print_status $BLUE "========================================"

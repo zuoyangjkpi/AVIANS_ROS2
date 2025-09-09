@@ -121,9 +121,9 @@ class NMPCConfig:
         self.TOPIC_DRONE_STATE = '/X3/odometry'
         self.TOPIC_PERSON_DETECTIONS = '/person_detections'
         self.TOPIC_CONTROL_OUTPUT = '/X3/cmd_vel'
-        self.TOPIC_TRAJECTORY_VIS = '/nmpc/trajectory'
-        self.TOPIC_TARGET_VIS = '/nmpc/target'
-        self.TOPIC_STATUS = '/nmpc/status'
+        self.TOPIC_TRAJECTORY_VIS = '/drone/trajectory'
+        self.TOPIC_TARGET_VIS = '/drone/target'
+        self.TOPIC_STATUS = '/drone/controller/status'
         
         # ========== Logging and Debug ==========
         self.DEBUG_MODE = True
@@ -158,4 +158,3 @@ class NMPCConfig:
 
 # Global configuration instance
 nmpc_config = NMPCConfig()
-

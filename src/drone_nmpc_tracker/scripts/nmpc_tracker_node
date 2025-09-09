@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 from drone_nmpc_tracker.nmpc_node import main
 if __name__ == '__main__':
     main()

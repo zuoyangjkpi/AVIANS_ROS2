@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """
 Test node for NMPC Drone Person Tracker
 Provides simulated person detections and drone state for testing
@@ -14,6 +14,7 @@ from geometry_msgs.msg import Twist, PoseStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Bool, Header
 from neural_network_msgs.msg import NeuralNetworkDetectionArray, NeuralNetworkDetection
+from sensor_msgs.msg import Image
 import tf2_ros
 
 class NMPCTestNode(Node):
@@ -45,7 +46,7 @@ class NMPCTestNode(Node):
         
         self.odom_pub = self.create_publisher(
             Odometry,
-            '/X3/odometry',
+            '/X3/odometry',  # 保持与NMPC控制器配置一致
             10
         )
         
@@ -54,6 +55,14 @@ class NMPCTestNode(Node):
             '/nmpc/enable',
             10
         )
+        
+        # 添加图像发布器
+        # 注释掉图像发布器，避免与Gazebo发布的图像话题冲突
+        # self.image_pub = self.create_publisher(
+        #     Image,
+        #     '/camera/image_raw',  
+        #     10
+        # )
         
         # Subscriber for control commands (to simulate drone response)
         self.cmd_sub = self.create_subscription(
@@ -68,6 +77,8 @@ class NMPCTestNode(Node):
         self.odom_timer = self.create_timer(0.05, self.publish_odometry)  # 20 Hz
         self.enable_timer = self.create_timer(1.0, self.publish_enable)  # 1 Hz
         self.tf_timer = self.create_timer(0.05, self.publish_transforms)  # 20 Hz
+        # 移除图像定时器，避免与Gazebo的图像话题冲突
+        # self.image_timer = self.create_timer(0.033, self.publish_image)  # 30 Hz (模拟摄像头帧率)
         
         self.get_logger().info(f"NMPC Test Node started - Mode: {self.test_mode}")
         self.get_logger().info("Publishing simulated person detections and drone odometry")
@@ -120,6 +131,7 @@ class NMPCTestNode(Node):
     
     def publish_detection(self):
         """Publish simulated person detection"""
+        # Update person position based on test mode
         self.update_person_position()
         
         # Create detection message
@@ -230,47 +242,26 @@ class NMPCTestNode(Node):
         self.enable_pub.publish(enable_msg)
     
     def publish_transforms(self):
-        """Publish TF transforms for simulation"""
-        now = self.get_clock().now().to_msg()
-        
-        # Publish world -> X3/base_link transform (drone position)
-        drone_transform = TransformStamped()
-        drone_transform.header.stamp = now
-        drone_transform.header.frame_id = "world"
-        drone_transform.child_frame_id = "X3/base_link"
-        
-        drone_transform.transform.translation.x = float(self.drone_position[0])
-        drone_transform.transform.translation.y = float(self.drone_position[1])
-        drone_transform.transform.translation.z = float(self.drone_position[2])
-        
-        # Assume level flight (no rotation)
-        drone_transform.transform.rotation.x = 0.0
-        drone_transform.transform.rotation.y = 0.0
-        drone_transform.transform.rotation.z = 0.0
-        drone_transform.transform.rotation.w = 1.0
-        
-        # Publish X3/base_link -> camera_link transform (camera mounted on drone)
-        # Assume camera is mounted 0.1m forward and 0.05m down from drone center
-        camera_transform = TransformStamped()
-        camera_transform.header.stamp = now
-        camera_transform.header.frame_id = "X3/base_link"
-        camera_transform.child_frame_id = "camera_link"
-        
-        camera_transform.transform.translation.x = 0.1  # Forward
-        camera_transform.transform.translation.y = 0.0  # No lateral offset
-        camera_transform.transform.translation.z = -0.05  # Slightly down
-        
-        # Camera pointing forward and slightly down (15 degrees)
-        # This is a simplified quaternion for 15 degree pitch down
-        pitch_angle = -15.0 * math.pi / 180.0  # Convert to radians
-        camera_transform.transform.rotation.x = math.sin(pitch_angle / 2.0)
-        camera_transform.transform.rotation.y = 0.0
-        camera_transform.transform.rotation.z = 0.0
-        camera_transform.transform.rotation.w = math.cos(pitch_angle / 2.0)
-        
-        # Send both transforms
-        self.tf_broadcaster.sendTransform([drone_transform, camera_transform])
+        """Publish TF transforms"""
+        # Implementation for TF publishing
+        pass
     
+    # 注释掉图像发布函数，避免与Gazebo的图像话题冲突
+    # def publish_image(self):
+    #     """Publish simulated camera image"""
+    #     # Create a simple test image
+    #     image = Image()
+    #     image.header.stamp = self.get_clock().now().to_msg()
+    #     image.header.frame_id = "camera_link"
+    #     image.height = 480
+    #     image.width = 640
+    #     image.encoding = "rgb8"
+    #     image.is_bigendian = False
+    #     image.step = 640 * 3
+    #     image.data = [100] * (640 * 480 * 3)  # Simple gray image
+    #     
+    #     self.image_pub.publish(image)
+
     def set_test_mode(self, mode: str):
         """Change test mode"""
         if mode in ['circular', 'linear', 'stationary']:
@@ -310,4 +301,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-
