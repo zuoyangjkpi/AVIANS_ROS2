@@ -342,34 +342,40 @@ full_integration_test() {
     print_status $BLUE "🎯 Full Integration Test (Fixed System)"
     echo "========================================"
     
-    print_status $YELLOW "🔄 Starting complete fixed system with proper launch sequence..."
+    print_status $YELLOW "🔄 Starting complete fixed system with enhanced human detection..."
     print_status $YELLOW "📋 Launch sequence:"
-    print_status $YELLOW "   1. Gazebo simulation environment"
-    print_status $YELLOW "   2. YOLO person detector"
-    print_status $YELLOW "   3. NMPC test node (virtual person)"
-    print_status $YELLOW "   4. NMPC tracker"
-    print_status $YELLOW "   5. Enable tracking"
+    print_status $YELLOW "   1. Create enhanced human models for better YOLO detection"
+    print_status $YELLOW "   2. Gazebo simulation environment with enhanced models"
+    print_status $YELLOW "   3. YOLO person detector (optimized parameters)"
+    print_status $YELLOW "   4. RViz visualization with trajectory display"
+    print_status $YELLOW "   5. NMPC test node (virtual person)"
+    print_status $YELLOW "   6. NMPC tracker"
+    print_status $YELLOW "   7. Enable tracking"
     
     # Clean up existing processes
     print_status $YELLOW "🧹 Cleaning up existing processes..."
     kill_all_processes
     sleep 3
     
-    # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/5: Starting Gazebo simulation..."
-    if ! launch_gazebo; then
-        print_status $RED "❌ Gazebo startup failed, cannot continue"
+    # Step 0: Create enhanced human models for better YOLO detection
+    print_status $YELLOW "Step 0/7: Creating enhanced human models..."
+    create_enhanced_human_models
+    
+    # Step 1: Launch Enhanced Gazebo
+    print_status $YELLOW "Step 1/7: Starting Enhanced Gazebo simulation..."
+    if ! launch_enhanced_gazebo; then
+        print_status $RED "❌ Enhanced Gazebo startup failed, cannot continue"
         return 1
     fi
     
-    # Step 2: Start YOLO detector and detection visualizer
-    print_status $YELLOW "Step 2/5: Starting YOLO detector..."
-    if ! test_yolo_detector; then
-        print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
+    # Step 2: Start optimized YOLO detector
+    print_status $YELLOW "Step 2/7: Starting optimized YOLO detector..."
+    if ! test_optimized_yolo_detector; then
+        print_status $YELLOW "⚠️  Optimized YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
-    print_status $YELLOW "Step 2.1/5: Starting detection visualizer..."
+    print_status $YELLOW "Step 3/7: Starting detection visualizer..."
     export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
     export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
     source install/setup.bash
@@ -384,8 +390,25 @@ full_integration_test() {
         print_status $RED "❌ Detection visualizer failed to start"
     fi
     
-    # Step 3: Start NMPC test node
-    print_status $YELLOW "Step 3/5: Starting NMPC test node..."
+    # Step 4: Start RViz visualization with trajectory display
+    print_status $YELLOW "Step 4/7: Starting RViz visualization..."
+    /usr/bin/python3 visualization_node.py > /tmp/visualization.log 2>&1 &
+    local viz_node_pid=$!
+    sleep 2
+    
+    if check_process "visualization_node.py"; then
+        print_status $GREEN "✅ RViz visualization node started successfully"
+        print_status $YELLOW "💡 Open RViz2 and add these topics for visualization:"
+        print_status $YELLOW "   - /visualization_markers (MarkerArray)"
+        print_status $YELLOW "   - /person_position_markers (MarkerArray)"
+        print_status $YELLOW "   - /drone_trajectory_markers (MarkerArray)"
+        print_status $YELLOW "   - /drone_path (Path)"
+    else
+        print_status $YELLOW "⚠️  RViz visualization node failed to start (continuing anyway)"
+    fi
+    
+    # Step 5: Start NMPC test node
+    print_status $YELLOW "Step 5/7: Starting NMPC test node..."
     export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
     export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
     source install/setup.bash
@@ -401,8 +424,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 4: Start NMPC tracker
-    print_status $YELLOW "Step 4/5: Starting NMPC tracker..."
+    # Step 6: Start NMPC tracker
+    print_status $YELLOW "Step 6/7: Starting NMPC tracker..."
     /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
@@ -415,7 +438,7 @@ full_integration_test() {
     fi
     
     # Step 5: Enable tracking
-    print_status $YELLOW "Step 5/5: Enabling drone tracking..."
+    print_status $YELLOW "Step 7/7: Enabling drone tracking..."
     /opt/ros/jazzy/bin/ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
@@ -506,6 +529,8 @@ kill_all_processes() {
     pkill -f "yolo12_detector_node" 2>/dev/null
     pkill -f "nmpc_tracker_node" 2>/dev/null
     pkill -f "nmpc_test_node" 2>/dev/null
+    pkill -f "detection_visualizer_node" 2>/dev/null
+    pkill -f "visualization_node.py" 2>/dev/null
     pkill -f "ros2 launch" 2>/dev/null
     pkill -f "parameter_bridge" 2>/dev/null
     pkill -f "rviz2" 2>/dev/null
@@ -747,7 +772,7 @@ pure_nmpc_tracking_test() {
     fi
     
     # Step 5: Enable tracking
-    print_status $YELLOW "Step 5/5: Enabling drone tracking..."
+    print_status $YELLOW "Step 7/7: Enabling drone tracking..."
     /opt/ros/jazzy/bin/ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
@@ -897,6 +922,366 @@ nmpc_gazebo_visual_tracking() {
     print_status $YELLOW "   - Drone tracking simulated person movement"
     print_status $YELLOW "   - RViz showing tracking data (if available)"
     print_status $YELLOW "💡 Use option 8 to stop all processes"
+}
+
+# Create enhanced human models for better YOLO detection
+create_enhanced_human_models() {
+    print_status $YELLOW "📝 Creating enhanced human model for YOLO detection..."
+    
+    # Create a more realistic human model using simple geometric shapes
+    cat > /tmp/enhanced_human.sdf << 'EOF'
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="enhanced_human">
+    <static>false</static>
+    <pose>0 0 1.0 0 0 0</pose>
+    
+    <!-- Human torso - blue shirt -->
+    <link name="torso">
+      <pose>0 0 1.3 0 0 0</pose>
+      <collision name="torso_collision">
+        <geometry>
+          <cylinder><radius>0.2</radius><length>0.6</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="torso_visual">
+        <geometry>
+          <cylinder><radius>0.2</radius><length>0.6</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.8 1</ambient>
+          <diffuse>0.1 0.1 0.8 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>40.0</mass>
+        <inertia>
+          <ixx>1.5</ixx><iyy>1.5</iyy><izz>0.8</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <!-- Human head -->
+    <link name="head">
+      <pose>0 0 1.75 0 0 0</pose>
+      <collision name="head_collision">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+      </collision>
+      <visual name="head_visual">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+        <material>
+          <ambient>0.9 0.8 0.7 1</ambient>
+          <diffuse>0.9 0.8 0.7 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>5.0</mass>
+        <inertia>
+          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.03</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <!-- Arms -->
+    <link name="left_arm">
+      <pose>-0.3 0 1.4 1.57 0 0</pose>
+      <collision name="left_arm_collision">
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="left_arm_visual">
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.8 0.7 1</ambient>
+          <diffuse>0.9 0.8 0.7 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>3.0</mass>
+        <inertia>
+          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.006</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <link name="right_arm">
+      <pose>0.3 0 1.4 1.57 0 0</pose>
+      <collision name="right_arm_collision">
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="right_arm_visual">
+        <geometry>
+          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.9 0.8 0.7 1</ambient>
+          <diffuse>0.9 0.8 0.7 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>3.0</mass>
+        <inertia>
+          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.006</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <!-- Legs -->
+    <link name="left_leg">
+      <pose>-0.1 0 0.5 0 0 0</pose>
+      <collision name="left_leg_collision">
+        <geometry>
+          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="left_leg_visual">
+        <geometry>
+          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>0.4</ixx><iyy>0.4</iyy><izz>0.025</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <link name="right_leg">
+      <pose>0.1 0 0.5 0 0 0</pose>
+      <collision name="right_leg_collision">
+        <geometry>
+          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
+        </geometry>
+      </collision>
+      <visual name="right_leg_visual">
+        <geometry>
+          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.2 0.2 0.2 1</ambient>
+          <diffuse>0.2 0.2 0.2 1</diffuse>
+        </material>
+      </visual>
+      <inertial>
+        <mass>8.0</mass>
+        <inertia>
+          <ixx>0.4</ixx><iyy>0.4</iyy><izz>0.025</izz>
+        </inertia>
+      </inertial>
+    </link>
+    
+    <!-- Fixed joints to connect parts -->
+    <joint name="head_torso" type="fixed">
+      <parent>torso</parent>
+      <child>head</child>
+    </joint>
+    
+    <joint name="torso_left_arm" type="fixed">
+      <parent>torso</parent>
+      <child>left_arm</child>
+    </joint>
+    
+    <joint name="torso_right_arm" type="fixed">
+      <parent>torso</parent>
+      <child>right_arm</child>
+    </joint>
+    
+    <joint name="torso_left_leg" type="fixed">
+      <parent>torso</parent>
+      <child>left_leg</child>
+    </joint>
+    
+    <joint name="torso_right_leg" type="fixed">
+      <parent>torso</parent>
+      <child>right_leg</child>
+    </joint>
+    
+  </model>
+</sdf>
+EOF
+
+    print_status $GREEN "✅ Enhanced human model created"
+    
+    # Modify the world file to include better human models
+    print_status $YELLOW "📝 Creating enhanced world file..."
+    
+    # Copy original world file and modify it
+    cp src/drone_description/worlds/drone_world.sdf /tmp/enhanced_world.sdf
+    
+    # Remove the existing actor and add our enhanced models
+    sed -i '198,251d' /tmp/enhanced_world.sdf  # Remove walking_person actor
+    
+    # Add enhanced human models before the closing </world> tag
+    sed -i '$i\    <!-- Enhanced Human Model 1 -->' /tmp/enhanced_world.sdf
+    sed -i '$i\    <include>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <uri>file:///tmp/enhanced_human.sdf</uri>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <pose>1 1 0 0 0 0</pose>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <name>human1</name>' /tmp/enhanced_world.sdf
+    sed -i '$i\    </include>' /tmp/enhanced_world.sdf
+    sed -i '$i\\' /tmp/enhanced_world.sdf
+    sed -i '$i\    <!-- Enhanced Human Model 2 -->' /tmp/enhanced_world.sdf
+    sed -i '$i\    <include>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <uri>file:///tmp/enhanced_human.sdf</uri>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <pose>-1 -1 0 0 0 1.57</pose>' /tmp/enhanced_world.sdf
+    sed -i '$i\      <name>human2</name>' /tmp/enhanced_world.sdf
+    sed -i '$i\    </include>' /tmp/enhanced_world.sdf
+    
+    print_status $GREEN "✅ Enhanced world file created at /tmp/enhanced_world.sdf"
+}
+
+# Test YOLO detector with optimized parameters for enhanced humans
+test_optimized_yolo_detector() {
+    print_status $BLUE "🧠 Testing Optimized YOLO Detector"
+    echo "==================================="
+    
+    # Check if Gazebo is running
+    if ! check_process "gz sim"; then
+        print_status $RED "❌ Gazebo not running - cannot test YOLO"
+        return 1
+    fi
+    
+    # Check if YOLO is already running
+    if check_process "yolo12_detector_node"; then
+        print_status $YELLOW "⚠️  YOLO already running"
+        pkill -f "yolo12_detector_node"
+        sleep 2
+    fi
+    
+    # Find model files
+    local model_path=$(find . -name "yolo12n.onnx" | head -1)
+    local labels_path=$(find . -name "coco.names" | head -1)
+    
+    if [ -z "$model_path" ] || [ -z "$labels_path" ]; then
+        print_status $RED "❌ YOLO model files not found"
+        return 1
+    fi
+    
+    print_status $GREEN "📁 Using model: $model_path"
+    print_status $GREEN "📁 Using labels: $labels_path"
+    
+    print_status $YELLOW "🚀 Starting optimized YOLO detector..."
+    print_status $YELLOW "   - Lower confidence threshold for better detection"
+    print_status $YELLOW "   - Enabled debug images"
+    print_status $YELLOW "   - Optimized for person class (class 0)"
+    
+    # Start YOLO with optimized parameters for enhanced human detection
+    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
+    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
+    source install/setup.bash
+    
+    /opt/ros/jazzy/bin/ros2 run neural_network_detector yolo12_detector_node \
+        --ros-args \
+        -p "model_path:=$model_path" \
+        -p "labels_path:=$labels_path" \
+        -p "use_gpu:=false" \
+        -p "confidence_threshold:=0.3" \
+        -p "iou_threshold:=0.4" \
+        -p "desired_class:=0" \
+        -p "publish_debug_image:=true" \
+        -p "max_update_rate_hz:=2.0" > /tmp/yolo_optimized.log 2>&1 &
+    
+    local yolo_pid=$!
+    
+    # Wait for YOLO to start
+    sleep 5
+    
+    if check_process "yolo12_detector_node"; then
+        print_status $GREEN "✅ Optimized YOLO detector started"
+        
+        # Wait for detection topic
+        if wait_for_topic "/person_detections" 10; then
+            print_status $GREEN "✅ Detection topic is available"
+            
+            # Check if detections are being published
+            print_status $YELLOW "🔍 Testing detection with enhanced human models..."
+            sleep 3
+            
+            # Check for actual detections
+            local detection_test=$(timeout 5s /opt/ros/jazzy/bin/ros2 topic echo /person_detections --once 2>/dev/null)
+            if echo "$detection_test" | grep -q "detection_score"; then
+                local num_detections=$(echo "$detection_test" | grep -c "detection_score")
+                print_status $GREEN "✅ YOLO detected $num_detections person(s)!"
+            else
+                print_status $YELLOW "⚠️  No person detections yet (models may need time to load)"
+            fi
+            
+            return 0
+        else
+            print_status $RED "❌ Detection topic not available"
+            return 1
+        fi
+    else
+        print_status $RED "❌ Optimized YOLO detector failed to start"
+        print_status $YELLOW "📋 Check log: tail /tmp/yolo_optimized.log"
+        return 1
+    fi
+}
+
+# Launch Gazebo with enhanced world file
+launch_enhanced_gazebo() {
+    print_status $BLUE "🎮 Launching Enhanced Gazebo Simulation"
+    echo "======================================="
+    
+    if check_process "gz sim"; then
+        print_status $YELLOW "⚠️  Gazebo already running"
+        read -p "Kill existing Gazebo? (y/n): " kill_gazebo
+        if [ "$kill_gazebo" = "y" ]; then
+            pkill -f "gz sim"
+            sleep 2
+        else
+            return 0
+        fi
+    fi
+    
+    print_status $YELLOW "🚀 Starting Enhanced Gazebo..."
+    print_status $YELLOW "   Using enhanced human models for better YOLO detection"
+    
+    # Set model path for enhanced models
+    export GZ_SIM_RESOURCE_PATH="/tmp:$HOME/AVIANS_ROS2_PORT1/src/drone_description/models:$GZ_SIM_RESOURCE_PATH"
+    
+    # Launch with enhanced world file
+    gz sim /tmp/enhanced_world.sdf > /tmp/gazebo_enhanced.log 2>&1 &
+    local gazebo_pid=$!
+    
+    # Wait for Gazebo to start
+    local count=0
+    while [ $count -lt 30 ]; do
+        if check_process "gz sim"; then
+            print_status $GREEN "✅ Enhanced Gazebo started successfully"
+            
+            # Wait a bit more for models to load
+            sleep 5
+            
+            # Wait for camera topic
+            if wait_for_topic "/camera/image_raw" 15; then
+                print_status $GREEN "✅ Camera topic is publishing"
+                return 0
+            else
+                print_status $YELLOW "⚠️  Camera topic not yet available"
+                return 1
+            fi
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+    
+    print_status $RED "❌ Enhanced Gazebo failed to start"
+    print_status $YELLOW "📋 Check log: tail /tmp/gazebo_enhanced.log"
+    return 1
 }
 
 # Main execution

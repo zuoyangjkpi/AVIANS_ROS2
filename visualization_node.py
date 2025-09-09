@@ -31,7 +31,7 @@ class VisualizationNode(Node):
         # Data storage
         self.latest_person_detections = []
         self.drone_path = Path()
-        self.drone_path.header.frame_id = "world"
+        self.drone_path.header.frame_id = "odom"
         
         # Trajectory parameters (circular orbit around person)
         self.orbit_radius = 3.0  # meters
@@ -50,7 +50,7 @@ class VisualizationNode(Node):
         for i, detection in enumerate(msg.detections):
             # Create a marker for each person detection
             marker = Marker()
-            marker.header.frame_id = "world"
+            marker.header.frame_id = "odom"
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = "person"
             marker.id = i
@@ -91,7 +91,7 @@ class VisualizationNode(Node):
         # Clear old markers if no detections
         if not msg.detections:
             marker = Marker()
-            marker.header.frame_id = "world"
+            marker.header.frame_id = "odom"
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = "person"
             marker.id = 0
@@ -125,7 +125,7 @@ class VisualizationNode(Node):
         
         # Create trajectory circle
         marker = Marker()
-        marker.header.frame_id = "world"
+        marker.header.frame_id = "odom"
         marker.header.stamp = self.get_clock().now().to_msg()
         marker.ns = "trajectory"
         marker.id = 0
