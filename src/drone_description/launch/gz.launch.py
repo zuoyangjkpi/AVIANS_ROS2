@@ -87,13 +87,17 @@ def generate_launch_description():
     )
 
     yolo_node = Node(
-        package="person_tracker",
-        executable="yolo_detector",
-        name="yolo_detector",
+        package="neural_network_detector",
+        executable="yolo12_detector_node",
+        name="yolo12_detector_node",
         output="screen",
-        remappings=[
-            ('/camera/image_raw', '/camera/image_raw'),
-            ('/target_waypoint', '/target_waypoint')
+        parameters=[
+            {'model_path': '/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/yolo12n.onnx'},
+            {'labels_path': '/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/coco.names'},
+            {'use_gpu': False},
+            {'confidence_threshold': 0.5},
+            {'desired_class': 1},  # person class
+            {'max_update_rate_hz': 1.0}
         ]
     )
 
