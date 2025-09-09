@@ -55,15 +55,7 @@ class NMPCTestNode(Node):
             '/nmpc/enable',
             10
         )
-        
-        # 添加图像发布器
-        # 注释掉图像发布器，避免与Gazebo发布的图像话题冲突
-        # self.image_pub = self.create_publisher(
-        #     Image,
-        #     '/camera/image_raw',  
-        #     10
-        # )
-        
+                
         # Subscriber for control commands (to simulate drone response)
         self.cmd_sub = self.create_subscription(
             Twist,
@@ -77,8 +69,6 @@ class NMPCTestNode(Node):
         self.odom_timer = self.create_timer(0.05, self.publish_odometry)  # 20 Hz
         self.enable_timer = self.create_timer(1.0, self.publish_enable)  # 1 Hz
         self.tf_timer = self.create_timer(0.05, self.publish_transforms)  # 20 Hz
-        # 移除图像定时器，避免与Gazebo的图像话题冲突
-        # self.image_timer = self.create_timer(0.033, self.publish_image)  # 30 Hz (模拟摄像头帧率)
         
         self.get_logger().info(f"NMPC Test Node started - Mode: {self.test_mode}")
         self.get_logger().info("Publishing simulated person detections and drone odometry")
@@ -125,8 +115,8 @@ class NMPCTestNode(Node):
             # Person stays in one place
             self.person_position = np.array([2.0, 1.0, 0.0])
         
-        # Add some random noise
-        noise = np.random.normal(0, 0.05, 3)  # 5cm standard deviation
+        # Add minimal noise for more stable tracking
+        noise = np.random.normal(0, 0.01, 3)  # 1cm standard deviation for more stability
         self.person_position += noise
     
     def publish_detection(self):
@@ -152,9 +142,9 @@ class NMPCTestNode(Node):
             bbox_height = 0.3 / distance  # Inverse relationship
             bbox_width = bbox_height * 0.6  # Aspect ratio
             
-            # Center position (with some noise)
-            center_x = 0.5 + 0.1 * np.random.normal()  # Centered with noise
-            center_y = 0.6 + 0.05 * np.random.normal()  # Slightly below center
+            # Center position (with minimal stable noise)
+            center_x = 0.5 + 0.02 * np.random.normal()  # Centered with minimal noise
+            center_y = 0.6 + 0.01 * np.random.normal()  # Slightly below center with minimal noise
             
             # Ensure bounding box is within image bounds
             bbox_height = np.clip(bbox_height, 0.05, 0.8)

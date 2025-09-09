@@ -49,10 +49,10 @@ YOLO12DetectorNode::YOLO12DetectorNode(const rclcpp::NodeOptions & options)
     
     // Create publishers
     detection_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkDetectionArray>(
-        "person_detections", rclcpp::QoS(10));
+        "/person_detections", rclcpp::QoS(10));
     
     detection_count_pub_ = this->create_publisher<neural_network_msgs::msg::NeuralNetworkNumberOfDetections>(
-        "person_detection_count", rclcpp::QoS(10));
+        "/person_detection_count", rclcpp::QoS(10));
 
     
      if (publish_debug_image_) {

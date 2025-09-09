@@ -10,7 +10,20 @@ class DetectionVisualizerNode : public rclcpp::Node
 public:
     DetectionVisualizerNode() : Node("detection_visualizer_node")
     {
-        // Create image transport
+        RCLCPP_INFO(this->get_logger(), "Detection visualizer node starting...");
+        
+        // Use a one-shot timer to initialize after the object is fully constructed
+        init_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(100),
+            std::bind(&DetectionVisualizerNode::initialize, this));
+    }
+    
+    void initialize()
+    {
+        // Cancel the initialization timer
+        init_timer_.reset();
+        
+        // Now it's safe to use shared_from_this()
         image_transport_ = std::make_shared<image_transport::ImageTransport>(shared_from_this());
         
         // Subscribers
@@ -25,7 +38,9 @@ public:
         // Publisher for annotated image
         annotated_image_pub_ = image_transport_->advertise("/detection_image", 1);
         
-        RCLCPP_INFO(this->get_logger(), "Detection visualizer node started");
+        RCLCPP_INFO(this->get_logger(), "Detection visualizer node initialized successfully");
+        RCLCPP_INFO(this->get_logger(), "Subscribing to: /camera/image_raw and /person_detections");
+        RCLCPP_INFO(this->get_logger(), "Publishing to: /detection_image");
     }
 
 private:
@@ -44,6 +59,7 @@ private:
     void publishAnnotatedImage()
     {
         if (!current_image_) {
+            RCLCPP_DEBUG(this->get_logger(), "No current image available, skipping publish");
             return;
         }
         
@@ -52,7 +68,8 @@ private:
             cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(current_image_, sensor_msgs::image_encodings::BGR8);
             
             // Draw bounding boxes if detections are available
-            if (current_detections_) {
+            if (current_detections_ && !current_detections_->detections.empty()) {
+                int detection_count = 0;
                 for (const auto& detection : current_detections_->detections) {
                     if (detection.object_class == 1) { // Person class
                         // Draw green bounding box
@@ -66,12 +83,27 @@ private:
                         cv::putText(cv_ptr->image, confidence_text,
                             cv::Point(static_cast<int>(detection.xmin), static_cast<int>(detection.ymin) - 10),
                             cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+                        detection_count++;
                     }
                 }
+                
+                // Add detection count overlay
+                if (detection_count > 0) {
+                    std::string count_text = "Persons detected: " + std::to_string(detection_count);
+                    cv::putText(cv_ptr->image, count_text,
+                        cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
+                }
+            } else {
+                // Add "No detections" overlay when no person detected
+                std::string no_detection_text = "No persons detected";
+                cv::putText(cv_ptr->image, no_detection_text,
+                    cv::Point(10, 30), cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 0, 255), 2);
             }
             
-            // Publish annotated image
+            // Always publish the image (with or without detections)
             annotated_image_pub_.publish(cv_ptr->toImageMsg());
+            
+            RCLCPP_DEBUG(this->get_logger(), "Published detection image");
             
         } catch (cv_bridge::Exception& e) {
             RCLCPP_ERROR(this->get_logger(), "CV bridge exception: %s", e.what());
@@ -83,6 +115,7 @@ private:
     image_transport::Publisher annotated_image_pub_;
     
     rclcpp::Subscription<neural_network_msgs::msg::NeuralNetworkDetectionArray>::SharedPtr detection_sub_;
+    rclcpp::TimerBase::SharedPtr init_timer_;
     
     sensor_msgs::msg::Image::ConstSharedPtr current_image_;
     neural_network_msgs::msg::NeuralNetworkDetectionArray::ConstSharedPtr current_detections_;
