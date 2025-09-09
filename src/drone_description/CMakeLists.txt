@@ -29,7 +29,7 @@ install(TARGETS
 )
 
 install(
-  DIRECTORY models worlds launch config 
+  DIRECTORY models worlds launch config urdf
   DESTINATION share/${PROJECT_NAME}
 )
 

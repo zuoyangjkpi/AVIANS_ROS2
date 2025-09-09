@@ -10,6 +10,7 @@ from launch.actions import (
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
 
 
 def generate_launch_description():
@@ -19,6 +20,7 @@ def generate_launch_description():
     world_file = os.path.join(drone_description, "worlds", "drone_world.sdf")
     config_file = os.path.join(drone_description, "config", "bridge.yaml")
     rviz_config = os.path.join(drone_description, "config", "drone.rviz")
+    urdf_file = os.path.join(drone_description, "urdf", "x3_drone.urdf")
 
     # Environment variables
     libgl_env = SetEnvironmentVariable(name="LIBGL_ALWAYS_SOFTWARE", value="1")
@@ -59,6 +61,15 @@ def generate_launch_description():
         executable="parameter_bridge",
         output='screen',
         parameters=[{'config_file': config_file}]
+    )
+
+    # Robot state publisher
+    robot_description = Command(['cat ', urdf_file])
+    robot_state_publisher = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="screen",
+        parameters=[{'robot_description': robot_description}]
     )
 
     # Static transform
@@ -110,6 +121,7 @@ def generate_launch_description():
         gz_plugin_path,
         gazebo,
         gz_ros2_bridge,
+        robot_state_publisher,
         TimerAction(
             period=10.0,
             actions=[ 

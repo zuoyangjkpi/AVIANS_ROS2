@@ -39,7 +39,7 @@ wait_for_topic() {
     print_status $YELLOW "⏳ Waiting for topic: $topic_name"
     
     while [ $count -lt $timeout ]; do
-        if /opt/ros/jazzy/bin/ros2 topic list | grep -q "$topic_name"; then
+        if ros2 topic list | grep -q "$topic_name"; then
             print_status $GREEN "✅ Topic $topic_name is available"
             return 0
         fi
@@ -59,7 +59,7 @@ check_topic_rate() {
     print_status $YELLOW "📊 Checking data rate for: $topic_name"
     
     # Use timeout to limit the check to 5 seconds
-    local rate_output=$(timeout 5s /opt/ros/jazzy/bin/ros2 topic hz "$topic_name" 2>/dev/null | tail -1)
+    local rate_output=$(timeout 5s ros2 topic hz "$topic_name" 2>/dev/null | tail -1)
     
     if [[ $rate_output == *"average rate"* ]]; then
         local rate=$(echo "$rate_output" | grep -o '[0-9]*\.[0-9]*' | head -1)
@@ -179,7 +179,10 @@ launch_gazebo() {
     print_status $YELLOW "🚀 Starting Gazebo..."
     print_status $YELLOW "   This may take 10-15 seconds..."
     
-    # Launch in background
+    # Launch in background with proper environment
+    export HOME="$HOME"
+    export USER="$USER"
+    export DISPLAY="${DISPLAY:-:0}"
     ros2 launch drone_description gz.launch.py > /tmp/gazebo.log 2>&1 &
     local gazebo_pid=$!
     
@@ -246,12 +249,9 @@ test_yolo_detector() {
     
     print_status $YELLOW "🚀 Starting YOLO detector..."
     
-    # Start YOLO with fixed topics - ensure ROS2 environment is sourced
-    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
-    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
-    source install/setup.bash
+    # Start YOLO with fixed topics - ROS2 environment should be sourced via drone command
     
-    /opt/ros/jazzy/bin/ros2 run neural_network_detector yolo12_detector_node \
+    ros2 run neural_network_detector yolo12_detector_node \
         --ros-args \
         -p "model_path:=$model_path" \
         -p "labels_path:=$labels_path" \
@@ -357,30 +357,23 @@ full_integration_test() {
     kill_all_processes
     sleep 3
     
-    # Step 0: Create enhanced human models for better YOLO detection
-    print_status $YELLOW "Step 0/7: Creating enhanced human models..."
-    create_enhanced_human_models
-    
-    # Step 1: Launch Enhanced Gazebo
-    print_status $YELLOW "Step 1/7: Starting Enhanced Gazebo simulation..."
-    if ! launch_enhanced_gazebo; then
-        print_status $RED "❌ Enhanced Gazebo startup failed, cannot continue"
+    # Step 1: Launch Gazebo
+    print_status $YELLOW "Step 1/7: Starting Gazebo simulation..."
+    if ! launch_gazebo; then
+        print_status $RED "❌ Gazebo startup failed, cannot continue"
         return 1
     fi
     
-    # Step 2: Start optimized YOLO detector
-    print_status $YELLOW "Step 2/7: Starting optimized YOLO detector..."
-    if ! test_optimized_yolo_detector; then
-        print_status $YELLOW "⚠️  Optimized YOLO detector had issues, but continuing..."
+    # Step 2: Start YOLO detector
+    print_status $YELLOW "Step 2/7: Starting YOLO detector..."
+    if ! test_yolo_detector; then
+        print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
     print_status $YELLOW "Step 3/7: Starting detection visualizer..."
-    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
-    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
-    source install/setup.bash
     
-    /opt/ros/jazzy/bin/ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
+    ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
     sleep 2
     
@@ -392,7 +385,7 @@ full_integration_test() {
     
     # Step 4: Start RViz visualization with trajectory display
     print_status $YELLOW "Step 4/7: Starting RViz visualization..."
-    /usr/bin/python3 visualization_node.py > /tmp/visualization.log 2>&1 &
+    python3 visualization_node.py > /tmp/visualization.log 2>&1 &
     local viz_node_pid=$!
     sleep 2
     
@@ -409,11 +402,8 @@ full_integration_test() {
     
     # Step 5: Start NMPC test node
     print_status $YELLOW "Step 5/7: Starting NMPC test node..."
-    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
-    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
-    source install/setup.bash
     
-    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
+    python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
     local test_pid=$!
     sleep 3
     
@@ -426,7 +416,7 @@ full_integration_test() {
     
     # Step 6: Start NMPC tracker
     print_status $YELLOW "Step 6/7: Starting NMPC tracker..."
-    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
+    python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
     
@@ -439,7 +429,7 @@ full_integration_test() {
     
     # Step 5: Enable tracking
     print_status $YELLOW "Step 7/7: Enabling drone tracking..."
-    /opt/ros/jazzy/bin/ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
     # System status verification
@@ -731,11 +721,8 @@ pure_nmpc_tracking_test() {
     
     # Step 2: Start detection visualizer node (without YOLO detector)
     print_status $YELLOW "Step 2/5: Starting detection visualizer..."
-    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
-    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
-    source install/setup.bash
     
-    /opt/ros/jazzy/bin/ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
+    ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
     sleep 2
     
@@ -747,7 +734,7 @@ pure_nmpc_tracking_test() {
     
     # Step 3: Start NMPC test node
     print_status $YELLOW "Step 3/5: Starting NMPC test node (simulated person)..."
-    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_pure.log 2>&1 &
+    python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_pure.log 2>&1 &
     local test_pid=$!
     sleep 3
     
@@ -760,7 +747,7 @@ pure_nmpc_tracking_test() {
     
     # Step 4: Start NMPC tracker
     print_status $YELLOW "Step 4/5: Starting NMPC tracker..."
-    /usr/bin/python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_pure.log 2>&1 &
+    python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_pure.log 2>&1 &
     local tracker_pid=$!
     sleep 3
     
@@ -773,7 +760,7 @@ pure_nmpc_tracking_test() {
     
     # Step 5: Enable tracking
     print_status $YELLOW "Step 7/7: Enabling drone tracking..."
-    /opt/ros/jazzy/bin/ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
     # System status verification
@@ -1179,11 +1166,8 @@ test_optimized_yolo_detector() {
     print_status $YELLOW "   - Optimized for person class (class 0)"
     
     # Start YOLO with optimized parameters for enhanced human detection
-    export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
-    export PYTHONPATH="/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/drone_nmpc_tracker/lib/python3.12/site-packages:/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_msgs/lib/python3.12/site-packages"
-    source install/setup.bash
     
-    /opt/ros/jazzy/bin/ros2 run neural_network_detector yolo12_detector_node \
+    ros2 run neural_network_detector yolo12_detector_node \
         --ros-args \
         -p "model_path:=$model_path" \
         -p "labels_path:=$labels_path" \
@@ -1211,7 +1195,7 @@ test_optimized_yolo_detector() {
             sleep 3
             
             # Check for actual detections
-            local detection_test=$(timeout 5s /opt/ros/jazzy/bin/ros2 topic echo /person_detections --once 2>/dev/null)
+            local detection_test=$(timeout 5s ros2 topic echo /person_detections --once 2>/dev/null)
             if echo "$detection_test" | grep -q "detection_score"; then
                 local num_detections=$(echo "$detection_test" | grep -c "detection_score")
                 print_status $GREEN "✅ YOLO detected $num_detections person(s)!"
@@ -1253,8 +1237,8 @@ launch_enhanced_gazebo() {
     # Set model path for enhanced models
     export GZ_SIM_RESOURCE_PATH="/tmp:$HOME/AVIANS_ROS2_PORT1/src/drone_description/models:$GZ_SIM_RESOURCE_PATH"
     
-    # Launch with enhanced world file
-    gz sim /tmp/enhanced_world.sdf > /tmp/gazebo_enhanced.log 2>&1 &
+    # Launch with enhanced world file in headless mode
+    gz sim -s --headless-rendering /tmp/enhanced_world.sdf > /tmp/gazebo_enhanced.log 2>&1 &
     local gazebo_pid=$!
     
     # Wait for Gazebo to start
