@@ -211,10 +211,10 @@ class NMPCTrackerNode(Node):
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
             
-            # Find person detections (object_class = 1 for person)
+            # Find person detections (object_class = 0 for person in COCO)
             person_detections = []
             for detection in msg.detections:
-                if detection.object_class == 1 and detection.detection_score > 0.5:
+                if detection.object_class == 0 and detection.detection_score > 0.4:
                     person_detections.append(detection)
             
             if person_detections:

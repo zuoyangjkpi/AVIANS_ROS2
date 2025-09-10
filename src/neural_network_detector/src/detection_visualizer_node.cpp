@@ -8,7 +8,10 @@
 class DetectionVisualizerNode : public rclcpp::Node
 {
 public:
-    DetectionVisualizerNode() : Node("detection_visualizer_node")
+    DetectionVisualizerNode() : Node("detection_visualizer_node"),
+        last_image_time_(this->get_clock()->now()),
+        last_detection_time_(this->get_clock()->now()),
+        last_publish_time_(this->get_clock()->now())
     {
         RCLCPP_INFO(this->get_logger(), "Detection visualizer node starting...");
         
@@ -47,12 +50,14 @@ private:
     void imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr& msg)
     {
         current_image_ = msg;
+        last_image_time_ = this->get_clock()->now();
         publishAnnotatedImage();
     }
     
     void detectionCallback(const neural_network_msgs::msg::NeuralNetworkDetectionArray::ConstSharedPtr& msg)
     {
         current_detections_ = msg;
+        last_detection_time_ = this->get_clock()->now();
         publishAnnotatedImage();
     }
     
@@ -63,6 +68,13 @@ private:
             return;
         }
         
+        // Rate limiting to prevent excessive publishing
+        auto now = this->get_clock()->now();
+        if ((now - last_publish_time_).seconds() < 0.033) {  // Max 30 Hz for smoother display
+            return;
+        }
+        last_publish_time_ = now;
+        
         try {
             // Convert ROS image to OpenCV
             cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(current_image_, sensor_msgs::image_encodings::BGR8);
@@ -71,18 +83,19 @@ private:
             if (current_detections_ && !current_detections_->detections.empty()) {
                 int detection_count = 0;
                 for (const auto& detection : current_detections_->detections) {
-                    if (detection.object_class == 1) { // Person class
-                        // Draw green bounding box
+                    if (detection.object_class == 0 && detection.detection_score > 0.4) { // Person class with stable threshold
+                        // Draw green bounding box with thicker line for stability
                         cv::rectangle(cv_ptr->image,
                             cv::Point(static_cast<int>(detection.xmin), static_cast<int>(detection.ymin)),
                             cv::Point(static_cast<int>(detection.xmax), static_cast<int>(detection.ymax)),
-                            cv::Scalar(0, 255, 0), 3);
+                            cv::Scalar(0, 255, 0), 4);
                         
-                        // Draw detection score
-                        std::string confidence_text = "Person: " + std::to_string(detection.detection_score).substr(0, 4);
+                        // Draw detection score with fixed precision
+                        char confidence_text[32];
+                        snprintf(confidence_text, sizeof(confidence_text), "Person: %.2f", detection.detection_score);
                         cv::putText(cv_ptr->image, confidence_text,
-                            cv::Point(static_cast<int>(detection.xmin), static_cast<int>(detection.ymin) - 10),
-                            cv::FONT_HERSHEY_SIMPLEX, 0.7, cv::Scalar(0, 255, 0), 2);
+                            cv::Point(static_cast<int>(detection.xmin), static_cast<int>(detection.ymin) - 15),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(0, 255, 0), 2);
                         detection_count++;
                     }
                 }
@@ -119,6 +132,10 @@ private:
     
     sensor_msgs::msg::Image::ConstSharedPtr current_image_;
     neural_network_msgs::msg::NeuralNetworkDetectionArray::ConstSharedPtr current_detections_;
+    
+    rclcpp::Time last_image_time_;
+    rclcpp::Time last_detection_time_;
+    rclcpp::Time last_publish_time_;
 };
 
 int main(int argc, char** argv)

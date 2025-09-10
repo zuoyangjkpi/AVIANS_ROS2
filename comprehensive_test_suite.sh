@@ -23,11 +23,17 @@ print_status() {
 # Function to check if a process is running
 check_process() {
     local process_name=$1
-    if pgrep -f "$process_name" > /dev/null; then
+    # Use more specific process matching and check if process is actually running
+    if pgrep -x "$process_name" > /dev/null 2>&1; then
         return 0
-    else
-        return 1
+    elif pgrep -f "$process_name" > /dev/null 2>&1; then
+        # Additional check: verify the process is actually active
+        local pid=$(pgrep -f "$process_name" | head -1)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            return 0
+        fi
     fi
+    return 1
 }
 
 # Function to wait for topic to be available
@@ -90,7 +96,7 @@ show_menu() {
     echo "8) 🧹 Kill All ROS Processes"
     echo "9) 🔧 Rebuild Project"
     echo "10) 📊 Performance Monitor"
-    echo "11) 🎯 Pure NMPC Tracking Test (Simulated Person Only)"
+    echo "11) 🔧 System Diagnostics and Testing"
     echo "0) 🚪 Exit"
     echo ""
     read -p "Enter your choice (0-11): " choice
@@ -223,16 +229,16 @@ test_yolo_detector() {
         fi
     fi
     
-    # Check if YOLO is already running
+    # Clean up any existing YOLO processes automatically
+    print_status $YELLOW "🧹 Cleaning up any existing YOLO processes..."
+    pkill -f "yolo12_detector_node" 2>/dev/null
+    sleep 2
+    
+    # Double check and force kill if needed
     if check_process "yolo12_detector_node"; then
-        print_status $YELLOW "⚠️  YOLO already running"
-        read -p "Kill existing YOLO? (y/n): " kill_yolo
-        if [ "$kill_yolo" = "y" ]; then
-            pkill -f "yolo12_detector_node"
-            sleep 2
-        else
-            return 0
-        fi
+        print_status $YELLOW "⚠️  Force killing stubborn YOLO processes..."
+        pkill -9 -f "yolo12_detector_node" 2>/dev/null
+        sleep 2
     fi
     
     # Find model files
@@ -256,9 +262,11 @@ test_yolo_detector() {
         -p "model_path:=$model_path" \
         -p "labels_path:=$labels_path" \
         -p "use_gpu:=false" \
-        -p "confidence_threshold:=0.5" \
-        -p "desired_class:=1" \
-        -p "max_update_rate_hz:=1.0" > /tmp/yolo.log 2>&1 &
+        -p "confidence_threshold:=0.3" \
+        -p "desired_class:=0" \
+        -p "iou_threshold:=0.4" \
+        -p "publish_debug_image:=true" \
+        -p "max_update_rate_hz:=2.0" > /tmp/yolo.log 2>&1 &
     
     local yolo_pid=$!
     
@@ -344,13 +352,14 @@ full_integration_test() {
     
     print_status $YELLOW "🔄 Starting complete fixed system with enhanced human detection..."
     print_status $YELLOW "📋 Launch sequence:"
-    print_status $YELLOW "   1. Create enhanced human models for better YOLO detection"
-    print_status $YELLOW "   2. Gazebo simulation environment with enhanced models"
-    print_status $YELLOW "   3. YOLO person detector (optimized parameters)"
-    print_status $YELLOW "   4. RViz visualization with trajectory display"
-    print_status $YELLOW "   5. NMPC test node (virtual person)"
-    print_status $YELLOW "   6. NMPC tracker"
-    print_status $YELLOW "   7. Enable tracking"
+    print_status $YELLOW "   1. Gazebo simulation environment"
+    print_status $YELLOW "   2. YOLO person detector (optimized parameters)"
+    print_status $YELLOW "   3. Detection visualizer"
+    print_status $YELLOW "   4. Drone TF publisher"
+    print_status $YELLOW "   5. RViz visualization with trajectory display"
+    print_status $YELLOW "   6. NMPC test node (virtual person)"
+    print_status $YELLOW "   7. NMPC tracker"
+    print_status $YELLOW "   8. Enable tracking"
     
     # Clean up existing processes
     print_status $YELLOW "🧹 Cleaning up existing processes..."
@@ -358,20 +367,20 @@ full_integration_test() {
     sleep 3
     
     # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/7: Starting Gazebo simulation..."
+    print_status $YELLOW "Step 1/8: Starting Gazebo simulation..."
     if ! launch_gazebo; then
         print_status $RED "❌ Gazebo startup failed, cannot continue"
         return 1
     fi
     
     # Step 2: Start YOLO detector
-    print_status $YELLOW "Step 2/7: Starting YOLO detector..."
+    print_status $YELLOW "Step 2/8: Starting YOLO detector..."
     if ! test_yolo_detector; then
         print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
-    print_status $YELLOW "Step 3/7: Starting detection visualizer..."
+    print_status $YELLOW "Step 3/8: Starting detection visualizer..."
     
     ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
@@ -383,8 +392,14 @@ full_integration_test() {
         print_status $RED "❌ Detection visualizer failed to start"
     fi
     
-    # Step 4: Start RViz visualization with trajectory display
-    print_status $YELLOW "Step 4/7: Starting RViz visualization..."
+    # Step 4: Start drone TF publisher for proper RViz display
+    print_status $YELLOW "Step 4/8: Starting drone TF publisher..."
+    python3 drone_tf_publisher.py > /tmp/drone_tf.log 2>&1 &
+    local tf_pid=$!
+    sleep 1
+    
+    # Step 5: Start RViz visualization with trajectory display
+    print_status $YELLOW "Step 5/8: Starting RViz visualization..."
     python3 visualization_node.py > /tmp/visualization.log 2>&1 &
     local viz_node_pid=$!
     sleep 2
@@ -392,16 +407,16 @@ full_integration_test() {
     if check_process "visualization_node.py"; then
         print_status $GREEN "✅ RViz visualization node started successfully"
         print_status $YELLOW "💡 Open RViz2 and add these topics for visualization:"
-        print_status $YELLOW "   - /visualization_markers (MarkerArray)"
-        print_status $YELLOW "   - /person_position_markers (MarkerArray)"
+        print_status $YELLOW "   - /person_position_markers (MarkerArray) - Red=Predicted, Blue=Actual"
         print_status $YELLOW "   - /drone_trajectory_markers (MarkerArray)"
         print_status $YELLOW "   - /drone_path (Path)"
+        print_status $YELLOW "   - /detection_image (Image) - Raw image with detection boxes"
     else
         print_status $YELLOW "⚠️  RViz visualization node failed to start (continuing anyway)"
     fi
     
-    # Step 5: Start NMPC test node
-    print_status $YELLOW "Step 5/7: Starting NMPC test node..."
+    # Step 6: Start NMPC test node
+    print_status $YELLOW "Step 6/8: Starting NMPC test node..."
     
     python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
     local test_pid=$!
@@ -414,8 +429,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 6: Start NMPC tracker
-    print_status $YELLOW "Step 6/7: Starting NMPC tracker..."
+    # Step 7: Start NMPC tracker
+    print_status $YELLOW "Step 7/8: Starting NMPC tracker..."
     python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
@@ -427,8 +442,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 5: Enable tracking
-    print_status $YELLOW "Step 7/7: Enabling drone tracking..."
+    # Step 8: Enable tracking
+    print_status $YELLOW "Step 8/8: Enabling drone tracking..."
     ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
     sleep 2
     
@@ -503,95 +518,11 @@ full_integration_test() {
     print_status $YELLOW "💡 Expected behavior:"
     print_status $YELLOW "   - See drone model in Gazebo"
     print_status $YELLOW "   - Drone should start flying and tracking virtual person"
+    print_status $YELLOW "   - Red sphere: Drone's prediction of person position"
+    print_status $YELLOW "   - Blue cylinder: Actual person position from Gazebo"
     print_status $YELLOW "   - Check logs: tail -f /tmp/nmpc_*.log"
     print_status $YELLOW "   - Use option 8 to stop all processes"
 }
-
-# Kill all ROS processes
-kill_all_processes() {
-    print_status $BLUE "🧹 Killing All ROS Processes"
-    echo "============================="
-    
-    print_status $YELLOW "🛑 Stopping all processes..."
-    
-    # Kill specific processes
-    pkill -f "gz sim" 2>/dev/null
-    pkill -f "yolo12_detector_node" 2>/dev/null
-    pkill -f "nmpc_tracker_node" 2>/dev/null
-    pkill -f "nmpc_test_node" 2>/dev/null
-    pkill -f "detection_visualizer_node" 2>/dev/null
-    pkill -f "visualization_node.py" 2>/dev/null
-    pkill -f "ros2 launch" 2>/dev/null
-    pkill -f "parameter_bridge" 2>/dev/null
-    pkill -f "rviz2" 2>/dev/null
-    pkill -f "ros2 topic pub" 2>/dev/null
-    
-    sleep 2
-    
-    # Check if processes are stopped
-    if ! check_process "gz sim" && ! check_process "yolo12_detector_node"; then
-        print_status $GREEN "✅ All processes stopped"
-    else
-        print_status $YELLOW "⚠️  Some processes may still be running"
-    fi
-    
-    # Clean up shared memory
-    rm -f /dev/shm/sem.* 2>/dev/null
-    rm -f /tmp/*.log 2>/dev/null
-    
-    print_status $GREEN "🧹 Cleanup complete"
-}
-
-# Rebuild project
-rebuild_project() {
-    print_status $BLUE "🔧 Rebuilding Project"
-    echo "====================="
-    
-    print_status $YELLOW "🧹 Cleaning build artifacts..."
-    rm -rf build/ install/ log/
-    
-    print_status $YELLOW "🔨 Building project..."
-    if colcon build; then
-        print_status $GREEN "✅ Build successful"
-        print_status $YELLOW "💡 Don't forget to source: source install/setup.bash"
-    else
-        print_status $RED "❌ Build failed"
-        return 1
-    fi
-}
-
-# Performance monitor
-performance_monitor() {
-    print_status $BLUE "📊 Performance Monitor"
-    echo "======================"
-    
-    print_status $YELLOW "🔍 System resources:"
-    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)%"
-    echo "Memory: $(free -h | awk '/^Mem:/ {print $3 "/" $2}')"
-    
-    print_status $YELLOW "🎯 ROS2 processes:"
-    ps aux | grep -E "(gz|yolo|ros2)" | grep -v grep | while read line; do
-        echo "  $line"
-    done
-    
-    if check_process "yolo12_detector_node"; then
-        print_status $YELLOW "🧠 YOLO performance:"
-        echo "  Check /tmp/yolo.log for inference times"
-        tail -5 /tmp/yolo.log 2>/dev/null | grep "Inference latency" || echo "  No recent inference data"
-    fi
-    
-    if check_process "nmpc_tracker_node"; then
-        print_status $YELLOW "🚁 NMPC performance:"
-        echo "  NMPC optimization warnings are normal"
-        # Check NMPC control commands
-        if ros2 topic list | grep -q "/X3/cmd_vel"; then
-            print_status $GREEN "  ✅ NMPC publishing control commands"
-        else
-            print_status $YELLOW "  ⚠️  No NMPC control commands"
-        fi
-    fi
-}
-
 
 # NMPC Person Tracking Test
 nmpc_person_tracking_test() {
@@ -694,147 +625,92 @@ nmpc_person_tracking_test() {
     print_status $YELLOW "💡 Press Ctrl+C in a terminal to stop processes"
 }
 
-# Pure NMPC Tracking Test (Simulated Person Only)
-pure_nmpc_tracking_test() {
-    print_status $BLUE "🎯 Pure NMPC Tracking Test (Simulated Person Only)"
-    echo "====================================================="
+# System Diagnostics and Testing
+system_diagnostics_test() {
+    print_status $BLUE "🔧 System Diagnostics and Testing"
+    echo "=================================="
     
-    print_status $YELLOW "🔄 Starting pure NMPC system with simulated person..."
-    print_status $YELLOW "📋 Launch sequence:"
-    print_status $YELLOW "   1. Gazebo simulation environment"
-    print_status $YELLOW "   2. Detection visualizer (for visual feedback)"
-    print_status $YELLOW "   3. NMPC test node (simulated person)"
-    print_status $YELLOW "   4. NMPC tracker"
-    print_status $YELLOW "   5. Enable tracking"
-    
-    # Clean up existing processes
-    print_status $YELLOW "🧹 Cleaning up existing processes..."
-    kill_all_processes
-    sleep 3
-    
-    # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/5: Starting Gazebo simulation..."
-    if ! launch_gazebo; then
-        print_status $RED "❌ Gazebo startup failed, cannot continue"
+    # Function to check if a topic is publishing
+    check_topic_diagnostics() {
+        local topic=$1
+        print_status $YELLOW "Checking topic: $topic"
+        
+        if ros2 topic list | grep -q "$topic"; then
+            print_status $GREEN "  ✅ Topic $topic exists"
+            
+            # Check if data is being published
+            local data=$(timeout 3s ros2 topic echo "$topic" --once 2>/dev/null)
+            if [ -n "$data" ]; then
+                print_status $GREEN "  ✅ Topic $topic has data"
+                return 0
+            else
+                print_status $YELLOW "  ⚠️  Topic $topic exists but no data"
+                return 1
+            fi
+        else
+            print_status $RED "  ❌ Topic $topic not found"
+            return 1
+        fi
+    }
+
+    # Check if ROS2 is sourced
+    if [ -z "$ROS_DISTRO" ]; then
+        print_status $RED "❌ ROS2 not sourced"
         return 1
     fi
+
+    print_status $GREEN "✅ ROS2 $ROS_DISTRO environment active"
+
+    # Test 1: Check visualization topics
+    print_status $BLUE "Test 1: Checking visualization topics"
+    check_topic_diagnostics "/person_position_markers"
+    check_topic_diagnostics "/drone_trajectory_markers" 
+    check_topic_diagnostics "/drone_path"
+
+    # Test 2: Check YOLO topics
+    print_status $BLUE "Test 2: Checking YOLO detection topics"
+    check_topic_diagnostics "/person_detections"
+    check_topic_diagnostics "/detection_image"
+
+    # Test 3: Check drone topics
+    print_status $BLUE "Test 3: Checking drone topics"
+    check_topic_diagnostics "/X3/odometry"
+    check_topic_diagnostics "/X3/cmd_vel"
+
+    # Test 4: Check camera topic
+    print_status $BLUE "Test 4: Checking camera topic"
+    check_topic_diagnostics "/camera/image_raw"
+
+    # Test 5: Check running processes
+    print_status $BLUE "Test 5: Checking running processes"
     
-    # Step 2: Start detection visualizer node (without YOLO detector)
-    print_status $YELLOW "Step 2/5: Starting detection visualizer..."
-    
-    ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
-    local viz_pid=$!
-    sleep 2
-    
-    if check_process "detection_visualizer_node"; then
-        print_status $GREEN "✅ Detection visualizer started successfully"
+    if check_process "gz sim"; then
+        print_status $GREEN "  ✅ Gazebo simulation running"
     else
-        print_status $RED "❌ Detection visualizer failed to start"
+        print_status $YELLOW "  ⚠️  Gazebo not running"
     fi
     
-    # Step 3: Start NMPC test node
-    print_status $YELLOW "Step 3/5: Starting NMPC test node (simulated person)..."
-    python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_pure.log 2>&1 &
-    local test_pid=$!
-    sleep 3
-    
-    if check_process "nmpc_test_node"; then
-        print_status $GREEN "✅ NMPC test node started successfully"
+    if check_process "yolo12_detector_node"; then
+        print_status $GREEN "  ✅ YOLO detector running"
     else
-        print_status $RED "❌ NMPC test node failed to start"
-        return 1
+        print_status $YELLOW "  ⚠️  YOLO detector not running"
     fi
-    
-    # Step 4: Start NMPC tracker
-    print_status $YELLOW "Step 4/5: Starting NMPC tracker..."
-    python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_pure.log 2>&1 &
-    local tracker_pid=$!
-    sleep 3
     
     if check_process "nmpc_tracker_node"; then
-        print_status $GREEN "✅ NMPC tracker started successfully"
+        print_status $GREEN "  ✅ NMPC tracker running"
     else
-        print_status $RED "❌ NMPC tracker failed to start"
-        return 1
+        print_status $YELLOW "  ⚠️  NMPC tracker not running"
     fi
     
-    # Step 5: Enable tracking
-    print_status $YELLOW "Step 7/7: Enabling drone tracking..."
-    ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
-    sleep 2
-    
-    # System status verification
-    print_status $GREEN "🎉 Pure NMPC system startup finished!"
-    print_status $BLUE "========================================"
-    print_status $YELLOW "📊 System status verification:"
-    
-    # Check critical topics
-    if wait_for_topic "/camera/image_raw" 5; then
-        print_status $GREEN "  ✅ Camera images available"
+    if check_process "nmpc_test_node"; then
+        print_status $GREEN "  ✅ NMPC test node running"
     else
-        print_status $RED "  ❌ Camera images not available"
+        print_status $YELLOW "  ⚠️  NMPC test node not running"
     fi
-    
-    if wait_for_topic "/person_detections" 5; then
-        print_status $GREEN "  ✅ Person detections available (simulated)"
-    else
-        print_status $RED "  ❌ Person detections not available"
-    fi
-    
-    if wait_for_topic "/X3/odometry" 5; then
-        print_status $GREEN "  ✅ Drone odometry available"
-    else
-        print_status $RED "  ❌ Drone odometry not available"
-    fi
-    
-    if wait_for_topic "/X3/cmd_vel" 5; then
-        print_status $GREEN "  ✅ Drone control commands available"
-    else
-        print_status $RED "  ❌ Drone control commands not available"
-    fi
-    
-    if wait_for_topic "/detection_image" 5; then
-        print_status $GREEN "  ✅ Detection image available"
-    else
-        print_status $RED "  ❌ Detection image not available"
-    fi
-    
-    print_status $BLUE "========================================"
-    print_status $GREEN "🎯 System functionality verification:"
-    
-    # Check topic data rates
-    if check_topic_rate "/person_detections" 1.0; then
-        print_status $GREEN "  ✅ Simulated person detections are being published"
-    else
-        print_status $YELLOW "  ⚠️  Person detection data rate is low"
-    fi
-    
-    if check_topic_rate "/X3/odometry" 10.0; then
-        print_status $GREEN "  ✅ Drone odometry is being published"
-    else
-        print_status $YELLOW "  ⚠️  Drone odometry data rate is low"
-    fi
-    
-    if check_topic_rate "/X3/cmd_vel" 1.0; then
-        print_status $GREEN "  ✅ NMPC is publishing control commands"
-    else
-        print_status $YELLOW "  ⚠️  NMPC control command data rate is low"
-    fi
-    
-    if check_topic_rate "/detection_image" 1.0; then
-        print_status $GREEN "  ✅ Detection images are being published"
-    else
-        print_status $YELLOW "  ⚠️  Detection image data rate is low"
-    fi
-    
-    print_status $BLUE "========================================"
-    print_status $GREEN "🎉 Pure NMPC tracking system is running!"
-    print_status $YELLOW "💡 Expected behavior:"
-    print_status $YELLOW "   - Drone should track simulated person in circular motion"
-    print_status $YELLOW "   - Green detection boxes should be stable on /detection_image"
-    print_status $YELLOW "   - Check logs: tail -f /tmp/nmpc_*.log"
-    print_status $YELLOW "   - Use rviz to visualize /detection_image topic"
-    print_status $YELLOW "   - Use option 8 to stop all processes"
+
+    print_status $GREEN "🎉 Diagnostics completed!"
+    print_status $YELLOW "💡 If topics show 'no data', make sure the simulation is running"
+    print_status $YELLOW "💡 Run option 5 to start full integration test"
 }
 
 # NMPC + Gazebo Visual Tracking
@@ -911,361 +787,90 @@ nmpc_gazebo_visual_tracking() {
     print_status $YELLOW "💡 Use option 8 to stop all processes"
 }
 
-# Create enhanced human models for better YOLO detection
-create_enhanced_human_models() {
-    print_status $YELLOW "📝 Creating enhanced human model for YOLO detection..."
+# Kill all ROS processes
+kill_all_processes() {
+    print_status $BLUE "🧹 Killing All ROS Processes"
+    echo "============================="
     
-    # Create a more realistic human model using simple geometric shapes
-    cat > /tmp/enhanced_human.sdf << 'EOF'
-<?xml version="1.0" ?>
-<sdf version="1.6">
-  <model name="enhanced_human">
-    <static>false</static>
-    <pose>0 0 1.0 0 0 0</pose>
+    print_status $YELLOW "🛑 Stopping all processes..."
     
-    <!-- Human torso - blue shirt -->
-    <link name="torso">
-      <pose>0 0 1.3 0 0 0</pose>
-      <collision name="torso_collision">
-        <geometry>
-          <cylinder><radius>0.2</radius><length>0.6</length></cylinder>
-        </geometry>
-      </collision>
-      <visual name="torso_visual">
-        <geometry>
-          <cylinder><radius>0.2</radius><length>0.6</length></cylinder>
-        </geometry>
-        <material>
-          <ambient>0.1 0.1 0.8 1</ambient>
-          <diffuse>0.1 0.1 0.8 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>40.0</mass>
-        <inertia>
-          <ixx>1.5</ixx><iyy>1.5</iyy><izz>0.8</izz>
-        </inertia>
-      </inertial>
-    </link>
+    # Kill specific processes
+    pkill -f "gz sim" 2>/dev/null
+    pkill -f "yolo12_detector_node" 2>/dev/null
+    pkill -f "nmpc_tracker_node" 2>/dev/null
+    pkill -f "nmpc_test_node" 2>/dev/null
+    pkill -f "detection_visualizer_node" 2>/dev/null
+    pkill -f "visualization_node.py" 2>/dev/null
+    pkill -f "drone_tf_publisher.py" 2>/dev/null
+    pkill -f "ros2 launch" 2>/dev/null
+    pkill -f "parameter_bridge" 2>/dev/null
+    pkill -f "rviz2" 2>/dev/null
+    pkill -f "ros2 topic pub" 2>/dev/null
     
-    <!-- Human head -->
-    <link name="head">
-      <pose>0 0 1.75 0 0 0</pose>
-      <collision name="head_collision">
-        <geometry>
-          <sphere><radius>0.15</radius></sphere>
-        </geometry>
-      </collision>
-      <visual name="head_visual">
-        <geometry>
-          <sphere><radius>0.15</radius></sphere>
-        </geometry>
-        <material>
-          <ambient>0.9 0.8 0.7 1</ambient>
-          <diffuse>0.9 0.8 0.7 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>5.0</mass>
-        <inertia>
-          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.03</izz>
-        </inertia>
-      </inertial>
-    </link>
+    sleep 2
     
-    <!-- Arms -->
-    <link name="left_arm">
-      <pose>-0.3 0 1.4 1.57 0 0</pose>
-      <collision name="left_arm_collision">
-        <geometry>
-          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
-        </geometry>
-      </collision>
-      <visual name="left_arm_visual">
-        <geometry>
-          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
-        </geometry>
-        <material>
-          <ambient>0.9 0.8 0.7 1</ambient>
-          <diffuse>0.9 0.8 0.7 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>3.0</mass>
-        <inertia>
-          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.006</izz>
-        </inertia>
-      </inertial>
-    </link>
-    
-    <link name="right_arm">
-      <pose>0.3 0 1.4 1.57 0 0</pose>
-      <collision name="right_arm_collision">
-        <geometry>
-          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
-        </geometry>
-      </collision>
-      <visual name="right_arm_visual">
-        <geometry>
-          <cylinder><radius>0.05</radius><length>0.5</length></cylinder>
-        </geometry>
-        <material>
-          <ambient>0.9 0.8 0.7 1</ambient>
-          <diffuse>0.9 0.8 0.7 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>3.0</mass>
-        <inertia>
-          <ixx>0.03</ixx><iyy>0.03</iyy><izz>0.006</izz>
-        </inertia>
-      </inertial>
-    </link>
-    
-    <!-- Legs -->
-    <link name="left_leg">
-      <pose>-0.1 0 0.5 0 0 0</pose>
-      <collision name="left_leg_collision">
-        <geometry>
-          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
-        </geometry>
-      </collision>
-      <visual name="left_leg_visual">
-        <geometry>
-          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
-        </geometry>
-        <material>
-          <ambient>0.2 0.2 0.2 1</ambient>
-          <diffuse>0.2 0.2 0.2 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>8.0</mass>
-        <inertia>
-          <ixx>0.4</ixx><iyy>0.4</iyy><izz>0.025</izz>
-        </inertia>
-      </inertial>
-    </link>
-    
-    <link name="right_leg">
-      <pose>0.1 0 0.5 0 0 0</pose>
-      <collision name="right_leg_collision">
-        <geometry>
-          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
-        </geometry>
-      </collision>
-      <visual name="right_leg_visual">
-        <geometry>
-          <cylinder><radius>0.08</radius><length>0.8</length></cylinder>
-        </geometry>
-        <material>
-          <ambient>0.2 0.2 0.2 1</ambient>
-          <diffuse>0.2 0.2 0.2 1</diffuse>
-        </material>
-      </visual>
-      <inertial>
-        <mass>8.0</mass>
-        <inertia>
-          <ixx>0.4</ixx><iyy>0.4</iyy><izz>0.025</izz>
-        </inertia>
-      </inertial>
-    </link>
-    
-    <!-- Fixed joints to connect parts -->
-    <joint name="head_torso" type="fixed">
-      <parent>torso</parent>
-      <child>head</child>
-    </joint>
-    
-    <joint name="torso_left_arm" type="fixed">
-      <parent>torso</parent>
-      <child>left_arm</child>
-    </joint>
-    
-    <joint name="torso_right_arm" type="fixed">
-      <parent>torso</parent>
-      <child>right_arm</child>
-    </joint>
-    
-    <joint name="torso_left_leg" type="fixed">
-      <parent>torso</parent>
-      <child>left_leg</child>
-    </joint>
-    
-    <joint name="torso_right_leg" type="fixed">
-      <parent>torso</parent>
-      <child>right_leg</child>
-    </joint>
-    
-  </model>
-</sdf>
-EOF
-
-    print_status $GREEN "✅ Enhanced human model created"
-    
-    # Modify the world file to include better human models
-    print_status $YELLOW "📝 Creating enhanced world file..."
-    
-    # Copy original world file and modify it
-    cp src/drone_description/worlds/drone_world.sdf /tmp/enhanced_world.sdf
-    
-    # Remove the existing actor and add our enhanced models
-    sed -i '198,251d' /tmp/enhanced_world.sdf  # Remove walking_person actor
-    
-    # Add enhanced human models before the closing </world> tag
-    sed -i '$i\    <!-- Enhanced Human Model 1 -->' /tmp/enhanced_world.sdf
-    sed -i '$i\    <include>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <uri>file:///tmp/enhanced_human.sdf</uri>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <pose>1 1 0 0 0 0</pose>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <name>human1</name>' /tmp/enhanced_world.sdf
-    sed -i '$i\    </include>' /tmp/enhanced_world.sdf
-    sed -i '$i\\' /tmp/enhanced_world.sdf
-    sed -i '$i\    <!-- Enhanced Human Model 2 -->' /tmp/enhanced_world.sdf
-    sed -i '$i\    <include>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <uri>file:///tmp/enhanced_human.sdf</uri>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <pose>-1 -1 0 0 0 1.57</pose>' /tmp/enhanced_world.sdf
-    sed -i '$i\      <name>human2</name>' /tmp/enhanced_world.sdf
-    sed -i '$i\    </include>' /tmp/enhanced_world.sdf
-    
-    print_status $GREEN "✅ Enhanced world file created at /tmp/enhanced_world.sdf"
-}
-
-# Test YOLO detector with optimized parameters for enhanced humans
-test_optimized_yolo_detector() {
-    print_status $BLUE "🧠 Testing Optimized YOLO Detector"
-    echo "==================================="
-    
-    # Check if Gazebo is running
-    if ! check_process "gz sim"; then
-        print_status $RED "❌ Gazebo not running - cannot test YOLO"
-        return 1
-    fi
-    
-    # Check if YOLO is already running
-    if check_process "yolo12_detector_node"; then
-        print_status $YELLOW "⚠️  YOLO already running"
-        pkill -f "yolo12_detector_node"
-        sleep 2
-    fi
-    
-    # Find model files
-    local model_path=$(find . -name "yolo12n.onnx" | head -1)
-    local labels_path=$(find . -name "coco.names" | head -1)
-    
-    if [ -z "$model_path" ] || [ -z "$labels_path" ]; then
-        print_status $RED "❌ YOLO model files not found"
-        return 1
-    fi
-    
-    print_status $GREEN "📁 Using model: $model_path"
-    print_status $GREEN "📁 Using labels: $labels_path"
-    
-    print_status $YELLOW "🚀 Starting optimized YOLO detector..."
-    print_status $YELLOW "   - Lower confidence threshold for better detection"
-    print_status $YELLOW "   - Enabled debug images"
-    print_status $YELLOW "   - Optimized for person class (class 0)"
-    
-    # Start YOLO with optimized parameters for enhanced human detection
-    
-    ros2 run neural_network_detector yolo12_detector_node \
-        --ros-args \
-        -p "model_path:=$model_path" \
-        -p "labels_path:=$labels_path" \
-        -p "use_gpu:=false" \
-        -p "confidence_threshold:=0.3" \
-        -p "iou_threshold:=0.4" \
-        -p "desired_class:=0" \
-        -p "publish_debug_image:=true" \
-        -p "max_update_rate_hz:=2.0" > /tmp/yolo_optimized.log 2>&1 &
-    
-    local yolo_pid=$!
-    
-    # Wait for YOLO to start
-    sleep 5
-    
-    if check_process "yolo12_detector_node"; then
-        print_status $GREEN "✅ Optimized YOLO detector started"
-        
-        # Wait for detection topic
-        if wait_for_topic "/person_detections" 10; then
-            print_status $GREEN "✅ Detection topic is available"
-            
-            # Check if detections are being published
-            print_status $YELLOW "🔍 Testing detection with enhanced human models..."
-            sleep 3
-            
-            # Check for actual detections
-            local detection_test=$(timeout 5s ros2 topic echo /person_detections --once 2>/dev/null)
-            if echo "$detection_test" | grep -q "detection_score"; then
-                local num_detections=$(echo "$detection_test" | grep -c "detection_score")
-                print_status $GREEN "✅ YOLO detected $num_detections person(s)!"
-            else
-                print_status $YELLOW "⚠️  No person detections yet (models may need time to load)"
-            fi
-            
-            return 0
-        else
-            print_status $RED "❌ Detection topic not available"
-            return 1
-        fi
+    # Check if processes are stopped
+    if ! check_process "gz sim" && ! check_process "yolo12_detector_node"; then
+        print_status $GREEN "✅ All processes stopped"
     else
-        print_status $RED "❌ Optimized YOLO detector failed to start"
-        print_status $YELLOW "📋 Check log: tail /tmp/yolo_optimized.log"
+        print_status $YELLOW "⚠️  Some processes may still be running"
+    fi
+    
+    # Clean up shared memory
+    rm -f /dev/shm/sem.* 2>/dev/null
+    rm -f /tmp/*.log 2>/dev/null
+    
+    print_status $GREEN "🧹 Cleanup complete"
+}
+
+# Rebuild project
+rebuild_project() {
+    print_status $BLUE "🔧 Rebuilding Project"
+    echo "====================="
+    
+    print_status $YELLOW "🧹 Cleaning build artifacts..."
+    rm -rf build/ install/ log/
+    
+    print_status $YELLOW "🔨 Building project..."
+    if colcon build; then
+        print_status $GREEN "✅ Build successful"
+        print_status $YELLOW "💡 Don't forget to source: source install/setup.bash"
+    else
+        print_status $RED "❌ Build failed"
         return 1
     fi
 }
 
-# Launch Gazebo with enhanced world file
-launch_enhanced_gazebo() {
-    print_status $BLUE "🎮 Launching Enhanced Gazebo Simulation"
-    echo "======================================="
+# Performance monitor
+performance_monitor() {
+    print_status $BLUE "📊 Performance Monitor"
+    echo "======================"
     
-    if check_process "gz sim"; then
-        print_status $YELLOW "⚠️  Gazebo already running"
-        read -p "Kill existing Gazebo? (y/n): " kill_gazebo
-        if [ "$kill_gazebo" = "y" ]; then
-            pkill -f "gz sim"
-            sleep 2
-        else
-            return 0
-        fi
-    fi
+    print_status $YELLOW "🔍 System resources:"
+    echo "CPU Usage: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)%"
+    echo "Memory: $(free -h | awk '/^Mem:/ {print $3 "/" $2}')"
     
-    print_status $YELLOW "🚀 Starting Enhanced Gazebo..."
-    print_status $YELLOW "   Using enhanced human models for better YOLO detection"
-    
-    # Set model path for enhanced models
-    export GZ_SIM_RESOURCE_PATH="/tmp:$HOME/AVIANS_ROS2_PORT1/src/drone_description/models:$GZ_SIM_RESOURCE_PATH"
-    
-    # Launch with enhanced world file in headless mode
-    gz sim -s --headless-rendering /tmp/enhanced_world.sdf > /tmp/gazebo_enhanced.log 2>&1 &
-    local gazebo_pid=$!
-    
-    # Wait for Gazebo to start
-    local count=0
-    while [ $count -lt 30 ]; do
-        if check_process "gz sim"; then
-            print_status $GREEN "✅ Enhanced Gazebo started successfully"
-            
-            # Wait a bit more for models to load
-            sleep 5
-            
-            # Wait for camera topic
-            if wait_for_topic "/camera/image_raw" 15; then
-                print_status $GREEN "✅ Camera topic is publishing"
-                return 0
-            else
-                print_status $YELLOW "⚠️  Camera topic not yet available"
-                return 1
-            fi
-        fi
-        sleep 1
-        count=$((count + 1))
+    print_status $YELLOW "🎯 ROS2 processes:"
+    ps aux | grep -E "(gz|yolo|ros2)" | grep -v grep | while read line; do
+        echo "  $line"
     done
     
-    print_status $RED "❌ Enhanced Gazebo failed to start"
-    print_status $YELLOW "📋 Check log: tail /tmp/gazebo_enhanced.log"
-    return 1
+    if check_process "yolo12_detector_node"; then
+        print_status $YELLOW "🧠 YOLO performance:"
+        echo "  Check /tmp/yolo.log for inference times"
+        tail -5 /tmp/yolo.log 2>/dev/null | grep "Inference latency" || echo "  No recent inference data"
+    fi
+    
+    if check_process "nmpc_tracker_node"; then
+        print_status $YELLOW "🚁 NMPC performance:"
+        echo "  NMPC optimization warnings are normal"
+        # Check NMPC control commands
+        if ros2 topic list | grep -q "/X3/cmd_vel"; then
+            print_status $GREEN "  ✅ NMPC publishing control commands"
+        else
+            print_status $YELLOW "  ⚠️  No NMPC control commands"
+        fi
+    fi
 }
 
 # Main execution
@@ -1302,7 +907,7 @@ main() {
             8) kill_all_processes ;;
             9) rebuild_project ;;
             10) performance_monitor ;;
-            11) pure_nmpc_tracking_test ;;
+            11) system_diagnostics_test ;;
             0) 
                 print_status $GREEN "👋 Goodbye!"
                 exit 0
@@ -1319,4 +924,3 @@ main() {
 
 # Run main function
 main
-

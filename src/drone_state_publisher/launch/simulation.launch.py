@@ -27,14 +27,11 @@ def generate_launch_description():
     world_file = os.path.join(drone_description, "worlds", "drone_world.sdf")
     config_file = os.path.join(drone_description, "config", "bridge.yaml")
     rviz_config = os.path.join(drone_description, "config", "drone.rviz")
+    urdf_file = os.path.join(drone_description, "urdf", "x3_drone.urdf")
     
     # YOLO model paths
     default_yolo_model_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/yolo12n.onnx"
-        neural_network_detector_dir, "YOLOs-CPP", "models", "yolo12n.onnx"
-    )
     default_yolo_labels_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/quantized_models/coco.names"
-        neural_network_detector_dir, "YOLOs-CPP", "models", "coco.names"
-    )
 
     # Launch arguments
     declare_use_sim_time = DeclareLaunchArgument(
@@ -73,7 +70,26 @@ def generate_launch_description():
         }
 
     # =============================================================================
-    # 1. GAZEBO SIMULATION
+    # 1. ROBOT DESCRIPTION PUBLISHER
+    # =============================================================================
+    
+    # Read URDF file
+    with open(urdf_file, 'r') as infp:
+        robot_description = infp.read()
+    
+    robot_state_publisher_node = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        name='robot_state_publisher',
+        output='screen',
+        parameters=[{
+            'robot_description': robot_description,
+            'use_sim_time': LaunchConfiguration('use_sim_time'),
+        }]
+    )
+
+    # =============================================================================
+    # 2. GAZEBO SIMULATION
     # =============================================================================
     
     gazebo = IncludeLaunchDescription(
@@ -469,6 +485,7 @@ def generate_launch_description():
         # Start Gazebo first
         gazebo,
         gz_ros2_bridge,
+        robot_state_publisher_node,
         
         # Static transforms MUST come early
         # TimerAction(period=2.0, actions=[

@@ -80,6 +80,9 @@ def generate_launch_description():
         output="screen"
     )
 
+    # Drone enabler - Use Python script instead of ros2 topic pub
+    # This creates a simple publisher that continuously enables the drone
+    
     # Waypoint controller
     controller = Node(
         package='drone_description',
@@ -107,7 +110,7 @@ def generate_launch_description():
             {'labels_path': '/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/coco.names'},
             {'use_gpu': False},
             {'confidence_threshold': 0.5},
-            {'desired_class': 1},  # person class
+            {'desired_class': 0},  # person class (COCO class 0)
             {'max_update_rate_hz': 1.0}
         ]
     )

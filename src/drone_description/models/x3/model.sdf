@@ -391,16 +391,10 @@
       </axis>
     </joint>
 
-    <!-- Simple velocity controller plugin for basic movement -->
-    <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
-      <initial_linear>0 0 0</initial_linear>
-      <initial_angular>0 0 0</initial_angular>
-      <cmd_vel_topic>/X3/cmd_vel</cmd_vel_topic>
-      <link_name>X3/base_link</link_name>
-    </plugin>
+    <!-- VelocityControl removed - using MulticopterVelocityControl from world file instead -->
 
     <!-- Odometry publisher plugin -->
-    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+    <plugin filename="gz-sim8-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
       <dimensions>3</dimensions>
       <odom_frame>X3/odom</odom_frame>
       <robot_base_frame>X3/base_link</robot_base_frame>
