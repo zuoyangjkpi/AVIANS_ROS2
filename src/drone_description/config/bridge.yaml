@@ -70,4 +70,11 @@
   ros_type_name: "geometry_msgs/msg/PoseArray"
   gz_type_name: "gz.msgs.Pose_V"
   direction: GZ_TO_ROS
+
+# X3 drone pose bridge
+- ros_topic_name: "/X3/pose"
+  gz_topic_name: "/model/X3/pose"
+  ros_type_name: "geometry_msgs/msg/PoseStamped"
+  gz_type_name: "gz.msgs.Pose"
+  direction: GZ_TO_ROS
     

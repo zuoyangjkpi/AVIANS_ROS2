@@ -115,14 +115,8 @@ def generate_launch_description():
         ]
     )
 
-    # Pose to Odometry bridge
-    pose_to_odom_bridge = Node(
-        package="drone_nmpc_tracker",
-        executable="python3",
-        name="pose_to_odom_bridge",
-        arguments=["/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/drone_nmpc_tracker/drone_nmpc_tracker/pose_to_odom_bridge.py"],
-        output="screen"
-    )
+    # Remove the problematic pose_to_odom_bridge for now
+    # We'll use the existing odometry from Gazebo plugins instead
 
     return LaunchDescription([
         libgl_env,
@@ -134,7 +128,7 @@ def generate_launch_description():
         gazebo,
         gz_ros2_bridge,
         robot_state_publisher,
-        pose_to_odom_bridge,  # Add the bridge node
+        # pose_to_odom_bridge removed
         TimerAction(
             period=10.0,
             actions=[ 

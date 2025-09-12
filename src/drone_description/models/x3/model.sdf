@@ -393,12 +393,12 @@
 
     <!-- VelocityControl removed - using MulticopterVelocityControl from world file instead -->
 
-    <!-- Pose publisher plugin - use ROS2 bridge -->
-    <plugin filename="gz-sim-pose-publisher-system" name="gz::sim::systems::PosePublisher">
-      <publish_link_pose>true</publish_link_pose>
-      <use_pose_vector_msg>false</use_pose_vector_msg>
-      <static_publisher>true</static_publisher>
-      <static_update_frequency>50</static_update_frequency>
+    <!-- Odometry publisher plugin -->
+    <plugin filename="gz-sim8-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>X3/odom</odom_frame>
+      <robot_base_frame>X3/base_link</robot_base_frame>
+      <odom_topic>/X3/odometry</odom_topic>
+      <odom_publish_frequency>50</odom_publish_frequency>
     </plugin>
 
   </model>
