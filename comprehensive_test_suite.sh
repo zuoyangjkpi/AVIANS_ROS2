@@ -442,10 +442,20 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 8: Enable tracking
-    print_status $YELLOW "Step 8/8: Enabling drone tracking..."
+    # Step 8: Enable drone and tracking
+    print_status $YELLOW "Step 8/8: Enabling drone control and tracking..."
+    
+    # 启用无人机控制
+    print_status $YELLOW "  - 启用无人机控制..."
+    ros2 topic pub -r 1 /X3/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
+    local enable_drone_pid=$!
+    
+    # 启用NMPC跟踪
+    print_status $YELLOW "  - 启用NMPC跟踪..."
     ros2 topic pub -r 1 /nmpc/enable std_msgs/msg/Bool "data: true" > /dev/null 2>&1 &
-    sleep 2
+    local enable_nmpc_pid=$!
+    
+    sleep 5
     
     # System status verification
     print_status $GREEN "🎉 Complete system startup finished!"

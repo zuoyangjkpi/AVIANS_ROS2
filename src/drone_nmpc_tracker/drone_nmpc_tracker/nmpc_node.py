@@ -203,6 +203,9 @@ class NMPCTrackerNode(Node):
             self.controller.set_drone_state(position, velocity, orientation, angular_velocity)
             self.drone_state_received = True
             
+            # ✅ 添加调试信息
+            self.get_logger().info(f"Drone state updated: pos={position}, vel={velocity}")
+            
         except Exception as e:
             self.get_logger().error(f"Error processing drone state: {e}")
     
@@ -344,7 +347,15 @@ class NMPCTrackerNode(Node):
     
     def control_loop_callback(self):
         """Main control loop"""
-        if not self.control_enabled or not self.drone_state_received:
+        # ✅ 添加调试信息
+        self.get_logger().info(f"Control enabled: {self.control_enabled}, Drone state received: {self.drone_state_received}")
+        
+        if not self.control_enabled:
+            self.get_logger().warn("Control not enabled")
+            return
+            
+        if not self.drone_state_received:
+            self.get_logger().warn("No drone state received - waiting for odometry data")
             return
         
         try:
@@ -353,9 +364,17 @@ class NMPCTrackerNode(Node):
             if (self.person_detected and 
                 current_time - self.last_person_detection_time > self.person_timeout):
                 self.person_detected = False
-                self.get_logger().warn("Person detection timeout - switching to hover mode")
+                self.get_logger().warn("Person detection timeout - switching to search mode")
             
-            # Run NMPC optimization
+            # ✅ 修复：当没有人员检测时，执行搜索模式而不是悬停
+            if not self.person_detected:
+                # 执行圆形搜索模式
+                search_cmd = self._generate_search_pattern(current_time)
+                self.cmd_vel_pub.publish(search_cmd)
+                self.get_logger().info(f"Search mode: cmd_vel = linear.z={search_cmd.linear.z:.3f}, angular.z={search_cmd.angular.z:.3f}")
+                return
+            
+            # Run NMPC optimization (只在有人员检测时)
             optimal_control, info = self.controller.optimize()
             
             # Convert control to ROS2 Twist message
@@ -411,6 +430,25 @@ class NMPCTrackerNode(Node):
         cmd.linear.y = np.clip(cmd.linear.y, -nmpc_config.DRONE_MAX_VELOCITY, nmpc_config.DRONE_MAX_VELOCITY)
         cmd.linear.z = np.clip(cmd.linear.z, -nmpc_config.DRONE_MAX_VELOCITY, nmpc_config.DRONE_MAX_VELOCITY)
         cmd.angular.z = np.clip(cmd.angular.z, -nmpc_config.DRONE_MAX_ANGULAR_VELOCITY, nmpc_config.DRONE_MAX_ANGULAR_VELOCITY)
+        
+        return cmd
+    
+    def _generate_search_pattern(self, current_time: float) -> Twist:
+        """生成搜索模式的控制指令"""
+        cmd = Twist()
+        
+        # 旋转搜索模式：只旋转不上升
+        search_period = 10.0  # 10秒一个搜索周期
+        
+        # 不上升，保持当前高度
+        cmd.linear.z = 0.0
+        
+        # 旋转搜索 (0.5 rad/s)
+        cmd.angular.z = 0.5
+        
+        # 可选：前后运动帮助搜索不同区域
+        cmd.linear.x = 0.3 * math.sin(current_time * 2 * math.pi / search_period)
+        cmd.linear.y = 0.3 * math.cos(current_time * 2 * math.pi / search_period)
         
         return cmd
     

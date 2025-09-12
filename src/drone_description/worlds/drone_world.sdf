@@ -14,6 +14,14 @@
       <render_engine>ogre2</render_engine>
     </plugin>
     
+    <!-- ROS2 Integration Bridge -->
+    <plugin filename="gz-sim-ros-gz-bridge-system" name="gz::sim::systems::RosGzBridge">
+      <!-- Bridge all essential topics -->
+      <ros_topic>/X3/odometry</ros_topic>
+      <gz_topic>X3/odometry</gz_topic>
+      <config_file></config_file>
+    </plugin>
+    
     <!-- Pose publisher for all models -->
     <plugin filename="gz-sim8-pose-publisher-system" name="gz::sim::systems::PosePublisher">
       <publish_nested_model_pose>true</publish_nested_model_pose>
@@ -278,6 +286,16 @@
       <uri>model://x3</uri>
       <pose>3 0 2.5 0 0.2 3.14159</pose>
       
+      <!-- ✅ 无人机启动脚本 -->  
+      <plugin filename="gz-sim8-triggered-publisher-system" name="gz::sim::systems::TriggeredPublisher">
+        <input type="gz.msgs.StringMsg" topic="/trigger_enable">
+          <match field="data">enable_drone</match>
+        </input>
+        <output type="gz.msgs.Boolean" topic="X3/enable">
+          data: true
+        </output>
+      </plugin>
+      
       <!-- 速度控制器插件 - 放在最前面 -->
       <plugin filename="gz-sim8-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">
         <robotNamespace>X3</robotNamespace>
@@ -390,6 +408,19 @@
         <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
         <motorType>velocity</motorType>
       </plugin>
+      
+      <!-- ✅ 添加里程计插件 -->
+      <plugin filename="gz-sim8-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+        <robotNamespace>X3</robotNamespace>
+        <odom_frame>X3/odom</odom_frame>
+        <robot_base_frame>X3/base_link</robot_base_frame>
+        <odom_topic>odometry</odom_topic>
+        <odom_publish_frequency>50</odom_publish_frequency>
+        <xyz_offset>0 0 0</xyz_offset>
+        <rpy_offset>0 0 0</rpy_offset>
+        <gaussian_noise>0.0</gaussian_noise>
+      </plugin>
+      
     </include>
     
   </world>
