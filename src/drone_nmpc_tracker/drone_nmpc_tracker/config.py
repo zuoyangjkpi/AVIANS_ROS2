@@ -118,7 +118,7 @@ class NMPCConfig:
         self.REGULARIZATION = 1e-6
         
         # ========== ROS2 Topic Names ==========
-        self.TOPIC_DRONE_STATE = '/X3/odometry'
+        self.TOPIC_DRONE_STATE = '/X3/odom'
         self.TOPIC_PERSON_DETECTIONS = '/person_detections'
         self.TOPIC_CONTROL_OUTPUT = '/X3/cmd_vel'
         self.TOPIC_TRAJECTORY_VIS = '/drone/trajectory'
