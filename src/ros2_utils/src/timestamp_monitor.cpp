@@ -192,9 +192,9 @@ private:
         
         // Odometry
         odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            "/X3/odom", 10,
+            "/X3/odometry", 10,
             [this](const nav_msgs::msg::Odometry::SharedPtr msg) {
-                recordMessage("/X3/odom", "nav_msgs/Odometry", msg->header);
+                recordMessage("/X3/odometry", "nav_msgs/Odometry", msg->header);
             });
         
         // Detection pipeline topics

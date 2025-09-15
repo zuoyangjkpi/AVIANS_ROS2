@@ -603,7 +603,7 @@ class PoseToOdomConverter(Node):
         
         # Header
         odom.header = msg.header
-        odom.header.frame_id = 'X3/odom'
+        odom.header.frame_id = 'X3/odometry'
         odom.child_frame_id = 'X3/base_link'
         
         # Position and orientation

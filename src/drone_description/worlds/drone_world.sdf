@@ -401,18 +401,6 @@
         <motorType>velocity</motorType>
       </plugin>
       
-      <!-- ✅ 添加里程计插件 -->
-      <plugin filename="gz-sim8-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
-        <robotNamespace>X3</robotNamespace>
-        <odom_frame>X3/odom</odom_frame>
-        <robot_base_frame>X3/base_link</robot_base_frame>
-        <odom_topic>odometry</odom_topic>
-        <odom_publish_frequency>50</odom_publish_frequency>
-        <xyz_offset>0 0 0</xyz_offset>
-        <rpy_offset>0 0 0</rpy_offset>
-        <gaussian_noise>0.0</gaussian_noise>
-      </plugin>
-      
     </include>
     
   </world>

@@ -411,7 +411,7 @@ def generate_launch_description():
     #         'enable_debug': True,
     #         'pure_tracking_mode': False,
     #         'cmd_vel_topic': '/X3/cmd_vel',
-    #         'odom_topic': '/X3/odom',
+    #         'odom_topic': '/X3/odometry',
     #     }]
     # )
 
@@ -451,7 +451,7 @@ def generate_launch_description():
         
         # Topics
         'cmd_vel_topic': '/X3/cmd_vel',
-        'odom_topic': '/X3/odom',
+        'odom_topic': '/X3/odometry',
     }]
 )
 

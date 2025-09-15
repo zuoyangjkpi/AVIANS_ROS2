@@ -33,7 +33,7 @@ DroneStatePublisher::DroneStatePublisher() : Node("drone_state_publisher") {
     
     // Create subscribers
     drone_odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/X3/odom", 10,
+        "/X3/odometry", 10,
         std::bind(&DroneStatePublisher::droneOdomCallback, this, std::placeholders::_1));
     
     target_pose_sub_ = this->create_subscription<geometry_msgs::msg::PoseWithCovarianceStamped>(

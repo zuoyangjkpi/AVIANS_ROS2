@@ -155,7 +155,7 @@ public:
         cmd_vel_pub_ = create_publisher<geometry_msgs::msg::Twist>(cmd_topic, 10);
 
         // Subscribers
-        declare_parameter("odom_topic", "/X3/odom");
+        declare_parameter("odom_topic", "/X3/odometry");
         std::string odom_topic = get_parameter("odom_topic").as_string();
         odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
             odom_topic, 10,

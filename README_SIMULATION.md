@@ -71,7 +71,7 @@ ros2 topic echo /machine_1/target_tracker/pose
 5. **控制系统**
    - 航点控制器
    - 速度命令: `/X3/cmd_vel`
-   - 里程计: `/X3/odom`
+   - 里程计: `/X3/odometry`
 
 ### 数据流
 
