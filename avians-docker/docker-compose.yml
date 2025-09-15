@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  avians:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: avians-ros2:latest
+    container_name: avians-ros2-container
+    hostname: avians-ros2
+    
+    # 网络设置
+    network_mode: host
+    
+    # 环境变量
+    environment:
+      - DISPLAY=${DISPLAY}
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - CONDA_DEFAULT_ENV=airship_ros2
+    
+    # 卷挂载
+    volumes:
+      # X11转发
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/home/aviansuser/.Xauthority:ro
+      
+      # 共享目录（可选，用于开发）
+      - ./shared:/home/aviansuser/shared:rw
+      
+      # 保持容器数据持久化
+      - avians_workspace:/home/aviansuser/AVIANS_ROS2_PORT1
+      - avians_conda:/home/aviansuser/miniconda3
+    
+    # 设备访问
+    devices:
+      - /dev/dri:/dev/dri  # GPU访问
+    
+    # 端口映射（如果不使用host网络模式）
+    # ports:
+    #   - "11311:11311"  # ROS Master
+    #   - "7400-7410:7400-7410"  # ROS2 DDS
+    
+    # 特权模式（如果需要访问硬件）
+    privileged: false
+    
+    # 安全选项
+    security_opt:
+      - seccomp:unconfined
+    
+    # IPC设置
+    ipc: host
+    
+    # 工作目录
+    working_dir: /home/aviansuser/AVIANS_ROS2_PORT1
+    
+    # 保持容器运行
+    tty: true
+    stdin_open: true
+    
+    # 重启策略
+    restart: unless-stopped
+
+# 命名卷
+volumes:
+  avians_workspace:
+    driver: local
+  avians_conda:
+    driver: local
+
+# 网络配置（如果不使用host模式）
+# networks:
+#   ros_network:
+#     driver: bridge
+#     ipam:
+#       config:
+#         - subnet: 172.20.0.0/16

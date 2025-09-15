@@ -484,7 +484,7 @@ except Exception as e:
         cd ..
     fi
     
-    cd ~/AVIANS_ROS2_PORT1
+    cd "$REPO_DIR"
 else
     print_warning "ONNX directory not found, skipping ONNX setup"
 fi
@@ -544,11 +544,13 @@ colcon build --symlink-install --continue-on-error || {
 # ===========================================================================
 print_header "STEP 12: Final Environment Setup"
 
-# Add workspace to bashrc
-if ! grep -q "source ~/AVIANS_ROS2_PORT1/install/setup.bash" ~/.bashrc; then
+# Add workspace to bashrc - use dynamic path
+CURRENT_WS_PATH="$(pwd)"
+WORKSPACE_SETUP_LINE="source $CURRENT_WS_PATH/install/setup.bash"
+if ! grep -q "$WORKSPACE_SETUP_LINE" ~/.bashrc; then
     echo "" >> ~/.bashrc
     echo "# AVIANS ROS2 Workspace" >> ~/.bashrc
-    echo "source ~/AVIANS_ROS2_PORT1/install/setup.bash" >> ~/.bashrc
+    echo "$WORKSPACE_SETUP_LINE" >> ~/.bashrc
 fi
 
 # Source workspace for current session
@@ -717,7 +719,7 @@ cat > setup_drone_ros2.sh << 'EOF'
 #!/bin/bash
 # AVIANS ROS2 Environment Setup Script
 
-export DRONE_WS="$HOME/AVIANS_ROS2_PORT1"
+export DRONE_WS="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
 cd "$DRONE_WS"
 
 # Source conda
@@ -799,7 +801,7 @@ echo -e "${GREEN}1. Restart your terminal or run:${NC}"
 echo -e "   source ~/.bashrc"
 echo ""
 echo -e "${GREEN}2. Navigate to workspace:${NC}"
-echo -e "   cd ~/AVIANS_ROS2_PORT1"
+echo -e "   cd $(pwd)"
 echo ""
 echo -e "${GREEN}3. Test the installation:${NC}"
 echo -e "   ./test_avians_complete.sh"

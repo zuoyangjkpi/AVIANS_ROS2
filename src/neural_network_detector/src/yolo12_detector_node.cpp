@@ -1,5 +1,6 @@
 #include "neural_network_detector/yolo12_detector_node.hpp"
 #include <ros2_utils/clock_sync.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <chrono>
 
 
@@ -97,9 +98,24 @@ void YOLO12DetectorNode::updateTimestampsAfterClockSync() {
 
 void YOLO12DetectorNode::initializeParameters()
 {
-    // Declare and get parameters
-    this->declare_parameter<std::string>("model_path", "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_detector/share/neural_network_detector/YOLOs-CPP/models/yolo12n.onnx");
-    this->declare_parameter<std::string>("labels_path", "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/install/neural_network_detector/share/neural_network_detector/YOLOs-CPP/models/coco.names");
+    // Declare and get parameters - use package share directory for default paths
+    std::string package_share_dir;
+    try {
+        package_share_dir = ament_index_cpp::get_package_share_directory("neural_network_detector");
+    } catch (const std::exception& e) {
+        RCLCPP_WARN(this->get_logger(), "Could not find neural_network_detector package: %s", e.what());
+        package_share_dir = "";
+    }
+    
+    std::string default_model_path = package_share_dir.empty() ? 
+        "models/yolo12n.onnx" : 
+        package_share_dir + "/models/yolo12n.onnx";
+    std::string default_labels_path = package_share_dir.empty() ? 
+        "models/coco.names" : 
+        package_share_dir + "/models/coco.names";
+        
+    this->declare_parameter<std::string>("model_path", default_model_path);
+    this->declare_parameter<std::string>("labels_path", default_labels_path);
     this->declare_parameter<bool>("use_gpu", false);
     this->declare_parameter<float>("confidence_threshold", 0.5f);
     this->declare_parameter<float>("iou_threshold", 0.45f);

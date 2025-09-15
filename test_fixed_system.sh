@@ -15,7 +15,9 @@ print_status() {
     echo -e "${color}${message}${NC}"
 }
 
-export DRONE_WS="/home/zuoyangjkpi/AVIANS_ROS2_PORT1"
+# Get workspace directory dynamically from script location
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export DRONE_WS="$SCRIPT_DIR"
 cd "$DRONE_WS"
 
 print_status $BLUE "🎯 测试修复后的无人机系统"

@@ -15,6 +15,7 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(neural_network_msgs REQUIRED)
 find_package(ros2_utils REQUIRED)
 
@@ -66,6 +67,7 @@ ament_target_dependencies(yolo12_detector_node
   neural_network_msgs
   OpenCV
   rclcpp_components
+  ament_index_cpp
   ros2_utils
 )
 

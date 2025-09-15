@@ -232,11 +232,13 @@ colcon build --packages-select \
 print_status "Building remaining packages..."
 colcon build
 
-# 14. Setup workspace environment
+# 14. Setup workspace environment  
 print_status "Setting up workspace environment..."
-if ! grep -q "source ~/AVIANS_ROS2_PORT1/install/setup.bash" ~/.bashrc; then
-    echo "source ~/AVIANS_ROS2_PORT1/install/setup.bash" >> ~/.bashrc
-    print_success "Added workspace to ~/.bashrc"
+CURRENT_WS_PATH="$(pwd)"
+WORKSPACE_SETUP_LINE="source $CURRENT_WS_PATH/install/setup.bash"
+if ! grep -q "$WORKSPACE_SETUP_LINE" ~/.bashrc; then
+    echo "$WORKSPACE_SETUP_LINE" >> ~/.bashrc
+    print_success "Added workspace to ~/.bashrc: $WORKSPACE_SETUP_LINE"
 fi
 
 # Source workspace for current session

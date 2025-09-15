@@ -20,6 +20,7 @@
   <depend>image_transport</depend>
   <depend>opencv2</depend>
   <depend>rclcpp_components</depend>
+  <depend>ament_index_cpp</depend>
   <build_depend>neural_network_msgs</build_depend>
   <exec_depend>neural_network_msgs</exec_depend> 
   <depend>ros2_utils</depend>

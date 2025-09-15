@@ -100,14 +100,26 @@ def generate_launch_description():
         output="screen"
     )
 
+    # Get YOLO model paths using environment variable or relative to workspace
+    workspace_path = os.environ.get('COLCON_PREFIX_PATH', '').split(':')[0] if os.environ.get('COLCON_PREFIX_PATH') else ''
+    if workspace_path:
+        workspace_root = str(Path(workspace_path).parent)
+        default_model_path = os.path.join(workspace_root, "src", "neural_network_detector", "third_party", "YOLOs-CPP", "models", "yolo12n.onnx")
+        default_labels_path = os.path.join(workspace_root, "src", "neural_network_detector", "third_party", "YOLOs-CPP", "models", "coco.names")
+    else:
+        # Fallback to install directory paths
+        neural_network_detector_share = get_package_share_directory("neural_network_detector")
+        default_model_path = os.path.join(neural_network_detector_share, "models", "yolo12n.onnx")
+        default_labels_path = os.path.join(neural_network_detector_share, "models", "coco.names")
+
     yolo_node = Node(
         package="neural_network_detector",
         executable="yolo12_detector_node",
         name="yolo12_detector_node",
         output="screen",
         parameters=[
-            {'model_path': '/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/yolo12n.onnx'},
-            {'labels_path': '/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/coco.names'},
+            {'model_path': default_model_path},
+            {'labels_path': default_labels_path},
             {'use_gpu': False},
             {'confidence_threshold': 0.5},
             {'desired_class': 0},  # person class (COCO class 0)

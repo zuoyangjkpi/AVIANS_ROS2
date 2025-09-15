@@ -29,9 +29,10 @@ def generate_launch_description():
     rviz_config = os.path.join(drone_description, "config", "drone.rviz")
     urdf_file = os.path.join(drone_description, "urdf", "x3_drone.urdf")
     
-    # YOLO model paths
-    default_yolo_model_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/models/yolo12n.onnx"
-    default_yolo_labels_path = "/home/zuoyangjkpi/AVIANS_ROS2_PORT1/src/neural_network_detector/third_party/YOLOs-CPP/quantized_models/coco.names"
+    # YOLO model paths - use relative paths from neural_network_detector package
+    neural_network_detector_path = get_package_share_directory("neural_network_detector")
+    default_yolo_model_path = os.path.join(neural_network_detector_path, "third_party", "YOLOs-CPP", "models", "yolo12n.onnx")
+    default_yolo_labels_path = os.path.join(neural_network_detector_path, "third_party", "YOLOs-CPP", "quantized_models", "coco.names")
 
     # Launch arguments
     declare_use_sim_time = DeclareLaunchArgument(
