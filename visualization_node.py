@@ -19,6 +19,7 @@ class VisualizationNode(Node):
         self.person_marker_pub = self.create_publisher(MarkerArray, '/person_position_markers', 10)
         self.trajectory_marker_pub = self.create_publisher(MarkerArray, '/drone_trajectory_markers', 10)
         self.drone_path_pub = self.create_publisher(Path, '/drone_path', 10)
+        self.drone_marker_pub = self.create_publisher(MarkerArray, '/drone_position_markers', 10)
         
         # Subscribers
         self.detection_sub = self.create_subscription(
@@ -26,7 +27,7 @@ class VisualizationNode(Node):
         self.odom_sub = self.create_subscription(
             Odometry, '/X3/odometry', self.odometry_callback, 10)
         self.actor_pose_sub = self.create_subscription(
-            PoseArray, '/actor/walking_person/pose', self.actor_pose_callback, 10)
+            PoseStamped, '/actor/walking_person/pose', self.actor_pose_callback, 10)
         self.gazebo_poses_sub = self.create_subscription(
             PoseArray, '/gazebo/all_poses', self.gazebo_poses_callback, 10)
         
@@ -170,36 +171,45 @@ class VisualizationNode(Node):
         
         self.drone_path.header.stamp = self.get_clock().now().to_msg()
         self.drone_path_pub.publish(self.drone_path)
+
+        # Publish drone position marker
+        self.publish_drone_marker()
     
     def actor_pose_callback(self, msg):
         """Update actual person position from Gazebo actor"""
-        if msg.poses:
-            pose = msg.poses[0]  # First pose is walking_person
-            self.actual_person_position = [
-                pose.position.x,
-                pose.position.y,
-                pose.position.z
-            ]
-            self.get_logger().info(f'Updated actor position from Gazebo: x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
-        else:
-            self.get_logger().warn('Received empty actor pose array')
+        # msg is now PoseStamped, not PoseArray
+        pose = msg.pose  # Extract Pose from PoseStamped
+        self.actual_person_position = [
+            pose.position.x,
+            pose.position.y,
+            pose.position.z
+        ]
+        self.get_logger().info(f'Updated actor position from Gazebo: x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
     
     def gazebo_poses_callback(self, msg):
         """Update actual person position from Gazebo all poses topic"""
         if msg.poses:
-            # In all poses, walking_person might be at different indices
-            # For now, assume it's the first actor (actors usually come after static models)
-            # We could add name matching if needed
+            # Find the walking person by looking for poses that move (not static models)
+            # Usually models in Gazebo follow a pattern: ground_plane, building, then actors
+            # Look for a pose that's at human height and not at origin
+            found_person = False
             for i, pose in enumerate(msg.poses):
-                # Update with the first pose that looks like an actor (at ground level, z around 1.0)
-                if 0.5 <= pose.position.z <= 2.0:  # Actor height range
+                # Skip static models (ground plane, buildings) - they're usually at z=0 or fixed positions
+                # Look for entities at human height (0.8-1.2m) and not at origin
+                if (0.8 <= pose.position.z <= 1.2 and
+                    (abs(pose.position.x) > 0.1 or abs(pose.position.y) > 0.1)):
+
                     self.actual_person_position = [
                         pose.position.x,
                         pose.position.y,
                         pose.position.z
                     ]
-                    self.get_logger().info(f'Updated actor position from all poses (pose {i}): x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
+                    self.get_logger().debug(f'Updated person position from all poses (entity {i}): x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
+                    found_person = True
                     break
+
+            if not found_person:
+                self.get_logger().debug('No person found in Gazebo poses')
 
     def publish_trajectory(self):
         """Publish desired circular trajectory around person"""
@@ -239,7 +249,69 @@ class VisualizationNode(Node):
         marker_array.markers.append(marker)
         
         self.trajectory_marker_pub.publish(marker_array)
-    
+
+    def publish_drone_marker(self):
+        """Publish current drone position marker"""
+        marker_array = MarkerArray()
+
+        # Create drone position marker
+        drone_marker = Marker()
+        drone_marker.header.frame_id = "world"
+        drone_marker.header.stamp = self.get_clock().now().to_msg()
+        drone_marker.ns = "drone_position"
+        drone_marker.id = 0
+        drone_marker.type = Marker.MESH_RESOURCE
+        drone_marker.action = Marker.ADD
+
+        # Set drone position
+        drone_marker.pose.position.x = self.current_drone_position[0]
+        drone_marker.pose.position.y = self.current_drone_position[1]
+        drone_marker.pose.position.z = self.current_drone_position[2]
+        drone_marker.pose.orientation.w = 1.0
+
+        # Use drone mesh if available, otherwise use a simple shape
+        drone_marker.mesh_resource = "package://drone_description/meshes/drone.dae"
+        drone_marker.mesh_use_embedded_materials = True
+
+        # Set marker properties - GREEN for drone
+        drone_marker.scale.x = 1.0
+        drone_marker.scale.y = 1.0
+        drone_marker.scale.z = 1.0
+        drone_marker.color.r = 0.0
+        drone_marker.color.g = 1.0
+        drone_marker.color.b = 0.0
+        drone_marker.color.a = 0.8
+
+        marker_array.markers.append(drone_marker)
+
+        # Also add a simpler arrow marker as fallback
+        arrow_marker = Marker()
+        arrow_marker.header.frame_id = "world"
+        arrow_marker.header.stamp = self.get_clock().now().to_msg()
+        arrow_marker.ns = "drone_arrow"
+        arrow_marker.id = 1
+        arrow_marker.type = Marker.ARROW
+        arrow_marker.action = Marker.ADD
+
+        # Set arrow position (slightly above drone for visibility)
+        arrow_marker.pose.position.x = self.current_drone_position[0]
+        arrow_marker.pose.position.y = self.current_drone_position[1]
+        arrow_marker.pose.position.z = self.current_drone_position[2] + 0.3
+        arrow_marker.pose.orientation.w = 1.0
+
+        # Set arrow properties - GREEN pointing up
+        arrow_marker.scale.x = 0.8  # Length
+        arrow_marker.scale.y = 0.1  # Width
+        arrow_marker.scale.z = 0.1  # Height
+        arrow_marker.color.r = 0.0
+        arrow_marker.color.g = 1.0
+        arrow_marker.color.b = 0.0
+        arrow_marker.color.a = 1.0
+
+        marker_array.markers.append(arrow_marker)
+
+        self.drone_marker_pub.publish(marker_array)
+
 
 def main(args=None):
     rclpy.init(args=args)

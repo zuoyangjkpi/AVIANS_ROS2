@@ -83,13 +83,13 @@ def generate_launch_description():
     # Drone enabler - Use Python script instead of ros2 topic pub
     # This creates a simple publisher that continuously enables the drone
     
-    # Waypoint controller
-    controller = Node(
-        package='drone_description',
-        executable='waypoint_controller',
-        name='waypoint_controller',
-        output='screen'
-    )
+    # Waypoint controller - DISABLED because NMPC controller is used instead
+    # controller = Node(
+    #     package='drone_description',
+    #     executable='waypoint_controller',
+    #     name='waypoint_controller',
+    #     output='screen'
+    # )
 
     # RViz2
     rviz_node = Node(
@@ -143,9 +143,9 @@ def generate_launch_description():
         # pose_to_odom_bridge removed
         TimerAction(
             period=10.0,
-            actions=[ 
+            actions=[
                       static_tf,
-                      controller,
+                      # controller,  # DISABLED - using NMPC instead
                       rviz_node
                     ]
         )

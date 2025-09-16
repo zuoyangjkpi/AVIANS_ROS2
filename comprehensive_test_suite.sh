@@ -357,9 +357,8 @@ full_integration_test() {
     print_status $YELLOW "   3. Detection visualizer"
     print_status $YELLOW "   4. Drone TF publisher"
     print_status $YELLOW "   5. RViz visualization with trajectory display"
-    print_status $YELLOW "   6. NMPC test node (virtual person)"
-    print_status $YELLOW "   7. NMPC tracker"
-    print_status $YELLOW "   8. Enable tracking"
+    print_status $YELLOW "   6. NMPC tracker (tracking real Gazebo walking_person)"
+    print_status $YELLOW "   7. Enable tracking"
     
     # Clean up existing processes
     print_status $YELLOW "🧹 Cleaning up existing processes..."
@@ -407,7 +406,8 @@ full_integration_test() {
     if check_process "visualization_node.py"; then
         print_status $GREEN "✅ RViz visualization node started successfully"
         print_status $YELLOW "💡 Open RViz2 and add these topics for visualization:"
-        print_status $YELLOW "   - /person_position_markers (MarkerArray) - Red=Predicted, Blue=Actual"
+        print_status $YELLOW "   - /person_position_markers (MarkerArray) - Red=Predicted, Blue=Actual person"
+        print_status $YELLOW "   - /drone_position_markers (MarkerArray) - Green=Current drone position"
         print_status $YELLOW "   - /drone_trajectory_markers (MarkerArray)"
         print_status $YELLOW "   - /drone_path (Path)"
         print_status $YELLOW "   - /detection_image (Image) - Raw image with detection boxes"
@@ -415,23 +415,9 @@ full_integration_test() {
         print_status $YELLOW "⚠️  RViz visualization node failed to start (continuing anyway)"
     fi
     
-    # Step 6: Start NMPC test node
-    print_status $YELLOW "Step 6/8: Starting NMPC test node..."
-    
-    python3 src/drone_nmpc_tracker/scripts/nmpc_test_node > /tmp/nmpc_test_fixed.log 2>&1 &
-    local test_pid=$!
-    sleep 3
-    
-    if check_process "nmpc_test_node"; then
-        print_status $GREEN "✅ NMPC test node started successfully"
-    else
-        print_status $RED "❌ NMPC test node failed to start"
-        return 1
-    fi
-    
-    # Step 7: Start NMPC tracker
-    print_status $YELLOW "Step 7/8: Starting NMPC tracker..."
-    python3 src/drone_nmpc_tracker/scripts/nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
+    # Step 6: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
+    print_status $YELLOW "Step 6/7: Starting NMPC tracker..."
+    ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
     
@@ -442,8 +428,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 8: Enable drone and tracking
-    print_status $YELLOW "Step 8/8: Enabling drone control and tracking..."
+    # Step 7: Enable drone and tracking
+    print_status $YELLOW "Step 7/7: Enabling drone control and tracking..."
     
     # 启用无人机控制
     print_status $YELLOW "  - 启用无人机控制..."
@@ -527,7 +513,7 @@ full_integration_test() {
     print_status $GREEN "🎉 AVIANS system is running!"
     print_status $YELLOW "💡 Expected behavior:"
     print_status $YELLOW "   - See drone model in Gazebo"
-    print_status $YELLOW "   - Drone should start flying and tracking virtual person"
+    print_status $YELLOW "   - Drone should start flying and tracking walking_person in Gazebo"
     print_status $YELLOW "   - Red sphere: Drone's prediction of person position"
     print_status $YELLOW "   - Blue cylinder: Actual person position from Gazebo"
     print_status $YELLOW "   - Check logs: tail -f /tmp/nmpc_*.log"

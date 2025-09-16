@@ -198,10 +198,10 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
         return;
     }
 
-     // Validate timestamp
+    // Validate timestamp (relaxed validation - allow processing even with timestamp issues)
     if (!ros2_utils::ClockSynchronizer::validateTimestamp(shared_from_this(), rclcpp::Time(msg->header.stamp))) {
-        RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Invalid timestamp in image message");
-        return;
+        RCLCPP_DEBUG_THROTTLE(this->get_logger(), *this->get_clock(), 5000, "Invalid timestamp in image message, but continuing processing");
+        // Continue processing instead of returning - timestamp issues shouldn't block detection
     }
 
     // Check rate limiting
@@ -397,10 +397,8 @@ void YOLO12DetectorNode::imageCallback(const sensor_msgs::msg::Image::SharedPtr 
             }
         }
 
-        // Publish detection array if not empty 
-        if (!detection_array_msg.detections.empty()) {
-            detection_pub_->publish(detection_array_msg);
-        }
+        // Always publish detection array (even if empty) so subscribers get updates
+        detection_pub_->publish(detection_array_msg);
 
         // Publish detection count
         auto count_msg = neural_network_msgs::msg::NeuralNetworkNumberOfDetections();

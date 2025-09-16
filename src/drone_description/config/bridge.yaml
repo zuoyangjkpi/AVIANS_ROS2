@@ -1,10 +1,10 @@
 # Odometry
-- 
+-
   ros_topic_name: "/X3/odometry"
   gz_topic_name: "/X3/odometry"
   ros_type_name: "nav_msgs/msg/Odometry"
   gz_type_name: "gz.msgs.Odometry"
-  direction: BIDIRECTIONAL
+  direction: GZ_TO_ROS
 
 
 # Command Velocity (from ROS to Gazebo)
@@ -57,14 +57,14 @@
 #     depth: 1
 
 
-  # Actor position bridge - Try different Gazebo topic naming patterns
+  # Actor position bridge - walking_person actor pose
 - ros_topic_name: "/actor/walking_person/pose"
-  gz_topic_name: "/model/walking_person/pose"
-  ros_type_name: "geometry_msgs/msg/PoseArray"
-  gz_type_name: "gz.msgs.Pose_V"
+  gz_topic_name: "/actor/walking_person/pose"
+  ros_type_name: "geometry_msgs/msg/PoseStamped"
+  gz_type_name: "gz.msgs.Pose"
   direction: GZ_TO_ROS
 
-# Alternative bridge for all poses topic
+# Alternative: All poses topic (includes all models and actors)
 - ros_topic_name: "/gazebo/all_poses"
   gz_topic_name: "/pose"
   ros_type_name: "geometry_msgs/msg/PoseArray"

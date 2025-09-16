@@ -486,7 +486,7 @@ def generate_launch_description():
         # Start Gazebo first
         gazebo,
         gz_ros2_bridge,
-        robot_state_publisher_node,
+        # robot_state_publisher_node,  # DISABLED - gz.launch.py already provides this
         
         # Static transforms MUST come early
         # TimerAction(period=2.0, actions=[
@@ -503,7 +503,7 @@ def generate_launch_description():
             yolo_detector_node,
             projector_node,
             # distributed_kf_node,
-            improved_waypoint_controller,
+            # improved_waypoint_controller,  # DISABLED - using NMPC instead
 
         ]),
         

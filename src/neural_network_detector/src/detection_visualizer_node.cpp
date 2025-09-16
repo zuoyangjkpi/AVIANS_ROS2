@@ -83,7 +83,7 @@ private:
             if (current_detections_ && !current_detections_->detections.empty()) {
                 int detection_count = 0;
                 for (const auto& detection : current_detections_->detections) {
-                    if (detection.object_class == 0 && detection.detection_score > 0.4) { // Person class with stable threshold
+                    if (detection.object_class == 0 && detection.detection_score > 0.3) { // Person class matching YOLO threshold
                         // Draw green bounding box with thicker line for stability
                         cv::rectangle(cv_ptr->image,
                             cv::Point(static_cast<int>(detection.xmin), static_cast<int>(detection.ymin)),

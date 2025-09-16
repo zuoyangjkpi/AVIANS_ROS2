@@ -26,22 +26,40 @@ class DroneTfPublisher(Node):
         """Convert odometry to TF transform"""
         try:
             # Create transform from world to drone base_link
-            transform = TransformStamped()
-            transform.header.stamp = self.get_clock().now().to_msg()
-            transform.header.frame_id = 'world'
-            transform.child_frame_id = 'X3/base_link'
-            
+            base_transform = TransformStamped()
+            base_transform.header.stamp = self.get_clock().now().to_msg()
+            base_transform.header.frame_id = 'world'
+            base_transform.child_frame_id = 'X3/base_link'
+
             # Copy position
-            transform.transform.translation.x = msg.pose.pose.position.x
-            transform.transform.translation.y = msg.pose.pose.position.y  
-            transform.transform.translation.z = msg.pose.pose.position.z
-            
+            base_transform.transform.translation.x = msg.pose.pose.position.x
+            base_transform.transform.translation.y = msg.pose.pose.position.y
+            base_transform.transform.translation.z = msg.pose.pose.position.z
+
             # Copy orientation
-            transform.transform.rotation = msg.pose.pose.orientation
-            
-            # Broadcast transform
-            self.tf_broadcaster.sendTransform(transform)
-            
+            base_transform.transform.rotation = msg.pose.pose.orientation
+
+            # Create static transform from X3/base_link to machine_1_camera_link
+            # Camera is positioned 0.2m forward from base_link (based on URDF)
+            camera_transform = TransformStamped()
+            camera_transform.header.stamp = self.get_clock().now().to_msg()
+            camera_transform.header.frame_id = 'X3/base_link'
+            camera_transform.child_frame_id = 'machine_1_camera_link'
+
+            # Camera position relative to base_link (from URDF)
+            camera_transform.transform.translation.x = 0.2  # 0.2m forward
+            camera_transform.transform.translation.y = 0.0
+            camera_transform.transform.translation.z = 0.0
+
+            # Camera orientation (no rotation relative to base_link)
+            camera_transform.transform.rotation.x = 0.0
+            camera_transform.transform.rotation.y = 0.0
+            camera_transform.transform.rotation.z = 0.0
+            camera_transform.transform.rotation.w = 1.0
+
+            # Broadcast both transforms
+            self.tf_broadcaster.sendTransform([base_transform, camera_transform])
+
         except Exception as e:
             self.get_logger().error(f'Failed to publish TF: {e}')
     

@@ -44,11 +44,7 @@ class NMPCTestNode(Node):
             10
         )
         
-        self.odom_pub = self.create_publisher(
-            Odometry,
-            '/X3/odometry',  # 保持与NMPC控制器配置一致
-            10
-        )
+        # Removed: self.odom_pub - odometry should come from Gazebo simulation only
         
         self.enable_pub = self.create_publisher(
             Bool,
@@ -66,7 +62,7 @@ class NMPCTestNode(Node):
         
         # Timers
         self.detection_timer = self.create_timer(0.1, self.publish_detection)  # 10 Hz
-        self.odom_timer = self.create_timer(0.05, self.publish_odometry)  # 20 Hz
+        # Removed: self.odom_timer - odometry comes from Gazebo simulation
         self.enable_timer = self.create_timer(1.0, self.publish_enable)  # 1 Hz
         self.tf_timer = self.create_timer(0.05, self.publish_transforms)  # 20 Hz
         
@@ -180,50 +176,7 @@ class NMPCTestNode(Node):
         # Publish detection
         self.detection_pub.publish(detection_array)
     
-    def publish_odometry(self):
-        """Publish simulated drone odometry"""
-        odom = Odometry()
-        odom.header.stamp = self.get_clock().now().to_msg()
-        odom.header.frame_id = "world"
-        odom.child_frame_id = "X3/base_link"
-        
-        # Position
-        odom.pose.pose.position.x = self.drone_position[0]
-        odom.pose.pose.position.y = self.drone_position[1]
-        odom.pose.pose.position.z = self.drone_position[2]
-        
-        # Orientation (quaternion) - assume level flight
-        odom.pose.pose.orientation.x = 0.0
-        odom.pose.pose.orientation.y = 0.0
-        odom.pose.pose.orientation.z = 0.0
-        odom.pose.pose.orientation.w = 1.0
-        
-        # Velocity
-        odom.twist.twist.linear.x = self.drone_velocity[0]
-        odom.twist.twist.linear.y = self.drone_velocity[1]
-        odom.twist.twist.linear.z = self.drone_velocity[2]
-        
-        # Angular velocity (assume zero for simplicity)
-        odom.twist.twist.angular.x = 0.0
-        odom.twist.twist.angular.y = 0.0
-        odom.twist.twist.angular.z = 0.0
-        
-        # Add some covariance (simplified)
-        odom.pose.covariance[0] = 0.01   # x
-        odom.pose.covariance[7] = 0.01   # y
-        odom.pose.covariance[14] = 0.01  # z
-        odom.pose.covariance[21] = 0.1   # roll
-        odom.pose.covariance[28] = 0.1   # pitch
-        odom.pose.covariance[35] = 0.1   # yaw
-        
-        odom.twist.covariance[0] = 0.1   # vx
-        odom.twist.covariance[7] = 0.1   # vy
-        odom.twist.covariance[14] = 0.1  # vz
-        odom.twist.covariance[21] = 0.1  # wx
-        odom.twist.covariance[28] = 0.1  # wy
-        odom.twist.covariance[35] = 0.1  # wz
-        
-        self.odom_pub.publish(odom)
+    # Removed publish_odometry method - odometry should come from Gazebo simulation only
     
     def publish_enable(self):
         """Publish enable signal"""

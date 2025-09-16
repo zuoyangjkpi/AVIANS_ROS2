@@ -6,7 +6,7 @@ Adapted for ROS2 Jazzy and Python 3.12
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
 import numpy as np
 import math
 from typing import Optional
@@ -39,6 +39,14 @@ class NMPCTrackerNode(Node):
         self.person_detected = False
         self.last_person_detection_time = 0.0
         self.control_enabled = True
+
+        # Search mode PID controller state
+        self.search_target_position = None  # Will be set when entering search mode
+        self.search_mode_active = False
+        # PID control errors (for integral and derivative terms)
+        self.pid_error_integral = np.zeros(3)  # [x, y, z] integral errors
+        self.pid_error_previous = np.zeros(3)  # [x, y, z] previous errors
+        self.pid_last_time = 0.0
         
         # TF2 buffer and listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -60,7 +68,7 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('enable_visualization', True)
         self.declare_parameter('drone_frame', 'X3/base_link')
         self.declare_parameter('world_frame', 'world')
-        self.declare_parameter('camera_frame', 'camera_link')
+        self.declare_parameter('camera_frame', 'machine_1_camera_link')
         
         # Get parameter values
         self.control_frequency = self.get_parameter('control_frequency').value
@@ -121,12 +129,8 @@ class NMPCTrackerNode(Node):
     
     def _init_subscribers(self):
         """Initialize ROS2 subscribers"""
-        # QoS profile for sensor data
-        sensor_qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10  # Increase queue depth
-        )
+        # Use ROS2 standard sensor QoS preset
+        sensor_qos = qos_profile_sensor_data
         
         # Drone state subscriber (odometry)
         self.odom_sub = self.create_subscription(
@@ -368,11 +372,22 @@ class NMPCTrackerNode(Node):
             
             # ✅ 修复：当没有人员检测时，执行搜索模式而不是悬停
             if not self.person_detected:
-                # 执行圆形搜索模式
+                # 初始化搜索模式目标位置（如果还未设置）
+                if not self.search_mode_active:
+                    self._initialize_search_mode()
+
+                # 执行PID位置控制搜索模式
                 search_cmd = self._generate_search_pattern(current_time)
                 self.cmd_vel_pub.publish(search_cmd)
-                self.get_logger().info(f"Search mode: cmd_vel = linear.z={search_cmd.linear.z:.3f}, angular.z={search_cmd.angular.z:.3f}")
+                current_pos = self._get_current_position()
+                pos_error = np.linalg.norm(current_pos - self.search_target_position)
+                self.get_logger().info(f"Search mode: pos=[{current_pos[0]:.2f},{current_pos[1]:.2f},{current_pos[2]:.2f}] target=[{self.search_target_position[0]:.2f},{self.search_target_position[1]:.2f},{self.search_target_position[2]:.2f}] error={pos_error:.3f} cmd=[{search_cmd.linear.x:.2f},{search_cmd.linear.y:.2f},{search_cmd.linear.z:.2f}]")
                 return
+            else:
+                # 如果检测到人员，退出搜索模式
+                if self.search_mode_active:
+                    self.search_mode_active = False
+                    self.get_logger().info("Person detected - exiting search mode")
             
             # Run NMPC optimization (只在有人员检测时)
             optimal_control, info = self.controller.optimize()
@@ -433,23 +448,74 @@ class NMPCTrackerNode(Node):
         
         return cmd
     
+    def _initialize_search_mode(self):
+        """初始化搜索模式，设置目标位置为当前X,Y位置和2米高度"""
+        current_pos = self._get_current_position()
+        # 目标位置：保持当前X,Y坐标，高度设为2米
+        self.search_target_position = np.array([current_pos[0], current_pos[1], 2.0])
+        self.search_mode_active = True
+
+        # 重置PID控制器状态
+        self.pid_error_integral = np.zeros(3)
+        self.pid_error_previous = np.zeros(3)
+        self.pid_last_time = self.get_clock().now().nanoseconds / 1e9
+
+        self.get_logger().info(f"Search mode initialized - target position: {self.search_target_position}")
+
+    def _get_current_position(self) -> np.ndarray:
+        """获取当前无人机位置"""
+        return self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
+
     def _generate_search_pattern(self, current_time: float) -> Twist:
-        """生成搜索模式的控制指令"""
+        """使用PID控制器生成搜索模式的控制指令"""
         cmd = Twist()
-        
-        # 旋转搜索模式：只旋转不上升
-        search_period = 10.0  # 10秒一个搜索周期
-        
-        # 不上升，保持当前高度
-        cmd.linear.z = 0.0
-        
-        # 旋转搜索 (0.5 rad/s)
-        cmd.angular.z = 0.5
-        
-        # 可选：前后运动帮助搜索不同区域
-        cmd.linear.x = 0.3 * math.sin(current_time * 2 * math.pi / search_period)
-        cmd.linear.y = 0.3 * math.cos(current_time * 2 * math.pi / search_period)
-        
+
+        # PID控制器参数 - 更保守的设置
+        kp = np.array([0.8, 0.8, 0.6])  # [x, y, z] 比例增益 - 降低避免过冲
+        ki = np.array([0.02, 0.02, 0.02])  # [x, y, z] 积分增益 - 大幅降低避免积分饱和
+        kd = np.array([0.1, 0.1, 0.1])  # [x, y, z] 微分增益 - 降低减少噪声影响
+
+        # 计算时间间隔
+        dt = current_time - self.pid_last_time
+        if dt <= 0:
+            dt = 0.01  # 避免除零或负时间间隔
+
+        # 获取当前位置和计算位置误差
+        current_pos = self._get_current_position()
+        position_error = self.search_target_position - current_pos
+
+        # 添加死区以避免在目标附近的小振荡
+        deadband = 0.1  # 10cm死区
+        for i in range(3):
+            if abs(position_error[i]) < deadband:
+                position_error[i] = 0.0
+
+        # 更新积分误差（带抗饱和）- 更严格的积分限制
+        max_integral = 2.0  # 积分上限 - 降低避免积分饱和
+        self.pid_error_integral += position_error * dt
+        self.pid_error_integral = np.clip(self.pid_error_integral, -max_integral, max_integral)
+
+        # 计算微分误差
+        error_derivative = (position_error - self.pid_error_previous) / dt
+
+        # PID控制输出
+        control_output = (kp * position_error +
+                         ki * self.pid_error_integral +
+                         kd * error_derivative)
+
+        # 转换为速度命令 - 更保守的速度限制
+        max_velocity = np.array([0.5, 0.5, 0.8])  # [x, y, z] 最大速度限制 - 大幅降低
+        cmd.linear.x = np.clip(control_output[0], -max_velocity[0], max_velocity[0])
+        cmd.linear.y = np.clip(control_output[1], -max_velocity[1], max_velocity[1])
+        cmd.linear.z = np.clip(control_output[2], -max_velocity[2], max_velocity[2])
+
+        # 旋转搜索 (0.3 rad/s，比之前慢一点以保持稳定)
+        cmd.angular.z = 0.3
+
+        # 更新PID状态
+        self.pid_error_previous = position_error.copy()
+        self.pid_last_time = current_time
+
         return cmd
     
     def _publish_visualization(self, info: dict):
