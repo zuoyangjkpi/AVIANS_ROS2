@@ -15,7 +15,7 @@ import tf2_geometry_msgs
 from tf2_ros import TransformException
 
 # ROS2 message types
-from geometry_msgs.msg import Twist, PoseStamped, Vector3Stamped
+from geometry_msgs.msg import Twist, PoseStamped, Vector3Stamped, TwistStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image
 from std_msgs.msg import Header, Float64MultiArray, Bool
@@ -40,13 +40,11 @@ class NMPCTrackerNode(Node):
         self.last_person_detection_time = 0.0
         self.control_enabled = True
 
-        # Search mode PID controller state
-        self.search_target_position = None  # Will be set when entering search mode
+        # Search mode state
+        self.search_target_waypoint = None  # Target waypoint for search mode
+        self.search_target_attitude = None  # Target attitude for search mode
         self.search_mode_active = False
-        # PID control errors (for integral and derivative terms)
-        self.pid_error_integral = np.zeros(3)  # [x, y, z] integral errors
-        self.pid_error_previous = np.zeros(3)  # [x, y, z] previous errors
-        self.pid_last_time = 0.0
+        self.search_start_time = None
         
         # TF2 buffer and listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -69,7 +67,11 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('drone_frame', 'X3/base_link')
         self.declare_parameter('world_frame', 'world')
         self.declare_parameter('camera_frame', 'machine_1_camera_link')
-        
+        # Align with projection_model output topic started in the integration script
+        self.declare_parameter('projected_detection_topic', '/person_detections/world_frame')
+        self.declare_parameter('use_actor_groundtruth', True)
+        self.declare_parameter('actor_pose_topic', '/actor/walking_person/pose')
+
         # Get parameter values
         self.control_frequency = self.get_parameter('control_frequency').value
         self.person_timeout = self.get_parameter('person_timeout').value
@@ -77,7 +79,10 @@ class NMPCTrackerNode(Node):
         self.drone_frame = self.get_parameter('drone_frame').value
         self.world_frame = self.get_parameter('world_frame').value
         self.camera_frame = self.get_parameter('camera_frame').value
-        
+        self.projected_detection_topic = self.get_parameter('projected_detection_topic').value
+        self.use_actor_groundtruth = self.get_parameter('use_actor_groundtruth').value
+        self.actor_pose_topic = self.get_parameter('actor_pose_topic').value
+
         self.get_logger().info(f"Control frequency: {self.control_frequency} Hz")
         self.get_logger().info(f"Person timeout: {self.person_timeout} seconds")
     
@@ -97,10 +102,41 @@ class NMPCTrackerNode(Node):
             depth=10
         )
         
-        # Control command publisher
-        self.cmd_vel_pub = self.create_publisher(
-            Twist, 
-            nmpc_config.TOPIC_CONTROL_OUTPUT, 
+        # Control command publishers for low-level controllers
+        self.waypoint_pub = self.create_publisher(
+            PoseStamped, 
+            '/drone/control/waypoint_command', 
+            control_qos
+        )
+        
+        self.attitude_pub = self.create_publisher(
+            Vector3Stamped, 
+            '/drone/control/attitude_command', 
+            control_qos
+        )
+        
+        self.velocity_pub = self.create_publisher(
+            TwistStamped, 
+            '/drone/control/velocity_setpoint', 
+            control_qos
+        )
+        
+        # Control enable/disable publishers
+        self.waypoint_enable_pub = self.create_publisher(
+            Bool,
+            '/drone/control/waypoint_enable',
+            control_qos
+        )
+        
+        self.attitude_enable_pub = self.create_publisher(
+            Bool,
+            '/drone/control/attitude_enable',
+            control_qos
+        )
+        
+        self.velocity_enable_pub = self.create_publisher(
+            Bool,
+            '/drone/control/velocity_enable',
             control_qos
         )
         
@@ -140,14 +176,14 @@ class NMPCTrackerNode(Node):
             sensor_qos
         )
         
-        # Person detection subscriber
+        # Person detection subscriber (using projected detections from projection_model)
         self.detection_sub = self.create_subscription(
-            NeuralNetworkDetectionArray,
-            nmpc_config.TOPIC_PERSON_DETECTIONS,
-            self.person_detection_callback,
+            PoseWithCovarianceStamped,
+            self.projected_detection_topic,
+            self.projected_detection_callback,
             sensor_qos
         )
-        
+
         # Control enable/disable subscriber
         self.enable_sub = self.create_subscription(
             Bool,
@@ -155,7 +191,18 @@ class NMPCTrackerNode(Node):
             self.enable_callback,
             sensor_qos  # Use sensor_qos for consistency
         )
-        
+
+        if self.use_actor_groundtruth:
+            self.actor_pose_sub = self.create_subscription(
+                PoseStamped,
+                self.actor_pose_topic,
+                self.actor_pose_callback,
+                sensor_qos
+            )
+            self.get_logger().info(
+                f"Actor ground-truth tracking enabled via {self.actor_pose_topic}"
+            )
+
         self.get_logger().info("Subscribers initialized")
     
     def _init_timers(self):
@@ -213,113 +260,57 @@ class NMPCTrackerNode(Node):
         except Exception as e:
             self.get_logger().error(f"Error processing drone state: {e}")
     
-    def person_detection_callback(self, msg: NeuralNetworkDetectionArray):
-        """Process person detection messages"""
+    def projected_detection_callback(self, msg: PoseWithCovarianceStamped):
+        """Process projected person detection messages from projection_model"""
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
             
-            # Find person detections (object_class = 0 for person in COCO)
-            person_detections = []
-            for detection in msg.detections:
-                if detection.object_class == 0 and detection.detection_score > 0.4:
-                    person_detections.append(detection)
-            
-            if person_detections:
-                # Use the detection with highest confidence
-                best_detection = max(person_detections, key=lambda d: d.detection_score)
-                
-                # Convert detection to 3D position
-                person_position = self._detection_to_3d_position(best_detection)
-                
-                if person_position is not None:
-                    # Estimate velocity (simple finite difference)
-                    person_velocity = self._estimate_person_velocity(person_position, current_time)
-                    
-                    # Update controller
-                    self.controller.set_person_detection(person_position, person_velocity)
-                    self.person_detected = True
-                    self.last_person_detection_time = current_time
-                    
-                    self.get_logger().debug(
-                        f"Person detected at: {person_position}, confidence: {best_detection.detection_score:.2f}"
-                    )
-            
-        except Exception as e:
-            self.get_logger().error(f"Error processing person detection: {e}")
-    
-    def _detection_to_3d_position(self, detection) -> Optional[np.ndarray]:
-        """Convert 2D detection to 3D world position"""
-        try:
-            # Get camera transform
-            transform = self.tf_buffer.lookup_transform(
-                self.world_frame,
-                self.camera_frame,
-                rclpy.time.Time(),
-                timeout=rclpy.duration.Duration(seconds=0.1)
-            )
-            
-            # Camera position in world frame
-            camera_pos = np.array([
-                transform.transform.translation.x,
-                transform.transform.translation.y,
-                transform.transform.translation.z
+            # Extract person position from projected detection
+            person_position = np.array([
+                msg.pose.pose.position.x,
+                msg.pose.pose.position.y,
+                msg.pose.pose.position.z
             ])
             
-            # Simple depth estimation based on detection size
-            # This is a simplified approach - in practice, you might use stereo vision,
-            # depth camera, or other methods for better depth estimation
-            detection_height = abs(detection.ymax - detection.ymin)
-            estimated_depth = self._estimate_depth_from_bbox_size(detection_height)
-            
-            # Convert pixel coordinates to world coordinates
-            # This requires camera calibration parameters
-            # For now, use a simplified projection model
-            
-            # Center of bounding box in normalized coordinates
-            # Assuming detection coordinates are in pixels, convert to normalized [0,1] then to [-1,1]
-            image_width = 640  # Assumed image width
-            image_height = 480  # Assumed image height
-            
-            center_x_norm = ((detection.xmin + detection.xmax) / 2.0) / image_width
-            center_y_norm = ((detection.ymin + detection.ymax) / 2.0) / image_height
-            
-            center_x = (center_x_norm - 0.5) * 2.0  # [-1, 1]
-            center_y = (center_y_norm - 0.5) * 2.0  # [-1, 1]
-            
-            # Project to 3D (simplified)
-            # Assume camera points forward with some downward tilt
-            camera_direction = np.array([1.0, 0.0, -0.3])  # Forward and slightly down
-            camera_direction = camera_direction / np.linalg.norm(camera_direction)
-            
-            # Estimate person position
-            person_position = camera_pos + camera_direction * estimated_depth
-            person_position[0] += center_x * estimated_depth * 0.5  # Lateral offset
-            person_position[2] = 0.0  # Assume person is on ground
-            
-            return person_position
-            
-        except TransformException as e:
-            self.get_logger().warn(f"Could not get camera transform: {e}")
-            return None
+            # Estimate velocity (simple finite difference)
+            person_velocity = self._estimate_person_velocity(person_position, current_time)
+
+            # Update controller
+            self.controller.set_person_detection(person_position, person_velocity)
+            self.person_detected = True
+            self.last_person_detection_time = current_time
+
+            self.get_logger().info(
+                f"✅ Person tracking ENABLED: pos={person_position}"
+            )
+
         except Exception as e:
-            self.get_logger().error(f"Error in 3D position estimation: {e}")
-            return None
-    
-    def _estimate_depth_from_bbox_size(self, bbox_height: float) -> float:
-        """Estimate depth based on bounding box size"""
-        # Simple inverse relationship: larger bbox = closer person
-        # This assumes average person height of 1.7m
-        # bbox_height is now in pixels, normalize it first
-        
-        image_height = 480  # Assumed image height
-        normalized_height = bbox_height / image_height
-        
-        if normalized_height > 0.01:  # Avoid division by zero
-            # Empirical relationship - tune based on your camera setup
-            estimated_depth = 0.3 / normalized_height  # meters
-            return np.clip(estimated_depth, 2.0, 20.0)  # Reasonable range
-        else:
-            return 10.0  # Default distance
+            self.get_logger().error(f"Error processing projected person detection: {e}")
+
+    def actor_pose_callback(self, msg: PoseStamped):
+        """Use Gazebo actor ground-truth pose as person detection"""
+        try:
+            current_time = self.get_clock().now().nanoseconds / 1e9
+            person_position = np.array([
+                msg.pose.position.x,
+                msg.pose.position.y,
+                msg.pose.position.z
+            ])
+
+            person_velocity = self._estimate_person_velocity(person_position, current_time)
+
+            self.controller.set_person_detection(person_position, person_velocity)
+            was_tracking = self.person_detected
+            self.person_detected = True
+            self.last_person_detection_time = current_time
+
+            if not was_tracking:
+                self.get_logger().info(
+                    f"✅ Ground-truth actor tracking enabled: pos={person_position}"
+                )
+
+        except Exception as e:
+            self.get_logger().error(f"Error processing actor pose: {e}")
     
     def _estimate_person_velocity(self, position: np.ndarray, timestamp: float) -> np.ndarray:
         """Estimate person velocity using finite differences"""
@@ -348,6 +339,14 @@ class NMPCTrackerNode(Node):
         """Handle control enable/disable commands"""
         self.control_enabled = msg.data
         self.get_logger().info(f"Control {'enabled' if self.control_enabled else 'disabled'}")
+        
+        # Enable/disable low-level controllers
+        enable_msg = Bool()
+        enable_msg.data = self.control_enabled
+        
+        self.waypoint_enable_pub.publish(enable_msg)
+        self.attitude_enable_pub.publish(enable_msg)
+        self.velocity_enable_pub.publish(enable_msg)
     
     def control_loop_callback(self):
         """Main control loop"""
@@ -370,18 +369,15 @@ class NMPCTrackerNode(Node):
                 self.person_detected = False
                 self.get_logger().warn("Person detection timeout - switching to search mode")
             
-            # ✅ 修复：当没有人员检测时，执行搜索模式而不是悬停
+            # ✅ 搜索模式：等待底层控制插件实现
             if not self.person_detected:
-                # 初始化搜索模式目标位置（如果还未设置）
                 if not self.search_mode_active:
                     self._initialize_search_mode()
+                    self.search_start_time = current_time
 
-                # 执行PID位置控制搜索模式
-                search_cmd = self._generate_search_pattern(current_time)
-                self.cmd_vel_pub.publish(search_cmd)
-                current_pos = self._get_current_position()
-                pos_error = np.linalg.norm(current_pos - self.search_target_position)
-                self.get_logger().info(f"Search mode: pos=[{current_pos[0]:.2f},{current_pos[1]:.2f},{current_pos[2]:.2f}] target=[{self.search_target_position[0]:.2f},{self.search_target_position[1]:.2f},{self.search_target_position[2]:.2f}] error={pos_error:.3f} cmd=[{search_cmd.linear.x:.2f},{search_cmd.linear.y:.2f},{search_cmd.linear.z:.2f}]")
+                # Send search commands to low-level controllers
+                self._send_search_commands(current_time)
+                self.get_logger().info(f"Search mode: Sending commands to low-level controllers")
                 return
             else:
                 # 如果检测到人员，退出搜索模式
@@ -392,11 +388,8 @@ class NMPCTrackerNode(Node):
             # Run NMPC optimization (只在有人员检测时)
             optimal_control, info = self.controller.optimize()
             
-            # Convert control to ROS2 Twist message
-            cmd_msg = self._control_to_twist(optimal_control)
-            
-            # Publish control command
-            self.cmd_vel_pub.publish(cmd_msg)
+            # Convert control to low-level controller commands
+            self._send_tracking_commands(optimal_control)
             
             # Publish visualization if enabled
             if self.enable_visualization:
@@ -411,8 +404,95 @@ class NMPCTrackerNode(Node):
         except Exception as e:
             self.get_logger().error(f"Error in control loop: {e}")
             # Publish hover command as safety fallback
-            hover_cmd = Twist()
-            self.cmd_vel_pub.publish(hover_cmd)
+            self._send_hover_commands()
+    
+    def _send_tracking_commands(self, control: np.ndarray):
+        """Send tracking commands to low-level controllers"""
+        # Extract target position from controller
+        target_position = self.controller.target_position
+        
+        # Create and publish waypoint command
+        waypoint_msg = PoseStamped()
+        waypoint_msg.header.stamp = self.get_clock().now().to_msg()
+        waypoint_msg.header.frame_id = self.world_frame
+        waypoint_msg.pose.position.x = float(target_position[0])
+        waypoint_msg.pose.position.y = float(target_position[1])
+        waypoint_msg.pose.position.z = float(target_position[2])
+        waypoint_msg.pose.orientation.w = 1.0
+        
+        self.waypoint_pub.publish(waypoint_msg)
+        
+        # Calculate desired attitude (face the person)
+        current_pos = self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
+        person_pos = self.controller.person_position
+        
+        to_person = person_pos - current_pos
+        desired_yaw = math.atan2(to_person[1], to_person[0])
+        
+        # Create and publish attitude command
+        attitude_msg = Vector3Stamped()
+        attitude_msg.header.stamp = self.get_clock().now().to_msg()
+        attitude_msg.header.frame_id = self.drone_frame
+        attitude_msg.vector.x = 0.0  # roll
+        attitude_msg.vector.y = 0.0  # pitch
+        attitude_msg.vector.z = desired_yaw  # yaw
+        
+        self.attitude_pub.publish(attitude_msg)
+    
+    def _send_hover_commands(self):
+        """Send hover commands as safety fallback"""
+        # Get current position as target
+        current_pos = self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
+        
+        # Publish current position as waypoint
+        waypoint_msg = PoseStamped()
+        waypoint_msg.header.stamp = self.get_clock().now().to_msg()
+        waypoint_msg.header.frame_id = self.world_frame
+        waypoint_msg.pose.position.x = float(current_pos[0])
+        waypoint_msg.pose.position.y = float(current_pos[1])
+        waypoint_msg.pose.position.z = float(current_pos[2])
+        waypoint_msg.pose.orientation.w = 1.0
+        
+        self.waypoint_pub.publish(waypoint_msg)
+        
+        # Publish level attitude
+        attitude_msg = Vector3Stamped()
+        attitude_msg.header.stamp = self.get_clock().now().to_msg()
+        attitude_msg.header.frame_id = self.drone_frame
+        attitude_msg.vector.x = 0.0  # roll
+        attitude_msg.vector.y = 0.0  # pitch
+        attitude_msg.vector.z = 0.0  # yaw
+        
+        self.attitude_pub.publish(attitude_msg)
+    
+    def _send_search_commands(self, current_time: float):
+        """Send search mode commands to low-level controllers"""
+        if self.search_target_waypoint is not None:
+            # Publish waypoint command (保持当前位置的XY坐标，Z坐标为2米)
+            waypoint_msg = PoseStamped()
+            waypoint_msg.header.stamp = self.get_clock().now().to_msg()
+            waypoint_msg.header.frame_id = self.world_frame
+            waypoint_msg.pose.position.x = float(self.search_target_waypoint[0])
+            waypoint_msg.pose.position.y = float(self.search_target_waypoint[1])
+            waypoint_msg.pose.position.z = float(self.search_target_waypoint[2])  # 2米高度
+            waypoint_msg.pose.orientation.w = 1.0
+            
+            self.waypoint_pub.publish(waypoint_msg)
+        
+        if self.search_target_attitude is not None:
+            # Update yaw for rotation (0.3 rad/s 匀速转动)
+            elapsed_time = current_time - self.search_start_time if self.search_start_time else 0.0
+            self.search_target_attitude[2] = (elapsed_time * 0.3) % (2 * math.pi)  # yaw
+            
+            # Publish attitude command (roll和pitch为0，yaw匀速转动)
+            attitude_msg = Vector3Stamped()
+            attitude_msg.header.stamp = self.get_clock().now().to_msg()
+            attitude_msg.header.frame_id = self.drone_frame
+            attitude_msg.vector.x = float(self.search_target_attitude[0])  # roll = 0
+            attitude_msg.vector.y = float(self.search_target_attitude[1])  # pitch = 0
+            attitude_msg.vector.z = float(self.search_target_attitude[2])  # yaw = 匀速转动
+            
+            self.attitude_pub.publish(attitude_msg)
     
     def _control_to_twist(self, control: np.ndarray) -> Twist:
         """Convert NMPC control output to ROS2 Twist message"""
@@ -449,72 +529,32 @@ class NMPCTrackerNode(Node):
         return cmd
     
     def _initialize_search_mode(self):
-        """初始化搜索模式，设置目标位置为当前X,Y位置和2米高度"""
+        """初始化搜索模式"""
         current_pos = self._get_current_position()
-        # 目标位置：保持当前X,Y坐标，高度设为2米
-        self.search_target_position = np.array([current_pos[0], current_pos[1], 2.0])
+        # 设置搜索目标：当前X,Y位置，高度2米，姿态为水平+旋转
+        self.search_target_waypoint = np.array([current_pos[0], current_pos[1], 2.0])
+        self.search_target_attitude = np.array([0.0, 0.0, 0.0])  # [roll, pitch, yaw] - yaw will rotate
         self.search_mode_active = True
 
-        # 重置PID控制器状态
-        self.pid_error_integral = np.zeros(3)
-        self.pid_error_previous = np.zeros(3)
-        self.pid_last_time = self.get_clock().now().nanoseconds / 1e9
-
-        self.get_logger().info(f"Search mode initialized - target position: {self.search_target_position}")
+        self.get_logger().info(f"Search mode initialized - target waypoint: {self.search_target_waypoint}")
 
     def _get_current_position(self) -> np.ndarray:
         """获取当前无人机位置"""
         return self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
 
-    def _generate_search_pattern(self, current_time: float) -> Twist:
-        """使用PID控制器生成搜索模式的控制指令"""
+    def _generate_simple_search_command(self, current_time: float) -> Twist:
+        """临时简单搜索命令（等待底层控制插件实现）"""
         cmd = Twist()
 
-        # PID控制器参数 - 更保守的设置
-        kp = np.array([0.8, 0.8, 0.6])  # [x, y, z] 比例增益 - 降低避免过冲
-        ki = np.array([0.02, 0.02, 0.02])  # [x, y, z] 积分增益 - 大幅降低避免积分饱和
-        kd = np.array([0.1, 0.1, 0.1])  # [x, y, z] 微分增益 - 降低减少噪声影响
-
-        # 计算时间间隔
-        dt = current_time - self.pid_last_time
-        if dt <= 0:
-            dt = 0.01  # 避免除零或负时间间隔
-
-        # 获取当前位置和计算位置误差
+        # 简单的上升和旋转
         current_pos = self._get_current_position()
-        position_error = self.search_target_position - current_pos
+        target_height = 2.0
 
-        # 添加死区以避免在目标附近的小振荡
-        deadband = 0.1  # 10cm死区
-        for i in range(3):
-            if abs(position_error[i]) < deadband:
-                position_error[i] = 0.0
-
-        # 更新积分误差（带抗饱和）- 更严格的积分限制
-        max_integral = 2.0  # 积分上限 - 降低避免积分饱和
-        self.pid_error_integral += position_error * dt
-        self.pid_error_integral = np.clip(self.pid_error_integral, -max_integral, max_integral)
-
-        # 计算微分误差
-        error_derivative = (position_error - self.pid_error_previous) / dt
-
-        # PID控制输出
-        control_output = (kp * position_error +
-                         ki * self.pid_error_integral +
-                         kd * error_derivative)
-
-        # 转换为速度命令 - 更保守的速度限制
-        max_velocity = np.array([0.5, 0.5, 0.8])  # [x, y, z] 最大速度限制 - 大幅降低
-        cmd.linear.x = np.clip(control_output[0], -max_velocity[0], max_velocity[0])
-        cmd.linear.y = np.clip(control_output[1], -max_velocity[1], max_velocity[1])
-        cmd.linear.z = np.clip(control_output[2], -max_velocity[2], max_velocity[2])
-
-        # 旋转搜索 (0.3 rad/s，比之前慢一点以保持稳定)
-        cmd.angular.z = 0.3
-
-        # 更新PID状态
-        self.pid_error_previous = position_error.copy()
-        self.pid_last_time = current_time
+        if current_pos[2] < target_height - 0.1:
+            cmd.linear.z = 0.5  # 上升到2米
+        else:
+            cmd.linear.z = 0.0
+            cmd.angular.z = 0.3  # 旋转搜索
 
         return cmd
     
@@ -656,4 +696,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-

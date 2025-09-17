@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(pose_cov_ops REQUIRED)
+find_package(nav_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -30,6 +31,15 @@ ament_target_dependencies(${PROJECT_NAME}
   geometry_msgs
 )
 
+# Executable
+add_executable(pose_cov_ops_interface_node src/pose_cov_ops_interface_node.cpp)
+
+ament_target_dependencies(pose_cov_ops_interface_node
+  rclcpp
+  geometry_msgs
+  nav_msgs
+)
+
 
 # Install targets
 install(TARGETS ${PROJECT_NAME}
@@ -37,6 +47,10 @@ install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin
+)
+
+install(TARGETS pose_cov_ops_interface_node
+  DESTINATION lib/${PROJECT_NAME}
 )
 
 install(DIRECTORY include/

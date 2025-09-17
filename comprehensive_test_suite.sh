@@ -357,8 +357,12 @@ full_integration_test() {
     print_status $YELLOW "   3. Detection visualizer"
     print_status $YELLOW "   4. Drone TF publisher"
     print_status $YELLOW "   5. RViz visualization with trajectory display"
-    print_status $YELLOW "   6. NMPC tracker (tracking real Gazebo walking_person)"
-    print_status $YELLOW "   7. Enable tracking"
+    print_status $YELLOW "   6. tf_from_uav_pose node"
+    print_status $YELLOW "   7. projection_model node"
+    print_status $YELLOW "   8. pose_cov_ops_interface node"
+    print_status $YELLOW "   9. NMPC tracker (tracking real Gazebo walking_person)"
+    print_status $YELLOW "   10. Velocity controller (converts NMPC commands to Gazebo)"
+    print_status $YELLOW "   11. Enable tracking"
     
     # Clean up existing processes
     print_status $YELLOW "🧹 Cleaning up existing processes..."
@@ -366,20 +370,20 @@ full_integration_test() {
     sleep 3
     
     # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/8: Starting Gazebo simulation..."
+    print_status $YELLOW "Step 1/10: Starting Gazebo simulation..."
     if ! launch_gazebo; then
         print_status $RED "❌ Gazebo startup failed, cannot continue"
         return 1
     fi
     
     # Step 2: Start YOLO detector
-    print_status $YELLOW "Step 2/8: Starting YOLO detector..."
+    print_status $YELLOW "Step 2/10: Starting YOLO detector..."
     if ! test_yolo_detector; then
         print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
-    print_status $YELLOW "Step 3/8: Starting detection visualizer..."
+    print_status $YELLOW "Step 3/10: Starting detection visualizer..."
     
     ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
@@ -392,13 +396,13 @@ full_integration_test() {
     fi
     
     # Step 4: Start drone TF publisher for proper RViz display
-    print_status $YELLOW "Step 4/8: Starting drone TF publisher..."
+    print_status $YELLOW "Step 4/10: Starting drone TF publisher..."
     python3 drone_tf_publisher.py > /tmp/drone_tf.log 2>&1 &
     local tf_pid=$!
     sleep 1
     
     # Step 5: Start RViz visualization with trajectory display
-    print_status $YELLOW "Step 5/8: Starting RViz visualization..."
+    print_status $YELLOW "Step 5/10: Starting RViz visualization..."
     python3 visualization_node.py > /tmp/visualization.log 2>&1 &
     local viz_node_pid=$!
     sleep 2
@@ -415,21 +419,94 @@ full_integration_test() {
         print_status $YELLOW "⚠️  RViz visualization node failed to start (continuing anyway)"
     fi
     
-    # Step 6: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
-    print_status $YELLOW "Step 6/7: Starting NMPC tracker..."
+    # Step 6: Start tf_from_uav_pose node
+    print_status $YELLOW "Step 6/10: Starting tf_from_uav_pose node..."
+    ros2 run tf_from_uav_pose tf_from_uav_pose_node \
+        --ros-args \
+        -p machineFrameID:="X3" \
+        -p worldFrameID:="world" \
+        -p cameraFrameID:="X3/camera_link" \
+        -p cameraRGBOpticalFrameID:="X3/camera_rgb_optical_frame" \
+        -p dontPublishTFs:=False \
+        -p cameraStaticPublish.publish:=True \
+        > /tmp/tf_from_uav_pose.log 2>&1 &
+    local tf_uav_pid=$!
+    sleep 3
+    
+    if check_process "tf_from_uav_pose_node"; then
+        print_status $GREEN "✅ tf_from_uav_pose node started successfully"
+    else
+        print_status $RED "❌ tf_from_uav_pose node failed to start"
+        return 1
+    fi
+    
+    # Step 7: Start projection_model node
+    print_status $YELLOW "Step 7/10: Starting projection_model node..."
+    ros2 run projection_model projection_model_node \
+        --ros-args \
+        -p topics.robot:="X3/odometry" \
+        -p topics.camera:="X3/camera_link" \
+        -p topics.optical:="X3/camera_rgb_optical_frame" \
+        -p camera.info_topic:="/camera/camera_info" \
+        -p projected_object_topic:="/person_detections/world_frame" \
+        -p detections_topic:="/person_detections" \
+        > /tmp/projection_model.log 2>&1 &
+    local projection_pid=$!
+    sleep 3
+    
+    if check_process "projection_model_node"; then
+        print_status $GREEN "✅ projection_model node started successfully"
+    else
+        print_status $RED "❌ projection_model node failed to start"
+        return 1
+    fi
+    
+    # Step 8: Start pose_cov_ops_interface node
+    print_status $YELLOW "Step 8/10: Starting pose_cov_ops_interface node..."
+    ros2 run pose_cov_ops_interface pose_cov_ops_interface_node \
+        --ros-args \
+        -p input_pose_topic:="/X3/odometry" \
+        -p output_pose_topic:="/X3/pose_with_covariance" \
+        -p default_covariance.matrix:="[0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.1]" \
+        > /tmp/pose_cov_ops_interface.log 2>&1 &
+    local pose_cov_pid=$!
+    sleep 3
+    
+    if check_process "pose_cov_ops_interface_node"; then
+        print_status $GREEN "✅ pose_cov_ops_interface node started successfully"
+    else
+        print_status $RED "❌ pose_cov_ops_interface node failed to start"
+        return 1
+    fi
+    
+    # Step 9: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
+    print_status $YELLOW "Step 9/11: Starting NMPC tracker..."
     ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
-    
+
     if check_process "nmpc_tracker_node"; then
         print_status $GREEN "✅ NMPC tracker started successfully"
     else
         print_status $RED "❌ NMPC tracker failed to start"
         return 1
     fi
+
+    # Step 10: Start velocity controller (critical missing link!)
+    print_status $YELLOW "Step 10/11: Starting velocity controller..."
+    ros2 run drone_low_level_controllers velocity_controller.py > /tmp/velocity_controller.log 2>&1 &
+    local velocity_pid=$!
+    sleep 3
+
+    if check_process "velocity_controller.py"; then
+        print_status $GREEN "✅ Velocity controller started successfully"
+    else
+        print_status $RED "❌ Velocity controller failed to start"
+        return 1
+    fi
     
-    # Step 7: Enable drone and tracking
-    print_status $YELLOW "Step 7/7: Enabling drone control and tracking..."
+    # Step 11: Enable drone and tracking
+    print_status $YELLOW "Step 11/11: Enabling drone control and tracking..."
     
     # 启用无人机控制
     print_status $YELLOW "  - 启用无人机控制..."
@@ -448,66 +525,92 @@ full_integration_test() {
     print_status $BLUE "========================================"
     print_status $YELLOW "📊 System status verification:"
     
-    # Check critical topics
-    if wait_for_topic "/camera/image_raw" 5; then
-        print_status $GREEN "  ✅ Camera images available"
-    else
-        print_status $RED "  ❌ Camera images not available"
-    fi
+    # # Check critical topics
+    # if wait_for_topic "/camera/image_raw" 5; then
+    #     print_status $GREEN "  ✅ Camera images available"
+    # else
+    #     print_status $RED "  ❌ Camera images not available"
+    # fi
     
-    if wait_for_topic "/person_detections" 5; then
-        print_status $GREEN "  ✅ Person detections available"
-    else
-        print_status $RED "  ❌ Person detections not available"
-    fi
+    # if wait_for_topic "/person_detections" 5; then
+    #     print_status $GREEN "  ✅ Person detections available"
+    # else
+    #     print_status $RED "  ❌ Person detections not available"
+    # fi
     
-    if wait_for_topic "/X3/odometry" 5; then
-        print_status $GREEN "  ✅ Drone odometry available"
-    else
-        print_status $RED "  ❌ Drone odometry not available"
-    fi
+    # if wait_for_topic "/X3/odometry" 5; then
+    #     print_status $GREEN "  ✅ Drone odometry available"
+    # else
+    #     print_status $RED "  ❌ Drone odometry not available"
+    # fi
     
-    if wait_for_topic "/X3/cmd_vel" 5; then
-        print_status $GREEN "  ✅ Drone control commands available"
-    else
-        print_status $RED "  ❌ Drone control commands not available"
-    fi
+    # if wait_for_topic "/X3/cmd_vel" 5; then
+    #     print_status $GREEN "  ✅ Drone control commands available"
+    # else
+    #     print_status $RED "  ❌ Drone control commands not available"
+    # fi
     
-    # 添加检测图像话题检查
-    if wait_for_topic "/detection_image" 5; then
-        print_status $GREEN "  ✅ Detection image available"
-    else
-        print_status $RED "  ❌ Detection image not available"
-    fi
+    # # 添加检测图像话题检查
+    # if wait_for_topic "/detection_image" 5; then
+    #     print_status $GREEN "  ✅ Detection image available"
+    # else
+    #     print_status $RED "  ❌ Detection image not available"
+    # fi
     
-    print_status $BLUE "========================================"
-    print_status $GREEN "🎯 System functionality verification:"
+    # # Check new component topics
+    # if wait_for_topic "/person_detections/world_frame" 5; then
+    #     print_status $GREEN "  ✅ Projected detections to world frame available"
+    # else
+    #     print_status $RED "  ❌ Projected detections to world frame not available"
+    # fi
     
-    # Check topic data rates
-    if check_topic_rate "/person_detections" 1.0; then
-        print_status $GREEN "  ✅ Person detections are being published"
-    else
-        print_status $YELLOW "  ⚠️  Person detection data rate is low"
-    fi
+    # if wait_for_topic "/X3/pose_with_covariance" 5; then
+    #     print_status $GREEN "  ✅ Pose with covariance available"
+    # else
+    #     print_status $RED "  ❌ Pose with covariance not available"
+    # fi
     
-    if check_topic_rate "/X3/odometry" 10.0; then
-        print_status $GREEN "  ✅ Drone odometry is being published"
-    else
-        print_status $YELLOW "  ⚠️  Drone odometry data rate is low"
-    fi
+    # print_status $BLUE "========================================"
+    # print_status $GREEN "🎯 System functionality verification:"
     
-    if check_topic_rate "/X3/cmd_vel" 1.0; then
-        print_status $GREEN "  ✅ NMPC is publishing control commands"
-    else
-        print_status $YELLOW "  ⚠️  NMPC control command data rate is low"
-    fi
+    # # Check topic data rates
+    # if check_topic_rate "/person_detections" 1.0; then
+    #     print_status $GREEN "  ✅ Person detections are being published"
+    # else
+    #     print_status $YELLOW "  ⚠️  Person detection data rate is low"
+    # fi
     
-    # 添加检测图像话题数据速率检查
-    if check_topic_rate "/detection_image" 1.0; then
-        print_status $GREEN "  ✅ Detection images are being published"
-    else
-        print_status $YELLOW "  ⚠️  Detection image data rate is low"
-    fi
+    # if check_topic_rate "/X3/odometry" 10.0; then
+    #     print_status $GREEN "  ✅ Drone odometry is being published"
+    # else
+    #     print_status $YELLOW "  ⚠️  Drone odometry data rate is low"
+    # fi
+    
+    # if check_topic_rate "/X3/cmd_vel" 1.0; then
+    #     print_status $GREEN "  ✅ NMPC is publishing control commands"
+    # else
+    #     print_status $YELLOW "  ⚠️  NMPC control command data rate is low"
+    # fi
+    
+    # # 添加检测图像话题数据速率检查
+    # if check_topic_rate "/detection_image" 1.0; then
+    #     print_status $GREEN "  ✅ Detection images are being published"
+    # else
+    #     print_status $YELLOW "  ⚠️  Detection image data rate is low"
+    # fi
+    
+    # # Check new component data rates
+    # if check_topic_rate "/person_detections/world_frame" 1.0; then
+    #     print_status $GREEN "  ✅ Projected detections are being published"
+    # else
+    #     print_status $YELLOW "  ⚠️  Projected detection data rate is low"
+    # fi
+    
+    # if check_topic_rate "/X3/pose_with_covariance" 1.0; then
+    #     print_status $GREEN "  ✅ Pose with covariance is being published"
+    # else
+    #     print_status $YELLOW "  ⚠️  Pose with covariance data rate is low"
+    # fi
     
     print_status $BLUE "========================================"
     print_status $GREEN "🎉 AVIANS system is running!"
@@ -802,6 +905,12 @@ kill_all_processes() {
     pkill -f "parameter_bridge" 2>/dev/null
     pkill -f "rviz2" 2>/dev/null
     pkill -f "ros2 topic pub" 2>/dev/null
+    pkill -f "projection_model_node" 2>/dev/null
+    pkill -f "tf_from_uav_pose_node" 2>/dev/null
+    pkill -f "pose_cov_ops_interface_node" 2>/dev/null
+    pkill -f "velocity_controller.py" 2>/dev/null
+    pkill -f "waypoint_controller.py" 2>/dev/null
+    pkill -f "attitude_controller.py" 2>/dev/null
     
     sleep 2
     

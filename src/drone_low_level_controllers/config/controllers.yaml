@@ -1,0 +1,54 @@
+# Low-Level Controller Configuration for X3 Drone
+
+waypoint_controller:
+  ros__parameters:
+    # Control parameters
+    control_frequency: 50.0
+    position_tolerance: 0.2      # meters
+    velocity_tolerance: 0.1      # m/s
+
+    # PID gains for position control
+    kp_xy: 2.0                   # Proportional gain for X,Y
+    ki_xy: 0.1                   # Integral gain for X,Y
+    kd_xy: 0.5                   # Derivative gain for X,Y
+    kp_z: 1.5                    # Proportional gain for Z
+    ki_z: 0.05                   # Integral gain for Z
+    kd_z: 0.3                    # Derivative gain for Z
+
+    # Velocity limits
+    max_velocity_xy: 2.0         # m/s for X,Y
+    max_velocity_z: 1.0          # m/s for Z
+
+attitude_controller:
+  ros__parameters:
+    # Control parameters
+    control_frequency: 100.0     # Higher frequency for attitude
+    attitude_tolerance: 0.1      # radians (~5.7 degrees)
+
+    # PID gains for attitude control
+    kp_roll: 3.0                 # Proportional gain for roll
+    ki_roll: 0.1                 # Integral gain for roll
+    kd_roll: 0.2                 # Derivative gain for roll
+    kp_pitch: 3.0                # Proportional gain for pitch
+    ki_pitch: 0.1                # Integral gain for pitch
+    kd_pitch: 0.2                # Derivative gain for pitch
+    kp_yaw: 2.0                  # Proportional gain for yaw
+    ki_yaw: 0.05                 # Integral gain for yaw
+    kd_yaw: 0.1                  # Derivative gain for yaw
+
+    # Angular velocity limits
+    max_angular_velocity_roll: 2.0   # rad/s
+    max_angular_velocity_pitch: 2.0  # rad/s
+    max_angular_velocity_yaw: 1.0    # rad/s
+
+velocity_controller:
+  ros__parameters:
+    # Control parameters
+    control_frequency: 50.0
+    velocity_smoothing: 0.8      # 0.0 = no smoothing, 1.0 = full smoothing
+
+    # Velocity and angular velocity limits (final safety limits)
+    max_linear_velocity_xy: 3.0  # m/s
+    max_linear_velocity_z: 2.0   # m/s
+    max_angular_velocity_xy: 2.0 # rad/s (roll/pitch rates)
+    max_angular_velocity_z: 1.5  # rad/s (yaw rate)
