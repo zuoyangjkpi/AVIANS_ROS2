@@ -361,7 +361,7 @@ full_integration_test() {
     print_status $YELLOW "   7. projection_model node"
     print_status $YELLOW "   8. pose_cov_ops_interface node"
     print_status $YELLOW "   9. NMPC tracker (tracking real Gazebo walking_person)"
-    print_status $YELLOW "   10. Velocity controller (converts NMPC commands to Gazebo)"
+    print_status $YELLOW "   10. Low-level controllers (waypoint, attitude, velocity)"
     print_status $YELLOW "   11. Enable tracking"
     
     # Clean up existing processes
@@ -370,20 +370,20 @@ full_integration_test() {
     sleep 3
     
     # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/10: Starting Gazebo simulation..."
+    print_status $YELLOW "Step 1/11: Starting Gazebo simulation..."
     if ! launch_gazebo; then
         print_status $RED "❌ Gazebo startup failed, cannot continue"
         return 1
     fi
     
     # Step 2: Start YOLO detector
-    print_status $YELLOW "Step 2/10: Starting YOLO detector..."
+    print_status $YELLOW "Step 2/11: Starting YOLO detector..."
     if ! test_yolo_detector; then
         print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
-    print_status $YELLOW "Step 3/10: Starting detection visualizer..."
+    print_status $YELLOW "Step 3/11: Starting detection visualizer..."
     
     ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
@@ -396,13 +396,13 @@ full_integration_test() {
     fi
     
     # Step 4: Start drone TF publisher for proper RViz display
-    print_status $YELLOW "Step 4/10: Starting drone TF publisher..."
+    print_status $YELLOW "Step 4/11: Starting drone TF publisher..."
     python3 drone_tf_publisher.py > /tmp/drone_tf.log 2>&1 &
     local tf_pid=$!
     sleep 1
     
     # Step 5: Start RViz visualization with trajectory display
-    print_status $YELLOW "Step 5/10: Starting RViz visualization..."
+    print_status $YELLOW "Step 5/11: Starting RViz visualization..."
     python3 visualization_node.py > /tmp/visualization.log 2>&1 &
     local viz_node_pid=$!
     sleep 2
@@ -420,7 +420,7 @@ full_integration_test() {
     fi
     
     # Step 6: Start tf_from_uav_pose node
-    print_status $YELLOW "Step 6/10: Starting tf_from_uav_pose node..."
+    print_status $YELLOW "Step 6/11: Starting tf_from_uav_pose node..."
     ros2 run tf_from_uav_pose tf_from_uav_pose_node \
         --ros-args \
         -p machineFrameID:="X3" \
@@ -441,7 +441,7 @@ full_integration_test() {
     fi
     
     # Step 7: Start projection_model node
-    print_status $YELLOW "Step 7/10: Starting projection_model node..."
+    print_status $YELLOW "Step 7/11: Starting projection_model node..."
     ros2 run projection_model projection_model_node \
         --ros-args \
         -p topics.robot:="X3/odometry" \
@@ -462,7 +462,7 @@ full_integration_test() {
     fi
     
     # Step 8: Start pose_cov_ops_interface node
-    print_status $YELLOW "Step 8/10: Starting pose_cov_ops_interface node..."
+    print_status $YELLOW "Step 8/11: Starting pose_cov_ops_interface node..."
     ros2 run pose_cov_ops_interface pose_cov_ops_interface_node \
         --ros-args \
         -p input_pose_topic:="/X3/odometry" \
@@ -492,11 +492,35 @@ full_integration_test() {
         return 1
     fi
 
-    # Step 10: Start velocity controller (critical missing link!)
+    # Step 10: Start low-level controllers that bridge NMPC to Gazebo
+    print_status $YELLOW "Step 10/11: Starting waypoint controller..."
+    ros2 run drone_low_level_controllers waypoint_controller.py > /tmp/waypoint_controller.log 2>&1 &
+    local waypoint_pid=$!
+    sleep 2
+
+    if check_process "waypoint_controller.py"; then
+        print_status $GREEN "✅ Waypoint controller started successfully"
+    else
+        print_status $RED "❌ Waypoint controller failed to start"
+        return 1
+    fi
+
+    print_status $YELLOW "Step 10/11: Starting attitude controller..."
+    ros2 run drone_low_level_controllers attitude_controller.py > /tmp/attitude_controller.log 2>&1 &
+    local attitude_pid=$!
+    sleep 2
+
+    if check_process "attitude_controller.py"; then
+        print_status $GREEN "✅ Attitude controller started successfully"
+    else
+        print_status $RED "❌ Attitude controller failed to start"
+        return 1
+    fi
+
     print_status $YELLOW "Step 10/11: Starting velocity controller..."
     ros2 run drone_low_level_controllers velocity_controller.py > /tmp/velocity_controller.log 2>&1 &
     local velocity_pid=$!
-    sleep 3
+    sleep 2
 
     if check_process "velocity_controller.py"; then
         print_status $GREEN "✅ Velocity controller started successfully"
