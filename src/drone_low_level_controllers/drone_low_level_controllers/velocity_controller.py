@@ -100,6 +100,7 @@ class VelocityController(Node):
         ])
         self.velocity_command_active = True
         self.last_velocity_command_time = self.get_clock().now()
+        self.smoothed_velocity = self.target_velocity.copy()
 
         self.get_logger().debug(f'Velocity setpoint: [{self.target_velocity[0]:.2f}, '
                                f'{self.target_velocity[1]:.2f}, {self.target_velocity[2]:.2f}]')
@@ -157,6 +158,7 @@ class VelocityController(Node):
             if time_diff > self.command_timeout:
                 self.velocity_command_active = False
                 self.target_velocity = np.zeros(3)
+                self.smoothed_velocity = np.zeros(3)
                 self.get_logger().debug('Velocity command timed out')
 
         # Check angular velocity command timeout
@@ -166,6 +168,7 @@ class VelocityController(Node):
             if time_diff > self.command_timeout:
                 self.angular_velocity_command_active = False
                 self.target_angular_velocity = np.zeros(3)
+                self.smoothed_angular_velocity = np.zeros(3)
                 self.get_logger().debug('Angular velocity command timed out')
 
     def control_loop(self):
@@ -175,6 +178,12 @@ class VelocityController(Node):
 
         # Check for command timeouts
         self._check_command_timeouts()
+
+        if not self.velocity_command_active and not self.angular_velocity_command_active:
+            self.smoothed_velocity = np.zeros(3)
+            self.smoothed_angular_velocity = np.zeros(3)
+            self._send_zero_command()
+            return
 
         # Apply velocity smoothing
         alpha = self.velocity_smoothing

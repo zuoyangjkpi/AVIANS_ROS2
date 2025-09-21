@@ -21,6 +21,7 @@ class WaypointController(Node):
         self.declare_parameter('control_frequency', 50.0)
         self.declare_parameter('position_tolerance', 0.2)  # meters
         self.declare_parameter('velocity_tolerance', 0.1)  # m/s
+        self.declare_parameter('waypoint_timeout', 0.5)    # seconds
 
         # PID gains for position control (similar to PX4 v1.16.0)
         self.declare_parameter('kp_xy', 1.0)
@@ -38,6 +39,7 @@ class WaypointController(Node):
         self.control_frequency = self.get_parameter('control_frequency').value
         self.position_tolerance = self.get_parameter('position_tolerance').value
         self.velocity_tolerance = self.get_parameter('velocity_tolerance').value
+        self.waypoint_timeout = float(self.get_parameter('waypoint_timeout').value)
 
         # PID gains
         self.kp_xy = self.get_parameter('kp_xy').value
@@ -60,6 +62,7 @@ class WaypointController(Node):
         self.position_error_integral = np.zeros(3)
         self.position_error_previous = np.zeros(3)
         self.last_control_time = None
+        self.last_waypoint_time = None
 
         # Publishers
         self.velocity_setpoint_pub = self.create_publisher(
@@ -90,6 +93,7 @@ class WaypointController(Node):
             msg.pose.position.y,
             msg.pose.position.z
         ])
+        self.last_waypoint_time = self.get_clock().now()
 
         # Reset PID state for new waypoint
         self.position_error_integral = np.zeros(3)
@@ -121,14 +125,32 @@ class WaypointController(Node):
 
     def control_loop(self):
         """Main control loop for waypoint following"""
+        current_time = self.get_clock().now()
+
         if not self.controller_active:
             return
 
-        if (self.current_pose is None or
-            self.target_waypoint is None):
+        if self.current_pose is None:
             return
 
-        current_time = self.get_clock().now()
+        if self.target_waypoint is None:
+            return
+
+        if (self.last_waypoint_time is not None and
+            (current_time - self.last_waypoint_time).nanoseconds / 1e9 > self.waypoint_timeout):
+            zero_cmd = TwistStamped()
+            zero_cmd.header.stamp = current_time.to_msg()
+            zero_cmd.header.frame_id = 'world'
+            self.velocity_setpoint_pub.publish(zero_cmd)
+            self.target_waypoint = None
+            self.last_waypoint_time = None
+            self.position_error_integral = np.zeros(3)
+            self.position_error_previous = np.zeros(3)
+            self.last_control_time = None
+            return
+
+        if self.current_velocity is None:
+            self.current_velocity = np.zeros(3)
 
         # Calculate time step
         if self.last_control_time is not None:

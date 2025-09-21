@@ -123,7 +123,6 @@ class NMPCConfig:
         self.TOPIC_CONTROL_OUTPUT = '/drone/control/waypoint_command'
         self.TOPIC_WAYPOINT_CMD = '/drone/control/waypoint_command'
         self.TOPIC_ATTITUDE_CMD = '/drone/control/attitude_command'
-        self.TOPIC_VELOCITY_SETPOINT = '/drone/control/velocity_setpoint'
         self.TOPIC_TRAJECTORY_VIS = '/drone/trajectory'
         self.TOPIC_TARGET_VIS = '/drone/target'
         self.TOPIC_STATUS = '/drone/controller/status'
