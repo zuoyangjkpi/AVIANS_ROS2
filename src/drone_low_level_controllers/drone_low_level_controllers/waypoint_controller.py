@@ -122,6 +122,11 @@ class WaypointController(Node):
             self.get_logger().info('Waypoint controller ENABLED')
         else:
             self.get_logger().info('Waypoint controller DISABLED')
+            self.target_waypoint = None
+            self.last_waypoint_time = None
+            self.position_error_integral = np.zeros(3)
+            self.position_error_previous = np.zeros(3)
+            self.last_control_time = None
 
     def control_loop(self):
         """Main control loop for waypoint following"""

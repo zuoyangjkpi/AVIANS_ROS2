@@ -56,6 +56,8 @@ class VelocityController(Node):
         # State variables
         self.current_velocity = None
         self.current_angular_velocity = None
+        self._last_position = None
+        self._last_odom_time = None
         self.target_velocity = np.zeros(3)  # [vx, vy, vz]
         self.target_angular_velocity = np.zeros(3)  # [wx, wy, wz]
         self.smoothed_velocity = np.zeros(3)
@@ -120,17 +122,42 @@ class VelocityController(Node):
 
     def odometry_callback(self, msg: Odometry):
         """Update current drone velocities"""
-        self.current_velocity = np.array([
+        reported_linear = np.array([
             msg.twist.twist.linear.x,
             msg.twist.twist.linear.y,
             msg.twist.twist.linear.z
         ])
 
-        self.current_angular_velocity = np.array([
+        reported_angular = np.array([
             msg.twist.twist.angular.x,
             msg.twist.twist.angular.y,
             msg.twist.twist.angular.z
         ])
+
+        now = self.get_clock().now()
+        position = np.array([
+            msg.pose.pose.position.x,
+            msg.pose.pose.position.y,
+            msg.pose.pose.position.z
+        ])
+
+        pose_velocity = None
+        if self._last_position is not None and self._last_odom_time is not None:
+            dt = (now - self._last_odom_time).nanoseconds / 1e9
+            if dt > 1e-3:
+                pose_velocity = (position - self._last_position) / dt
+
+        estimated_linear = reported_linear
+        if pose_velocity is not None:
+            if (np.linalg.norm(reported_linear) < 0.05 or
+                    np.linalg.norm(pose_velocity) > np.linalg.norm(reported_linear)):
+                estimated_linear = pose_velocity
+
+        self.current_velocity = estimated_linear
+        self.current_angular_velocity = reported_angular
+
+        self._last_position = position
+        self._last_odom_time = now
 
     def enable_callback(self, msg: Bool):
         """Enable/disable velocity controller"""
