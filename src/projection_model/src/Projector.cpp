@@ -229,6 +229,11 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
 
   // For every detection
   for (const auto &detection : msg->detections) {
+    // Filter low confidence detections
+    if (detection.detection_score < 0.8) {
+      RCLCPP_DEBUG(this->get_logger(), "Skipping low confidence detection: %.3f", detection.detection_score);
+      continue;
+    }
     // Transform vector [0 0 -1] to optical frame
     if (!interface_->compose_down(pup, keys, detection.header.stamp, vec_up)) {
       interface_warning();
@@ -270,8 +275,15 @@ void Projector::detectionCallback3D(const neural_network_msgs::msg::NeuralNetwor
     double uncorr_height = fabs(ray_max.y - ray_min.y);
     double uncorr_height_cov = var_ymin + var_ymax;
 
-    // Compute expected distance to object
-    double scalefactor = projectionModel_->compute_distance(vec_up.pose.position, ray_min.y, uncorr_height);
+    // Estimate adaptive height based on detection
+    double adaptive_height = projectionModel_->estimate_person_height_from_detection(detection);
+
+    // Compute expected distance to object using adaptive height
+    double scalefactor = projectionModel_->compute_distance_adaptive(vec_up.pose.position, ray_min.y, uncorr_height, adaptive_height);
+
+    RCLCPP_DEBUG(this->get_logger(), "Adaptive height estimation: %.2fm (confidence: %.3f, aspect: %.2f)",
+                adaptive_height, detection.detection_score,
+                std::abs(detection.ymax - detection.ymin) / std::abs(detection.xmax - detection.xmin));
 
     // Scale all variables accordingly - z is later after rotating to object
     center_pose.pose.position.x *= scalefactor;

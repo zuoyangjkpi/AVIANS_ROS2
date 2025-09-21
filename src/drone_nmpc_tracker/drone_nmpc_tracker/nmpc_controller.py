@@ -68,6 +68,8 @@ class DroneNMPCController:
         self.person_velocity = np.array([0.0, 0.0, 0.0])
         self.person_detected = False
         self.last_detection_time = 0.0
+        self.tracking_height_offset = nmpc_config.TRACKING_HEIGHT_OFFSET
+        self._desired_phase = 0.0
         
         # Control history for warm start
         self.control_history = []
@@ -133,25 +135,18 @@ class DroneNMPCController:
             current_phase = 0.0
         
         # Desired phase evolution - slowly orbit around the person
-        # Angular velocity based on person's movement speed
         person_speed = np.linalg.norm(self.person_velocity[:2])
-        base_angular_velocity = 0.5  # rad/s - base orbital speed (increased from 0.3)
-        
-        # Increase orbital speed when person is moving to maintain better tracking
-        adaptive_angular_velocity = base_angular_velocity + 0.3 * person_speed  # Increased from 0.2
-        
-        # Update desired phase (integrate over time)
+        base_angular_velocity = 0.5  # rad/s
+        adaptive_angular_velocity = base_angular_velocity + 0.3 * person_speed
+
         dt = self.config.TIMESTEP
-        if not hasattr(self, '_desired_phase'):
-            self._desired_phase = current_phase
-        else:
-            self._desired_phase += adaptive_angular_velocity * dt
-        
+        self._desired_phase += adaptive_angular_velocity * dt
+
         # Calculate target position on the circle
         radius = self.config.OPTIMAL_TRACKING_DISTANCE
         target_x = person_pos[0] + radius * math.cos(self._desired_phase)
         target_y = person_pos[1] + radius * math.sin(self._desired_phase)
-        target_z = person_pos[2] + self.config.TRACKING_HEIGHT_OFFSET
+        target_z = person_pos[2] + self.tracking_height_offset
         
         self.target_position = np.array([target_x, target_y, target_z])
         
@@ -170,9 +165,15 @@ class DroneNMPCController:
         # Ensure drone always faces the person (yaw control)
         to_person = person_pos - np.array([target_x, target_y, target_z])
         desired_yaw = math.atan2(to_person[1], to_person[0]) + math.pi  # 加上pi确保面向人
-        
+
         # Store desired yaw for use in cost function
         self._desired_yaw = desired_yaw
+
+    def reset_phase(self, phase: float):
+        self._desired_phase = phase
+
+    def set_tracking_height_offset(self, offset: float):
+        self.tracking_height_offset = offset
     
     def drone_dynamics(self, state: State, control: np.ndarray) -> State:
         """Quadrotor dynamics model"""

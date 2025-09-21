@@ -122,31 +122,7 @@ class VisualizationNode(Node):
             
             marker_array.markers.append(marker)
         
-        # Add actual person position marker (BLUE for actual)
-        actual_marker = Marker()
-        actual_marker.header.frame_id = "world"
-        actual_marker.header.stamp = self.get_clock().now().to_msg()
-        actual_marker.ns = "person_actual"
-        actual_marker.id = 1
-        actual_marker.type = Marker.CYLINDER
-        actual_marker.action = Marker.ADD
-        
-        # Use actual position from Gazebo
-        actual_marker.pose.position.x = self.actual_person_position[0]
-        actual_marker.pose.position.y = self.actual_person_position[1]
-        actual_marker.pose.position.z = self.actual_person_position[2]
-        actual_marker.pose.orientation.w = 1.0
-        
-        # Set marker properties - BLUE for actual (more transparent)
-        actual_marker.scale.x = 0.4
-        actual_marker.scale.y = 0.4
-        actual_marker.scale.z = 1.8  # Human height
-        actual_marker.color.r = 0.0
-        actual_marker.color.g = 0.0
-        actual_marker.color.b = 1.0
-        actual_marker.color.a = 0.4  # More transparent
-        
-        marker_array.markers.append(actual_marker)
+        marker_array.markers.append(self._create_actual_person_marker())
         
         self.person_marker_pub.publish(marker_array)
 
@@ -185,6 +161,9 @@ class VisualizationNode(Node):
             pose.position.z
         ]
         self.get_logger().info(f'Updated actor position from Gazebo: x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
+        marker_array = MarkerArray()
+        marker_array.markers.append(self._create_actual_person_marker())
+        self.person_marker_pub.publish(marker_array)
     
     def gazebo_poses_callback(self, msg):
         """Update actual person position from Gazebo all poses topic"""
@@ -311,6 +290,30 @@ class VisualizationNode(Node):
         marker_array.markers.append(arrow_marker)
 
         self.drone_marker_pub.publish(marker_array)
+
+    def _create_actual_person_marker(self) -> Marker:
+        marker = Marker()
+        marker.header.frame_id = "world"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "person_actual"
+        marker.id = 1
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
+
+        marker.pose.position.x = self.actual_person_position[0]
+        marker.pose.position.y = self.actual_person_position[1]
+        marker.pose.position.z = self.actual_person_position[2]
+        marker.pose.orientation.w = 1.0
+
+        marker.scale.x = 0.4
+        marker.scale.y = 0.4
+        marker.scale.z = 1.8
+        marker.color.r = 0.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.color.a = 0.45
+
+        return marker
 
 
 def main(args=None):

@@ -40,11 +40,18 @@ class NMPCTrackerNode(Node):
         self.last_person_detection_time = 0.0
         self.control_enabled = True
 
-        # Search mode state
-        self.search_target_waypoint = None  # Target waypoint for search mode
-        self.search_target_attitude = None  # Target attitude for search mode
-        self.search_mode_active = False
-        self.search_start_time = None
+        # Vehicle references
+        self.home_position: Optional[np.ndarray] = None
+        self.home_yaw: float = 0.0
+        self.last_tracking_yaw: float = 0.0
+        self.last_known_position: Optional[np.ndarray] = None
+        self.takeoff_target_altitude: Optional[float] = None
+
+        # State machine management
+        self.state: Optional[str] = None
+        self.state_enter_time: float = 0.0
+        self.takeoff_alt_reached_time: Optional[float] = None
+        self.search_reference_position: Optional[np.ndarray] = None
         
         # TF2 buffer and listener
         self.tf_buffer = tf2_ros.Buffer()
@@ -55,6 +62,7 @@ class NMPCTrackerNode(Node):
         self._init_publishers()
         self._init_subscribers()
         self._init_timers()
+        self._switch_state('TAKEOFF')
         
         self.get_logger().info("NMPC Tracker Node initialized")
     
@@ -71,6 +79,14 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('projected_detection_topic', '/person_detections/world_frame')
         self.declare_parameter('use_actor_groundtruth', True)
         self.declare_parameter('actor_pose_topic', '/actor/walking_person/pose')
+        self.declare_parameter('takeoff_altitude', 2.0)
+        self.declare_parameter('takeoff_ascent_rate', 0.3)
+        self.declare_parameter('takeoff_hold_duration', 10.0)
+        self.declare_parameter('lost_target_hold_duration', 10.0)
+        self.declare_parameter('altitude_tolerance', 0.05)
+        self.declare_parameter('search_yaw_rate', 0.3)
+        self.declare_parameter('tracking_phase_offset', 0.0)
+        self.declare_parameter('tracking_height_offset', nmpc_config.TRACKING_HEIGHT_OFFSET)
 
         # Get parameter values
         self.control_frequency = self.get_parameter('control_frequency').value
@@ -82,6 +98,15 @@ class NMPCTrackerNode(Node):
         self.projected_detection_topic = self.get_parameter('projected_detection_topic').value
         self.use_actor_groundtruth = self.get_parameter('use_actor_groundtruth').value
         self.actor_pose_topic = self.get_parameter('actor_pose_topic').value
+        self.takeoff_altitude = self.get_parameter('takeoff_altitude').value
+        self.takeoff_ascent_rate = self.get_parameter('takeoff_ascent_rate').value
+        self.takeoff_hold_duration = self.get_parameter('takeoff_hold_duration').value
+        self.lost_target_hold_duration = self.get_parameter('lost_target_hold_duration').value
+        self.altitude_tolerance = max(0.01, self.get_parameter('altitude_tolerance').value)
+        self.search_yaw_rate = self.get_parameter('search_yaw_rate').value
+        self.tracking_phase_offset = self.get_parameter('tracking_phase_offset').value
+        self.tracking_height_offset = self.get_parameter('tracking_height_offset').value
+        self.controller.set_tracking_height_offset(self.tracking_height_offset)
 
         self.get_logger().info(f"Control frequency: {self.control_frequency} Hz")
         self.get_logger().info(f"Person timeout: {self.person_timeout} seconds")
@@ -253,6 +278,11 @@ class NMPCTrackerNode(Node):
             # Update controller state
             self.controller.set_drone_state(position, velocity, orientation, angular_velocity)
             self.drone_state_received = True
+            if self.home_position is None:
+                self.home_position = position.copy()
+                self.home_yaw = orientation[2]
+                self.takeoff_target_altitude = self.home_position[2] + self.takeoff_altitude
+                self.last_tracking_yaw = self.home_yaw
             
             # ✅ 添加调试信息
             self.get_logger().info(f"Drone state updated: pos={position}, vel={velocity}")
@@ -277,12 +307,7 @@ class NMPCTrackerNode(Node):
 
             # Update controller
             self.controller.set_person_detection(person_position, person_velocity)
-            self.person_detected = True
-            self.last_person_detection_time = current_time
-
-            self.get_logger().info(
-                f"✅ Person tracking ENABLED: pos={person_position}"
-            )
+            self._handle_person_detection(person_position, person_velocity)
 
         except Exception as e:
             self.get_logger().error(f"Error processing projected person detection: {e}")
@@ -300,14 +325,7 @@ class NMPCTrackerNode(Node):
             person_velocity = self._estimate_person_velocity(person_position, current_time)
 
             self.controller.set_person_detection(person_position, person_velocity)
-            was_tracking = self.person_detected
-            self.person_detected = True
-            self.last_person_detection_time = current_time
-
-            if not was_tracking:
-                self.get_logger().info(
-                    f"✅ Ground-truth actor tracking enabled: pos={person_position}"
-                )
+            self._handle_person_detection(person_position, person_velocity)
 
         except Exception as e:
             self.get_logger().error(f"Error processing actor pose: {e}")
@@ -335,6 +353,17 @@ class NMPCTrackerNode(Node):
         
         return velocity
     
+    def _handle_person_detection(self, person_position: np.ndarray, person_velocity: np.ndarray):
+        """Common logic when a person detection is received"""
+        current_time = self._now()
+        first_detection = not self.person_detected
+        self.person_detected = True
+        self.last_person_detection_time = current_time
+        if first_detection:
+            self.get_logger().info(f"✅ Person detected at {person_position}")
+        if self.state != 'TRACK':
+            self._switch_state('TRACK')
+
     def enable_callback(self, msg: Bool):
         """Handle control enable/disable commands"""
         self.control_enabled = msg.data
@@ -347,64 +376,56 @@ class NMPCTrackerNode(Node):
         self.waypoint_enable_pub.publish(enable_msg)
         self.attitude_enable_pub.publish(enable_msg)
         self.velocity_enable_pub.publish(enable_msg)
+        if not self.control_enabled:
+            return
     
     def control_loop_callback(self):
         """Main control loop"""
-        # ✅ 添加调试信息
-        self.get_logger().info(f"Control enabled: {self.control_enabled}, Drone state received: {self.drone_state_received}")
-        
+        current_time = self._now()
+
         if not self.control_enabled:
             self.get_logger().warn("Control not enabled")
             return
-            
+
         if not self.drone_state_received:
             self.get_logger().warn("No drone state received - waiting for odometry data")
             return
-        
-        try:
-            # Check if person detection is still valid
-            current_time = self.get_clock().now().nanoseconds / 1e9
-            if (self.person_detected and 
-                current_time - self.last_person_detection_time > self.person_timeout):
-                self.person_detected = False
-                self.get_logger().warn("Person detection timeout - switching to search mode")
-            
-            # ✅ 搜索模式：等待底层控制插件实现
-            if not self.person_detected:
-                if not self.search_mode_active:
-                    self._initialize_search_mode()
-                    self.search_start_time = current_time
 
-                # Send search commands to low-level controllers
-                self._send_search_commands(current_time)
-                self.get_logger().info(f"Search mode: Sending commands to low-level controllers")
-                return
+        if self.person_detected and current_time - self.last_person_detection_time > self.person_timeout:
+            self.person_detected = False
+            self.get_logger().warn("Person detection timeout - entering hold state")
+            if self.state == 'TRACK':
+                self._enter_lost_hold()
+
+        if self.state == 'TAKEOFF':
+            self._step_takeoff(current_time)
+            return
+
+        if self.state == 'SEARCH':
+            if self.person_detected:
+                self._switch_state('TRACK')
             else:
-                # 如果检测到人员，退出搜索模式
-                if self.search_mode_active:
-                    self.search_mode_active = False
-                    self.get_logger().info("Person detected - exiting search mode")
-            
-            # Run NMPC optimization (只在有人员检测时)
-            optimal_control, info = self.controller.optimize()
-            
-            # Convert control to low-level controller commands
-            self._send_tracking_commands(optimal_control)
-            
-            # Publish visualization if enabled
-            if self.enable_visualization:
-                self._publish_visualization(info)
-            
-            # Log performance
-            if info['iterations'] >= nmpc_config.MAX_ITERATIONS * 0.9:
-                self.get_logger().warn(
-                    f"NMPC optimization near iteration limit: {info['iterations']}"
-                )
-            
-        except Exception as e:
-            self.get_logger().error(f"Error in control loop: {e}")
-            # Publish hover command as safety fallback
-            self._send_hover_commands()
+                self._send_search_commands(current_time)
+                return
+
+        if self.state == 'LOST_HOLD':
+            if self.person_detected:
+                self._switch_state('TRACK')
+            else:
+                self._send_lost_hold_command()
+                if current_time - self.state_enter_time >= self.lost_target_hold_duration:
+                    self._switch_state('SEARCH')
+                return
+
+        if self.state == 'TRACK':
+            if not self.person_detected:
+                self._enter_lost_hold()
+                return
+            self._perform_tracking()
+            return
+
+        # Fallback: ensure we always have a valid control mode
+        self._switch_state('SEARCH')
     
     def _send_tracking_commands(self, control: np.ndarray):
         """Send tracking commands to low-level controllers"""
@@ -438,125 +459,118 @@ class NMPCTrackerNode(Node):
         attitude_msg.vector.z = desired_yaw  # yaw
         
         self.attitude_pub.publish(attitude_msg)
-    
-    def _send_hover_commands(self):
-        """Send hover commands as safety fallback"""
-        # Get current position as target
-        current_pos = self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
-        
-        # Publish current position as waypoint
-        waypoint_msg = PoseStamped()
-        waypoint_msg.header.stamp = self.get_clock().now().to_msg()
-        waypoint_msg.header.frame_id = self.world_frame
-        waypoint_msg.pose.position.x = float(current_pos[0])
-        waypoint_msg.pose.position.y = float(current_pos[1])
-        waypoint_msg.pose.position.z = float(current_pos[2])
-        waypoint_msg.pose.orientation.w = 1.0
-        
-        self.waypoint_pub.publish(waypoint_msg)
-        
-        # Publish level attitude
-        attitude_msg = Vector3Stamped()
-        attitude_msg.header.stamp = self.get_clock().now().to_msg()
-        attitude_msg.header.frame_id = self.drone_frame
-        attitude_msg.vector.x = 0.0  # roll
-        attitude_msg.vector.y = 0.0  # pitch
-        attitude_msg.vector.z = 0.0  # yaw
-        
-        self.attitude_pub.publish(attitude_msg)
-    
-    def _send_search_commands(self, current_time: float):
-        """Send search mode commands to low-level controllers"""
-        if self.search_target_waypoint is not None:
-            # Publish waypoint command (保持当前位置的XY坐标，Z坐标为2米)
-            waypoint_msg = PoseStamped()
-            waypoint_msg.header.stamp = self.get_clock().now().to_msg()
-            waypoint_msg.header.frame_id = self.world_frame
-            waypoint_msg.pose.position.x = float(self.search_target_waypoint[0])
-            waypoint_msg.pose.position.y = float(self.search_target_waypoint[1])
-            waypoint_msg.pose.position.z = float(self.search_target_waypoint[2])  # 2米高度
-            waypoint_msg.pose.orientation.w = 1.0
-            
-            self.waypoint_pub.publish(waypoint_msg)
-        
-        if self.search_target_attitude is not None:
-            # Update yaw for rotation (0.3 rad/s 匀速转动)
-            elapsed_time = current_time - self.search_start_time if self.search_start_time else 0.0
-            self.search_target_attitude[2] = (elapsed_time * 0.3) % (2 * math.pi)  # yaw
-            
-            # Publish attitude command (roll和pitch为0，yaw匀速转动)
-            attitude_msg = Vector3Stamped()
-            attitude_msg.header.stamp = self.get_clock().now().to_msg()
-            attitude_msg.header.frame_id = self.drone_frame
-            attitude_msg.vector.x = float(self.search_target_attitude[0])  # roll = 0
-            attitude_msg.vector.y = float(self.search_target_attitude[1])  # pitch = 0
-            attitude_msg.vector.z = float(self.search_target_attitude[2])  # yaw = 匀速转动
-            
-            self.attitude_pub.publish(attitude_msg)
-    
-    def _control_to_twist(self, control: np.ndarray) -> Twist:
-        """Convert NMPC control output to ROS2 Twist message"""
-        cmd = Twist()
-        
-        # Extract control components
-        thrust = control[0]
-        roll_cmd = control[1]
-        pitch_cmd = control[2]
-        yaw_rate_cmd = control[3]
-        
-        # Convert to velocity commands (simplified)
-        # This conversion depends on your specific drone controller
-        
-        # Vertical velocity from thrust
-        hover_thrust = nmpc_config.DRONE_MASS * nmpc_config.GRAVITY
-        thrust_normalized = (thrust - hover_thrust) / hover_thrust
-        cmd.linear.z = thrust_normalized * 2.0  # Scale factor
-        
-        # Horizontal velocities from roll/pitch commands
-        max_tilt = math.pi / 6  # 30 degrees max tilt
-        cmd.linear.x = (pitch_cmd / max_tilt) * nmpc_config.DRONE_MAX_VELOCITY
-        cmd.linear.y = -(roll_cmd / max_tilt) * nmpc_config.DRONE_MAX_VELOCITY  # Note: negative for correct direction
-        
-        # Yaw rate
-        cmd.angular.z = yaw_rate_cmd
-        
-        # Apply velocity limits
-        cmd.linear.x = np.clip(cmd.linear.x, -nmpc_config.DRONE_MAX_VELOCITY, nmpc_config.DRONE_MAX_VELOCITY)
-        cmd.linear.y = np.clip(cmd.linear.y, -nmpc_config.DRONE_MAX_VELOCITY, nmpc_config.DRONE_MAX_VELOCITY)
-        cmd.linear.z = np.clip(cmd.linear.z, -nmpc_config.DRONE_MAX_VELOCITY, nmpc_config.DRONE_MAX_VELOCITY)
-        cmd.angular.z = np.clip(cmd.angular.z, -nmpc_config.DRONE_MAX_ANGULAR_VELOCITY, nmpc_config.DRONE_MAX_ANGULAR_VELOCITY)
-        
-        return cmd
-    
-    def _initialize_search_mode(self):
-        """初始化搜索模式"""
-        current_pos = self._get_current_position()
-        # 设置搜索目标：当前X,Y位置，高度2米，姿态为水平+旋转
-        self.search_target_waypoint = np.array([current_pos[0], current_pos[1], 2.0])
-        self.search_target_attitude = np.array([0.0, 0.0, 0.0])  # [roll, pitch, yaw] - yaw will rotate
-        self.search_mode_active = True
 
-        self.get_logger().info(f"Search mode initialized - target waypoint: {self.search_target_waypoint}")
+        self.last_tracking_yaw = desired_yaw
+
+    def _send_search_commands(self, current_time: float):
+        if self.search_reference_position is None:
+            self.search_reference_position = self._get_current_position().copy()
+
+        if self.takeoff_target_altitude is not None:
+            target_altitude = self.takeoff_target_altitude
+        elif self.home_position is not None:
+            target_altitude = self.home_position[2] + self.takeoff_altitude
+        else:
+            target_altitude = self.takeoff_altitude
+
+        waypoint = np.array([
+            self.search_reference_position[0],
+            self.search_reference_position[1],
+            target_altitude
+        ])
+        self._publish_waypoint(waypoint)
+
+        yaw_command = (self.home_yaw if self.home_position is not None else 0.0) + \
+            self.search_yaw_rate * (current_time - self.state_enter_time)
+        self._publish_attitude(yaw_command)
 
     def _get_current_position(self) -> np.ndarray:
         """获取当前无人机位置"""
         return self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
 
-    def _generate_simple_search_command(self, current_time: float) -> Twist:
-        """临时简单搜索命令（等待底层控制插件实现）"""
-        cmd = Twist()
+    def _get_current_yaw(self) -> float:
+        return self.controller.current_state.data[nmpc_config.STATE_YAW]
 
-        # 简单的上升和旋转
-        current_pos = self._get_current_position()
-        target_height = 2.0
+    def _now(self) -> float:
+        return self.get_clock().now().nanoseconds / 1e9
 
-        if current_pos[2] < target_height - 0.1:
-            cmd.linear.z = 0.5  # 上升到2米
+    def _publish_waypoint(self, position: np.ndarray):
+        waypoint_msg = PoseStamped()
+        waypoint_msg.header.stamp = self.get_clock().now().to_msg()
+        waypoint_msg.header.frame_id = self.world_frame
+        waypoint_msg.pose.position.x = float(position[0])
+        waypoint_msg.pose.position.y = float(position[1])
+        waypoint_msg.pose.position.z = float(position[2])
+        waypoint_msg.pose.orientation.w = 1.0
+        self.waypoint_pub.publish(waypoint_msg)
+
+    def _publish_attitude(self, yaw: float, roll: float = 0.0, pitch: float = 0.0):
+        attitude_msg = Vector3Stamped()
+        attitude_msg.header.stamp = self.get_clock().now().to_msg()
+        attitude_msg.header.frame_id = self.drone_frame
+        attitude_msg.vector.x = float(roll)
+        attitude_msg.vector.y = float(pitch)
+        attitude_msg.vector.z = float(yaw)
+        self.attitude_pub.publish(attitude_msg)
+
+    def _step_takeoff(self, current_time: float):
+        if self.home_position is None or self.takeoff_target_altitude is None:
+            return
+
+        elapsed = max(0.0, current_time - self.state_enter_time)
+        ramp_altitude = self.home_position[2] + self.takeoff_ascent_rate * elapsed
+        target_altitude = min(self.takeoff_target_altitude, ramp_altitude)
+        target_altitude = max(target_altitude, self.home_position[2])
+
+        waypoint = np.array([
+            self.home_position[0],
+            self.home_position[1],
+            target_altitude
+        ])
+        self._publish_waypoint(waypoint)
+        self._publish_attitude(self.home_yaw)
+
+        current_altitude = self._get_current_position()[2]
+        if abs(current_altitude - self.takeoff_target_altitude) < self.altitude_tolerance:
+            if self.takeoff_alt_reached_time is None:
+                self.takeoff_alt_reached_time = current_time
+            if not self.person_detected and (current_time - self.takeoff_alt_reached_time) >= self.takeoff_hold_duration:
+                self._switch_state('SEARCH')
         else:
-            cmd.linear.z = 0.0
-            cmd.angular.z = 0.3  # 旋转搜索
+            self.takeoff_alt_reached_time = None
 
-        return cmd
+        if self.person_detected:
+            self._switch_state('TRACK')
+
+    def _enter_lost_hold(self):
+        self.last_known_position = self._get_current_position().copy()
+        self.last_tracking_yaw = self._get_current_yaw()
+        self._switch_state('LOST_HOLD')
+
+    def _switch_state(self, new_state: str):
+        previous = self.state
+        if previous == new_state:
+            return
+        self.state = new_state
+        self.state_enter_time = self._now()
+
+        if new_state == 'TAKEOFF':
+            self.takeoff_alt_reached_time = None
+        if new_state == 'SEARCH':
+            current_position = self._get_current_position()
+            self.search_reference_position = current_position.copy()
+        else:
+            self.search_reference_position = None
+        if new_state == 'TRACK':
+            self.controller.reset_phase(self.tracking_phase_offset)
+            self.controller.set_tracking_height_offset(self.tracking_height_offset)
+            self.last_tracking_yaw = self._get_current_yaw()
+        if new_state == 'LOST_HOLD' and self.last_known_position is None:
+            self.last_known_position = self._get_current_position().copy()
+        if new_state != 'LOST_HOLD':
+            self.last_known_position = None
+
+        self.get_logger().info(f"状态切换: {previous} -> {new_state}")
     
     def _publish_visualization(self, info: dict):
         """Publish visualization markers"""
