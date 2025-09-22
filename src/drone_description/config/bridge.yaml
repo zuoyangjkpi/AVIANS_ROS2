@@ -1,12 +1,3 @@
-# Odometry
--
-  ros_topic_name: "/X3/odometry"
-  gz_topic_name: "/X3/odometry"
-  ros_type_name: "nav_msgs/msg/Odometry"
-  gz_type_name: "gz.msgs.Odometry"
-  direction: GZ_TO_ROS
-
-
 # Command Velocity (from ROS to Gazebo)
 - 
   ros_topic_name: "/X3/cmd_vel"
@@ -14,6 +5,8 @@
   ros_type_name: "geometry_msgs/msg/Twist"
   gz_type_name: "gz.msgs.Twist"
   direction: ROS_TO_GZ
+
+# Odometry (Gazebo proto -> ROS2)
 
 # Clock (for synchronization)
 - 

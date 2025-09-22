@@ -64,10 +64,21 @@ def generate_launch_description():
         parameters=[{'config_file': config_file}],
         remappings=[
             ('/model/drone/cmd_vel', '/X3/cmd_vel'),
-            ('/model/drone/odometry', '/X3/odometry'),
         ]
     )
-    
+
+    odometry_bridge = Node(
+        package="drone_state_publisher",
+        executable="gazebo_odometry_bridge",
+        name="gazebo_odometry_bridge",
+        output="screen",
+        parameters=[
+            {"input_topic": "/X3/odometry_raw"},
+            {"output_topic": "/X3/odometry"},
+            {"child_frame": "X3/base_link"},
+        ]
+    )
+
     # Static transforms
     world_to_map_tf = Node(
         package="tf2_ros",
@@ -75,7 +86,7 @@ def generate_launch_description():
         arguments=["0", "0", "0", "0", "0", "0", "world", "map"],
         output="screen"
     )
-    
+
     # NMPC tracker node
     nmpc_tracker = Node(
         package="drone_nmpc_tracker",
@@ -90,7 +101,7 @@ def generate_launch_description():
             {"person_timeout": 2.0},
         ]
     )
-    
+
     # Simulated person detector (instead of test_node)
     person_simulator = Node(
         package="drone_nmpc_tracker",
@@ -98,7 +109,7 @@ def generate_launch_description():
         name="person_simulator",
         output="screen"
     )
-    
+
     # Enable NMPC controller
     enable_publisher = ExecuteProcess(
         cmd=[
@@ -116,6 +127,7 @@ def generate_launch_description():
         
         # Launch Gazebo
         gazebo,
+        odometry_bridge,
         
         # Start bridge after a delay
         TimerAction(

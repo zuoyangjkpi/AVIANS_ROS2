@@ -395,11 +395,12 @@
 
     <!-- Odometry publisher plugin -->
     <plugin filename="gz-sim8-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
-      <odom_frame>X3/odometry</odom_frame>
+      <odom_frame>X3/odometry_raw</odom_frame>
       <robot_base_frame>X3/base_link</robot_base_frame>
-      <odom_topic>/X3/gazebo_odometry</odom_topic>
+      <odom_topic>/X3/odometry_raw</odom_topic>
       <odom_publish_frequency>50</odom_publish_frequency>
     </plugin>
+
 
   </model>
 </sdf>

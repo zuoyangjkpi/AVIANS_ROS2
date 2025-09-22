@@ -22,6 +22,9 @@ include_directories(include)
 add_executable(drone_state_publisher_node
   src/drone_state_publisher.cpp
 )
+add_executable(gazebo_odometry_bridge
+  src/odometry_bridge.cpp
+)
 
 # Link dependencies
 ament_target_dependencies(drone_state_publisher_node
@@ -33,10 +36,16 @@ ament_target_dependencies(drone_state_publisher_node
   tf2_geometry_msgs
   ros2_utils
 )
+ament_target_dependencies(gazebo_odometry_bridge
+  rclcpp
+  nav_msgs
+  geometry_msgs
+)
 
 # Install targets
 install(TARGETS
   drone_state_publisher_node
+  gazebo_odometry_bridge
   DESTINATION lib/${PROJECT_NAME}
 )
 

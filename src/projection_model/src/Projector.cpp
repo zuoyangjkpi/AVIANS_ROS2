@@ -26,7 +26,7 @@ Projector::Projector() : Node("model_distance_from_height_node"), last_time_(rcl
   this->declare_parameter("feedback_topic", "/neural_network_feedback");
   
   // Frame topics
-  this->declare_parameter("topics.robot", "/machine_1/pose/raww/std");
+  this->declare_parameter("topics.robot", "/X3/odometry_raw");
   this->declare_parameter("topics.camera", "/machine_1/camera/pose");
   this->declare_parameter("topics.optical", "/machine_1/camera/pose_optical");
   

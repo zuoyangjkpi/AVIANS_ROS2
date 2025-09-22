@@ -16,7 +16,6 @@ setup(
          glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'config'), 
          glob('config/*.yaml')),
-         # >>> 新增：把脚本明确装到 lib/<package_name>/ 里 <<<
         (os.path.join('lib', package_name), ['scripts/nmpc_tracker_node', 'scripts/nmpc_test_node']),
     ],
     install_requires=['setuptools'],
@@ -33,4 +32,3 @@ setup(
         ],
     },
 )
-

@@ -440,11 +440,28 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 7: Start projection_model node
-    print_status $YELLOW "Step 7/11: Starting projection_model node..."
+    # Step 7: Start Gazebo odometry bridge
+    print_status $YELLOW "Step 7/12: Starting Gazebo odometry bridge..."
+    ros2 run drone_state_publisher gazebo_odometry_bridge \
+        --ros-args \
+        -p input_topic:="/X3/odometry_raw" \
+        -p output_topic:="/X3/odometry" \
+        > /tmp/gazebo_odometry_bridge.log 2>&1 &
+    local odom_bridge_pid=$!
+    sleep 2
+
+    if check_process "gazebo_odometry_bridge"; then
+        print_status $GREEN "✅ Gazebo odometry bridge started successfully"
+    else
+        print_status $RED "❌ Gazebo odometry bridge failed to start"
+        return 1
+    fi
+
+    # Step 8: Start projection_model node
+    print_status $YELLOW "Step 8/12: Starting projection_model node..."
     ros2 run projection_model projection_model_node \
         --ros-args \
-        -p topics.robot:="X3/odometry" \
+        -p topics.robot:="/X3/odometry_raw" \
         -p topics.camera:="X3/camera_link" \
         -p topics.optical:="X3/camera_rgb_optical_frame" \
         -p camera.info_topic:="/camera/camera_info" \
@@ -461,8 +478,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 8: Start pose_cov_ops_interface node
-    print_status $YELLOW "Step 8/11: Starting pose_cov_ops_interface node..."
+    # Step 9: Start pose_cov_ops_interface node
+    print_status $YELLOW "Step 9/12: Starting pose_cov_ops_interface node..."
     ros2 run pose_cov_ops_interface pose_cov_ops_interface_node \
         --ros-args \
         -p input_pose_topic:="/X3/odometry" \
@@ -479,8 +496,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 9: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
-    print_status $YELLOW "Step 9/11: Starting NMPC tracker..."
+    # Step 10: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
+    print_status $YELLOW "Step 10/12: Starting NMPC tracker..."
     ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
@@ -492,8 +509,8 @@ full_integration_test() {
         return 1
     fi
 
-    # Step 10: Start low-level controllers that bridge NMPC to Gazebo
-    print_status $YELLOW "Step 10/11: Starting waypoint controller..."
+    # Step 11: Start low-level controllers that bridge NMPC to Gazebo
+    print_status $YELLOW "Step 11/12: Starting waypoint controller..."
     ros2 run drone_low_level_controllers waypoint_controller.py > /tmp/waypoint_controller.log 2>&1 &
     local waypoint_pid=$!
     sleep 2
@@ -856,6 +873,7 @@ nmpc_gazebo_visual_tracking() {
     pkill -f "gz sim" 2>/dev/null
     pkill -f "nmpc_tracker_node" 2>/dev/null
     pkill -f "nmpc_test_node" 2>/dev/null
+    pkill -f "gazebo_odometry_bridge" 2>/dev/null
     pkill -f "parameter_bridge" 2>/dev/null
     sleep 3
     
@@ -922,6 +940,7 @@ kill_all_processes() {
     pkill -f "yolo12_detector_node" 2>/dev/null
     pkill -f "nmpc_tracker_node" 2>/dev/null
     pkill -f "nmpc_test_node" 2>/dev/null
+    pkill -f "gazebo_odometry_bridge" 2>/dev/null
     pkill -f "detection_visualizer_node" 2>/dev/null
     pkill -f "visualization_node.py" 2>/dev/null
     pkill -f "drone_tf_publisher.py" 2>/dev/null
@@ -932,6 +951,7 @@ kill_all_processes() {
     pkill -f "projection_model_node" 2>/dev/null
     pkill -f "tf_from_uav_pose_node" 2>/dev/null
     pkill -f "pose_cov_ops_interface_node" 2>/dev/null
+    pkill -f "gazebo_odometry_bridge" 2>/dev/null
     pkill -f "velocity_controller.py" 2>/dev/null
     pkill -f "waypoint_controller.py" 2>/dev/null
     pkill -f "attitude_controller.py" 2>/dev/null
