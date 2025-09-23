@@ -87,6 +87,7 @@ def generate_launch_description():
             {"camera_frame": "camera_link"},
             {"control_frequency": 10.0},
             {"person_timeout": 2.0},
+            {"search_yaw_rate": 0.3},
         ]
     )
 

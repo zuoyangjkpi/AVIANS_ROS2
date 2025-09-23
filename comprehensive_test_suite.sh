@@ -493,8 +493,16 @@ full_integration_test() {
     fi
 
     # Step 10: Start low-level controllers that bridge NMPC to Gazebo
+    local controller_params="$PWD/src/drone_low_level_controllers/config/controllers.yaml"
+    if [ ! -f "$controller_params" ]; then
+        print_status $RED "❌ Controller parameter file not found at $controller_params"
+        return 1
+    fi
+
     print_status $YELLOW "Step 10/11: Starting waypoint controller..."
-    ros2 run drone_low_level_controllers waypoint_controller.py > /tmp/waypoint_controller.log 2>&1 &
+    ros2 run drone_low_level_controllers waypoint_controller.py \
+        --ros-args --params-file "$controller_params" \
+        > /tmp/waypoint_controller.log 2>&1 &
     local waypoint_pid=$!
     sleep 2
 
@@ -506,7 +514,9 @@ full_integration_test() {
     fi
 
     print_status $YELLOW "Step 10/11: Starting attitude controller..."
-    ros2 run drone_low_level_controllers attitude_controller.py > /tmp/attitude_controller.log 2>&1 &
+    ros2 run drone_low_level_controllers attitude_controller.py \
+        --ros-args --params-file "$controller_params" \
+        > /tmp/attitude_controller.log 2>&1 &
     local attitude_pid=$!
     sleep 2
 
@@ -518,7 +528,9 @@ full_integration_test() {
     fi
 
     print_status $YELLOW "Step 10/11: Starting velocity controller..."
-    ros2 run drone_low_level_controllers velocity_controller.py > /tmp/velocity_controller.log 2>&1 &
+    ros2 run drone_low_level_controllers velocity_controller.py \
+        --ros-args --params-file "$controller_params" \
+        > /tmp/velocity_controller.log 2>&1 &
     local velocity_pid=$!
     sleep 2
 

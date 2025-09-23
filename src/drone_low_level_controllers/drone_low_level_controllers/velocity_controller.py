@@ -118,6 +118,8 @@ class VelocityController(Node):
         ])
         self.angular_velocity_command_active = True
         self.last_angular_velocity_command_time = self.get_clock().now()
+        # Reset smoothing so new commands take effect immediately
+        self.smoothed_angular_velocity = self.target_angular_velocity.copy()
 
         self.get_logger().debug(f'Angular velocity setpoint: [{self.target_angular_velocity[0]:.2f}, '
                                f'{self.target_angular_velocity[1]:.2f}, {self.target_angular_velocity[2]:.2f}]')
@@ -241,15 +243,14 @@ class VelocityController(Node):
 
         # Calculate velocity error
         velocity_error_world = self.smoothed_velocity - self.current_velocity_world
-        angular_velocity_error = self.smoothed_angular_velocity - self.current_angular_velocity
-
-        # PID control for velocity
+        # PID control for velocity (world frame)
         kp_v = np.array([self.kp_vx, self.kp_vy, self.kp_vz])
         acceleration_world = kp_v * velocity_error_world
 
-        # PID control for angular velocity
+        # Angular velocity feedback (feed-forward + proportional tracking in body frame)
+        angular_velocity_error = self.smoothed_angular_velocity - self.current_angular_velocity
         kp_w = np.array([self.kp_wx, self.kp_wy, self.kp_wz])
-        torque_command = kp_w * angular_velocity_error
+        torque_command = self.smoothed_angular_velocity + kp_w * angular_velocity_error
 
         # Transform linear command to body frame for cmd_vel
         if self.rotation_matrix is not None:

@@ -276,7 +276,7 @@
     <!-- 🔧 修复：重新排序插件，先加载速度控制器 -->
     <include>
       <uri>model://x3</uri>
-      <pose>3 0 2.5 0 0.2 3.14159</pose>
+      <pose>3 0 0 0 0.2 3.14159</pose>
       
       <!-- ✅ 无人机启动脚本 -->  
       <plugin filename="gz-sim8-triggered-publisher-system" name="gz::sim::systems::TriggeredPublisher">

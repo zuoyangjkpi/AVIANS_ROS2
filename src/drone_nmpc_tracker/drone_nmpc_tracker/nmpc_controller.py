@@ -116,7 +116,7 @@ class DroneNMPCController:
         
         # Update target position for tracking
         self._update_tracking_target()
-    
+
     def _update_tracking_target(self):
         """Update target position based on person location with circular tracking behavior"""
         if not self.person_detected:

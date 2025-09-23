@@ -188,6 +188,14 @@ class WaypointController(Node):
         # PID control
         # Integral term (with windup prevention)
         self.position_error_integral += position_error * dt
+        integral_deadband = np.array([0.01, 0.01, 0.01])
+        for i in range(3):
+            if abs(position_error[i]) < integral_deadband[i]:
+                self.position_error_integral[i] = 0.0
+        # Anti-windup: reset integral if error flips sign
+        for i in range(3):
+            if position_error[i] * self.position_error_previous[i] <= 0.0:
+                self.position_error_integral[i] = 0.0
         max_integral = 5.0  # Prevent windup
         self.position_error_integral = np.clip(
             self.position_error_integral, -max_integral, max_integral)

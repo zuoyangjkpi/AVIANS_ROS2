@@ -61,11 +61,13 @@ class AttitudeController(Node):
         ])
 
         # State variables
-        self.current_attitude = None  # [roll, pitch, yaw]
+        self.current_attitude = None  # [roll, pitch, yaw] (yaw unwrapped)
         self.current_angular_velocity = None
         self.target_attitude = None  # [roll, pitch, yaw]
         self.last_target_attitude = None
         self.last_command_time = None
+        self.unwrapped_yaw = None
+        self.last_yaw_measurement = None
         self.controller_active = False
 
         # PID state
@@ -108,6 +110,9 @@ class AttitudeController(Node):
             delta = np.abs(new_target - self.last_target_attitude)
             significant_change = bool(np.max(delta) > math.radians(2.0))
 
+        if self.last_target_attitude is not None:
+            yaw_delta = self.normalize_angle(new_target[2] - self.last_target_attitude[2])
+            new_target[2] = self.last_target_attitude[2] + yaw_delta
         self.target_attitude = new_target
         self.last_target_attitude = new_target.copy()
         self.last_command_time = self.get_clock().now()
@@ -133,7 +138,17 @@ class AttitudeController(Node):
 
         # Convert to Euler angles (roll, pitch, yaw)
         rotation = Rotation.from_quat(quat)
-        self.current_attitude = rotation.as_euler('xyz', degrees=False)
+        euler = rotation.as_euler('xyz', degrees=False)
+
+        wrapped_yaw = euler[2]
+        if self.unwrapped_yaw is None:
+            self.unwrapped_yaw = wrapped_yaw
+        else:
+            yaw_delta = self.normalize_angle(wrapped_yaw - self.last_yaw_measurement)
+            self.unwrapped_yaw += yaw_delta
+
+        self.last_yaw_measurement = wrapped_yaw
+        self.current_attitude = np.array([euler[0], euler[1], self.unwrapped_yaw])
 
         # Extract angular velocity
         self.current_angular_velocity = np.array([
@@ -192,6 +207,13 @@ class AttitudeController(Node):
         # PID control
         # Integral term (with windup prevention)
         self.attitude_error_integral += attitude_error * dt
+        integral_deadband = np.array([math.radians(0.5), math.radians(0.5), math.radians(0.5)])
+        for i in range(3):
+            if abs(attitude_error[i]) < integral_deadband[i]:
+                self.attitude_error_integral[i] = 0.0
+        for i in range(3):
+            if attitude_error[i] * self.attitude_error_previous[i] <= 0.0:
+                self.attitude_error_integral[i] = 0.0
         max_integral = 2.0  # Prevent windup
         self.attitude_error_integral = np.clip(
             self.attitude_error_integral, -max_integral, max_integral)
