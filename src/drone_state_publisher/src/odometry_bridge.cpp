@@ -8,7 +8,7 @@ public:
   GazeboOdometryBridge()
   : rclcpp::Node("gazebo_odometry_bridge"), have_prev_(false), prev_time_(0.0)
   {
-    input_topic_ = this->declare_parameter<std::string>("input_topic", "/X3/odometry_raw");
+    input_topic_ = this->declare_parameter<std::string>("input_topic", "/X3/pose_with_covariance");
     output_topic_ = this->declare_parameter<std::string>("output_topic", "/X3/odometry");
     child_frame_ = this->declare_parameter<std::string>("child_frame", "X3/base_link");
 

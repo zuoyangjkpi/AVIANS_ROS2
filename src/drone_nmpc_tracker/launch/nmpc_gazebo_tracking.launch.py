@@ -67,18 +67,6 @@ def generate_launch_description():
         ]
     )
 
-    odometry_bridge = Node(
-        package="drone_state_publisher",
-        executable="gazebo_odometry_bridge",
-        name="gazebo_odometry_bridge",
-        output="screen",
-        parameters=[
-            {"input_topic": "/X3/odometry_raw"},
-            {"output_topic": "/X3/odometry"},
-            {"child_frame": "X3/base_link"},
-        ]
-    )
-
     # Static transforms
     world_to_map_tf = Node(
         package="tf2_ros",
@@ -127,7 +115,6 @@ def generate_launch_description():
         
         # Launch Gazebo
         gazebo,
-        odometry_bridge,
         
         # Start bridge after a delay
         TimerAction(
