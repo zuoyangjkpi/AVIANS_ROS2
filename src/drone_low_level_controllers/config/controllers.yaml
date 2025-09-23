@@ -48,7 +48,7 @@ velocity_controller:
     velocity_smoothing: 0.8      # 0.0 = no smoothing, 1.0 = full smoothing
 
     # Velocity and angular velocity limits (final safety limits)
-    max_linear_velocity_xy: 3.0  # m/s
-    max_linear_velocity_z: 2.0   # m/s
-    max_angular_velocity_xy: 2.0 # rad/s (roll/pitch rates)
-    max_angular_velocity_z: 1.5  # rad/s (yaw rate)
+    max_linear_velocity_xy: 8.0  # m/s
+    max_linear_velocity_z: 4.0   # m/s
+    max_angular_velocity_xy: 4.0 # rad/s (roll/pitch rates)
+    max_angular_velocity_z: 3  # rad/s (yaw rate)

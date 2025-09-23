@@ -54,13 +54,15 @@ class VelocityController(Node):
         self.kp_wz = self.get_parameter('kp_wz').value
 
         # State variables
-        self.current_velocity = None
-        self.current_angular_velocity = None
+        self.current_velocity_world = np.zeros(3)
+        self.current_velocity_body = np.zeros(3)
+        self.current_angular_velocity = np.zeros(3)
+        self.rotation_matrix = None  # body -> world rotation
         self._last_position = None
         self._last_odom_time = None
         self.target_velocity = np.zeros(3)  # [vx, vy, vz]
         self.target_angular_velocity = np.zeros(3)  # [wx, wy, wz]
-        self.smoothed_velocity = np.zeros(3)
+        self.smoothed_velocity = np.zeros(3)  # expressed in world frame
         self.smoothed_angular_velocity = np.zeros(3)
         self.controller_active = False
 
@@ -153,7 +155,25 @@ class VelocityController(Node):
                     np.linalg.norm(pose_velocity) > np.linalg.norm(reported_linear)):
                 estimated_linear = pose_velocity
 
-        self.current_velocity = estimated_linear
+        self.rotation_matrix = self._quaternion_to_matrix([
+            msg.pose.pose.orientation.x,
+            msg.pose.pose.orientation.y,
+            msg.pose.pose.orientation.z,
+            msg.pose.pose.orientation.w
+        ])
+
+        if self.rotation_matrix is not None:
+            world_linear_from_body = self.rotation_matrix @ reported_linear
+        else:
+            world_linear_from_body = reported_linear
+
+        if pose_velocity is not None:
+            estimated_world = 0.5 * world_linear_from_body + 0.5 * pose_velocity
+        else:
+            estimated_world = world_linear_from_body
+
+        self.current_velocity_body = reported_linear
+        self.current_velocity_world = estimated_world
         self.current_angular_velocity = reported_angular
 
         self._last_position = position
@@ -220,28 +240,28 @@ class VelocityController(Node):
                                          (1 - alpha) * self.target_angular_velocity)
 
         # Calculate velocity error
-        velocity_error = np.zeros(3)
-        angular_velocity_error = np.zeros(3)
-        
-        if self.current_velocity is not None:
-            velocity_error = self.smoothed_velocity - self.current_velocity
-            
-        if self.current_angular_velocity is not None:
-            angular_velocity_error = self.smoothed_angular_velocity - self.current_angular_velocity
+        velocity_error_world = self.smoothed_velocity - self.current_velocity_world
+        angular_velocity_error = self.smoothed_angular_velocity - self.current_angular_velocity
 
         # PID control for velocity
         kp_v = np.array([self.kp_vx, self.kp_vy, self.kp_vz])
-        acceleration_command = kp_v * velocity_error
+        acceleration_world = kp_v * velocity_error_world
 
         # PID control for angular velocity
         kp_w = np.array([self.kp_wx, self.kp_wy, self.kp_wz])
         torque_command = kp_w * angular_velocity_error
 
+        # Transform linear command to body frame for cmd_vel
+        if self.rotation_matrix is not None:
+            acceleration_body = self.rotation_matrix.T @ acceleration_world
+        else:
+            acceleration_body = acceleration_world
+
         # Mix control commands
         cmd = Twist()
-        cmd.linear.x = acceleration_command[0]
-        cmd.linear.y = acceleration_command[1]
-        cmd.linear.z = acceleration_command[2]
+        cmd.linear.x = acceleration_body[0]
+        cmd.linear.y = acceleration_body[1]
+        cmd.linear.z = acceleration_body[2]
         cmd.angular.x = torque_command[0]
         cmd.angular.y = torque_command[1]
         cmd.angular.z = torque_command[2]
@@ -269,11 +289,34 @@ class VelocityController(Node):
         else:
             self._debug_counter = 0
 
-        if self._debug_counter % 25 == 0:  # Log every 25 iterations (0.5 seconds at 50Hz)
+        if self._debug_counter % 25 == 0:
             self.get_logger().debug(
-                f'Velocity control: vel=[{cmd.linear.x:.2f}, {cmd.linear.y:.2f}, {cmd.linear.z:.2f}], '
-                f'ang_vel=[{cmd.angular.x:.2f}, {cmd.angular.y:.2f}, {cmd.angular.z:.2f}]'
+                f'Velocity control: target_world={self.smoothed_velocity}, '
+                f'body_cmd=[{cmd.linear.x:.2f}, {cmd.linear.y:.2f}, {cmd.linear.z:.2f}], '
+                f'ang_vel_cmd=[{cmd.angular.x:.2f}, {cmd.angular.y:.2f}, {cmd.angular.z:.2f}]'
             )
+
+    @staticmethod
+    def _quaternion_to_matrix(quat):
+        x, y, z, w = quat
+        norm = x*x + y*y + z*z + w*w
+        if norm < 1e-8:
+            return None
+        s = 2.0 / norm
+        xx = x * x * s
+        yy = y * y * s
+        zz = z * z * s
+        xy = x * y * s
+        xz = x * z * s
+        yz = y * z * s
+        wx = w * x * s
+        wy = w * y * s
+        wz = w * z * s
+        return np.array([
+            [1.0 - (yy + zz), xy - wz, xz + wy],
+            [xy + wz, 1.0 - (xx + zz), yz - wx],
+            [xz - wy, yz + wx, 1.0 - (xx + yy)]
+        ])
 
 def main(args=None):
     rclpy.init(args=args)

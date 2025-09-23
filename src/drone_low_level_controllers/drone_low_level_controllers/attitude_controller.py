@@ -64,6 +64,8 @@ class AttitudeController(Node):
         self.current_attitude = None  # [roll, pitch, yaw]
         self.current_angular_velocity = None
         self.target_attitude = None  # [roll, pitch, yaw]
+        self.last_target_attitude = None
+        self.last_command_time = None
         self.controller_active = False
 
         # PID state
@@ -95,15 +97,25 @@ class AttitudeController(Node):
 
     def attitude_callback(self, msg: Vector3Stamped):
         """Receive attitude command from high-level controller"""
-        self.target_attitude = np.array([
+        new_target = np.array([
             msg.vector.x,  # roll
             msg.vector.y,  # pitch
             msg.vector.z   # yaw
         ])
 
-        # Reset PID state for new attitude command
-        self.attitude_error_integral = np.zeros(3)
-        self.attitude_error_previous = np.zeros(3)
+        significant_change = True
+        if self.last_target_attitude is not None:
+            delta = np.abs(new_target - self.last_target_attitude)
+            significant_change = bool(np.max(delta) > math.radians(2.0))
+
+        self.target_attitude = new_target
+        self.last_target_attitude = new_target.copy()
+        self.last_command_time = self.get_clock().now()
+
+        if significant_change:
+            # Reset PID history only when command jumps notably
+            self.attitude_error_integral = np.zeros(3)
+            self.attitude_error_previous = np.zeros(3)
 
         self.get_logger().debug(f'New attitude command: roll={math.degrees(self.target_attitude[0]):.1f}°, '
                                f'pitch={math.degrees(self.target_attitude[1]):.1f}°, '
@@ -167,18 +179,15 @@ class AttitudeController(Node):
 
         # Check if attitude is reached
         attitude_magnitude = np.linalg.norm(attitude_error)
-        if attitude_magnitude < self.attitude_tolerance:
-            # Attitude reached
+        command_recent = False
+        if self.last_command_time is not None:
+            dt_command = (current_time - self.last_command_time).nanoseconds / 1e9
+            command_recent = dt_command < 0.15
+
+        if attitude_magnitude < self.attitude_tolerance and not command_recent:
             attitude_reached_msg = Bool()
             attitude_reached_msg.data = True
             self.attitude_reached_pub.publish(attitude_reached_msg)
-
-            # Stop rotation
-            angular_velocity_cmd = Vector3Stamped()
-            angular_velocity_cmd.header.stamp = current_time.to_msg()
-            angular_velocity_cmd.header.frame_id = 'X3/base_link'
-            self.angular_velocity_setpoint_pub.publish(angular_velocity_cmd)
-            return
 
         # PID control
         # Integral term (with windup prevention)
