@@ -12,13 +12,13 @@ waypoint_controller:
     kp_xy: 3.4                   # Proportional gain for X,Y
     ki_xy: 0.05                  # Integral gain for X,Y
     kd_xy: 0.55                  # Derivative gain for X,Y
-    kp_z: 2.2                    # Proportional gain for Z
-    ki_z: 0.08                   # Integral gain for Z
-    kd_z: 0.8                    # Derivative gain for Z
+    kp_z: 2.0                    # Proportional gain for Z
+    ki_z: 0.06                   # Integral gain for Z
+    kd_z: 0.95                   # Derivative gain for Z
 
     # Velocity limits
     max_velocity_xy: 4.0         # m/s for X,Y
-    max_velocity_z: 2.5          # m/s for Z
+    max_velocity_z: 2.2          # m/s for Z
 
 attitude_controller:
   ros__parameters:
@@ -46,18 +46,18 @@ velocity_controller:
   ros__parameters:
     # Control parameters
     control_frequency: 100.0
-    velocity_smoothing: 0.2      # 0.0 = no smoothing, 1.0 = full smoothing
+    velocity_smoothing: 0.3      # 0.0 = no smoothing, 1.0 = full smoothing
 
     # Velocity and angular velocity limits (final safety limits)
     max_linear_velocity_xy: 4.5  # m/s
-    max_linear_velocity_z: 2.5   # m/s
+    max_linear_velocity_z: 2.2   # m/s
     max_angular_velocity_xy: 2.3 # rad/s (roll/pitch rates)
     max_angular_velocity_z: 1.2  # rad/s (yaw rate)
 
     # Velocity PID gains (world frame)
     kp_vx: 0.55
     kp_vy: 0.55
-    kp_vz: 0.7
+    kp_vz: 0.55
 
     # Angular velocity proportional gains (body frame)
     kp_wx: 0.6
