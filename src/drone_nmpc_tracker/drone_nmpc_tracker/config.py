@@ -93,10 +93,16 @@ class NMPCConfig:
         ])
         
         # ========== Person Tracking Parameters ==========
-        self.OPTIMAL_TRACKING_DISTANCE = 4.0  # Optimal distance to person (meters)
+        self.OPTIMAL_TRACKING_DISTANCE = 3.0  # Optimal distance to person (meters)
         self.MIN_TRACKING_DISTANCE = 2.0      # Minimum safe distance
         self.MAX_TRACKING_DISTANCE = 8.0      # Maximum tracking distance
         self.TRACKING_HEIGHT_OFFSET = 1.5     # Height above person for tracking
+        self.TRACKING_FIXED_ALTITUDE = 2.5      # Fixed tracking altitude (m)
+        self.BASE_TRACKING_ANGULAR_VELOCITY = 0.25  # Base orbit rate (rad/s)
+        self.TRACKING_SPEED_GAIN = 0.15              # Gain from person speed to orbit rate
+        self.MAX_TRACKING_ANGULAR_VELOCITY = 0.6     # Cap orbit rate
+        self.TARGET_POSITION_SMOOTHING = 0.6         # 0=no smoothing, 1=full smoothing
+        self.PERSON_POSITION_FILTER_ALPHA = 0.6      # Smoothing for detected person position
         
         # Camera parameters
         self.CAMERA_FOV_HORIZONTAL = math.pi/3  # 60 degrees horizontal FOV

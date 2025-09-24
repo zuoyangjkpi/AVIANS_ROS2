@@ -26,6 +26,8 @@ class VisualizationNode(Node):
             NeuralNetworkDetectionArray, '/person_detections', self.detection_callback, 10)
         self.odom_sub = self.create_subscription(
             Odometry, '/X3/odometry', self.odometry_callback, 10)
+        self.person_estimate_sub = self.create_subscription(
+            PoseStamped, '/nmpc/person_estimate', self.person_estimate_callback, 10)
         self.actor_pose_sub = self.create_subscription(
             PoseStamped, '/actor/walking_person/pose', self.actor_pose_callback, 10)
         self.gazebo_poses_sub = self.create_subscription(
@@ -45,8 +47,9 @@ class VisualizationNode(Node):
         # Trajectory parameters (circular orbit around person)
         self.orbit_radius = 3.0  # meters
         self.orbit_height = 2.5  # meters above person
-        self.current_person_position = [0.0, 0.0, 1.0]  # Predicted position from detection
-        self.actual_person_position = [0.0, 0.0, 1.0]   # True position from Gazebo actor
+        self.current_person_position = None  # Predicted position provided by NMPC
+        self.actual_person_position = None   # True position from Gazebo actor
+        self.person_estimate_available = False
         
         # Camera parameters (approximate)
         self.image_width = 640
@@ -58,73 +61,17 @@ class VisualizationNode(Node):
     def detection_callback(self, msg):
         """Process person detections and create position markers"""
         self.latest_person_detections = msg.detections
-        
-        # Create person position markers - only show predicted position
-        marker_array = MarkerArray()
-        
-        if msg.detections:
-            # Take the first detection for simplicity
-            detection = msg.detections[0]
-            
-            # Create predicted person position marker
-            marker = Marker()
-            marker.header.frame_id = "world"
-            marker.header.stamp = self.get_clock().now().to_msg()
-            marker.ns = "person_predicted"
-            marker.id = 0
-            marker.type = Marker.SPHERE
-            marker.action = Marker.ADD
-            
-            # Estimate 3D position from 2D detection using drone position and camera parameters
-            center_x = (detection.xmin + detection.xmax) / 2.0
-            center_y = (detection.ymin + detection.ymax) / 2.0
-            
-            # Convert image coordinates to world coordinates using camera model
-            # Assume camera is looking down from drone position
-            drone_x, drone_y, drone_z = self.current_drone_position
-            
-            # Calculate the ground projection based on camera FOV
-            # Horizontal angle from image center
-            pixel_offset_x = center_x - (self.image_width / 2.0)
-            pixel_offset_y = center_y - (self.image_height / 2.0)
-            
-            # Convert pixel offset to angle
-            angle_x = (pixel_offset_x / (self.image_width / 2.0)) * (self.camera_fov_horizontal / 2.0)
-            angle_y = (pixel_offset_y / (self.image_height / 2.0)) * (self.camera_fov_horizontal / 2.0 * 0.75)  # 4:3 aspect ratio
-            
-            # Project to ground plane (assuming ground at z=0)
-            ground_distance = abs(drone_z - 1.0)  # Height above person (assume person height 1m)
-            
-            world_x = drone_x + ground_distance * math.tan(angle_x)
-            world_y = drone_y + ground_distance * math.tan(angle_y)
-            world_z = 1.0  # Person height
-            
-            # Update current person position with some smoothing
-            alpha = 0.7  # Smoothing factor
-            self.current_person_position[0] = alpha * world_x + (1 - alpha) * self.current_person_position[0]
-            self.current_person_position[1] = alpha * world_y + (1 - alpha) * self.current_person_position[1]
-            self.current_person_position[2] = world_z
-            
-            # Set marker position (PREDICTED - RED)
-            marker.pose.position.x = world_x
-            marker.pose.position.y = world_y
-            marker.pose.position.z = world_z
-            marker.pose.orientation.w = 1.0
-            
-            # Set marker properties - RED for predicted
-            marker.scale.x = 0.6
-            marker.scale.y = 0.6
-            marker.scale.z = 0.6
-            marker.color.r = 1.0
-            marker.color.g = 0.0
-            marker.color.b = 0.0
-            marker.color.a = 0.8
-            
-            marker_array.markers.append(marker)
-        
-        marker_array.markers.append(self._create_actual_person_marker())
-        
-        self.person_marker_pub.publish(marker_array)
+        self._publish_person_markers()
+
+    def person_estimate_callback(self, msg: PoseStamped):
+        """Receive NMPC-estimated person position in world frame."""
+        self.current_person_position = [
+            msg.pose.position.x,
+            msg.pose.position.y,
+            msg.pose.position.z
+        ]
+        self.person_estimate_available = True
+        self._publish_person_markers()
 
     def odometry_callback(self, msg):
         """Update drone path with current position"""
@@ -161,9 +108,7 @@ class VisualizationNode(Node):
             pose.position.z
         ]
         self.get_logger().info(f'Updated actor position from Gazebo: x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
-        marker_array = MarkerArray()
-        marker_array.markers.append(self._create_actual_person_marker())
-        self.person_marker_pub.publish(marker_array)
+        self._publish_person_markers()
     
     def gazebo_poses_callback(self, msg):
         """Update actual person position from Gazebo all poses topic"""
@@ -185,10 +130,26 @@ class VisualizationNode(Node):
                     ]
                     self.get_logger().debug(f'Updated person position from all poses (entity {i}): x={pose.position.x:.2f}, y={pose.position.y:.2f}, z={pose.position.z:.2f}')
                     found_person = True
+                    self._publish_person_markers()
                     break
 
             if not found_person:
                 self.get_logger().debug('No person found in Gazebo poses')
+
+    def _publish_person_markers(self):
+        """Publish markers for predicted (NMPC) and actual person positions."""
+        marker_array = MarkerArray()
+
+        predicted_marker = self._create_predicted_person_marker()
+        if predicted_marker is not None:
+            marker_array.markers.append(predicted_marker)
+
+        actual_marker = self._create_actual_person_marker()
+        if actual_marker is not None:
+            marker_array.markers.append(actual_marker)
+
+        if marker_array.markers:
+            self.person_marker_pub.publish(marker_array)
 
     def publish_trajectory(self):
         """Publish desired circular trajectory around person"""
@@ -196,6 +157,8 @@ class VisualizationNode(Node):
         
         # Create circular trajectory markers
         num_points = 32
+        if self.current_person_position is None:
+            return
         person_x, person_y, person_z = self.current_person_position
         
         # Create trajectory circle
@@ -291,7 +254,37 @@ class VisualizationNode(Node):
 
         self.drone_marker_pub.publish(marker_array)
 
+    def _create_predicted_person_marker(self):
+        if not self.person_estimate_available or self.current_person_position is None:
+            return None
+
+        marker = Marker()
+        marker.header.frame_id = "world"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.ns = "person_predicted"
+        marker.id = 0
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+
+        marker.pose.position.x = float(self.current_person_position[0])
+        marker.pose.position.y = float(self.current_person_position[1])
+        marker.pose.position.z = float(self.current_person_position[2])
+        marker.pose.orientation.w = 1.0
+
+        marker.scale.x = 0.6
+        marker.scale.y = 0.6
+        marker.scale.z = 0.6
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 0.0
+        marker.color.a = 0.8
+
+        return marker
+
     def _create_actual_person_marker(self) -> Marker:
+        if self.actual_person_position is None:
+            return None
+
         marker = Marker()
         marker.header.frame_id = "world"
         marker.header.stamp = self.get_clock().now().to_msg()
@@ -300,9 +293,9 @@ class VisualizationNode(Node):
         marker.type = Marker.CYLINDER
         marker.action = Marker.ADD
 
-        marker.pose.position.x = self.actual_person_position[0]
-        marker.pose.position.y = self.actual_person_position[1]
-        marker.pose.position.z = self.actual_person_position[2]
+        marker.pose.position.x = float(self.actual_person_position[0])
+        marker.pose.position.y = float(self.actual_person_position[1])
+        marker.pose.position.z = float(self.actual_person_position[2])
         marker.pose.orientation.w = 1.0
 
         marker.scale.x = 0.4

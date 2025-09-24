@@ -7,6 +7,8 @@ Adapted for ROS2 Jazzy and Python 3.12
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
+from rclpy.duration import Duration
+from rclpy.time import Time
 import numpy as np
 import math
 from typing import Optional
@@ -17,7 +19,6 @@ from tf2_ros import TransformException
 # ROS2 message types
 from geometry_msgs.msg import Twist, PoseStamped, Vector3Stamped, TwistStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Image
 from std_msgs.msg import Header, Float64MultiArray, Bool
 from visualization_msgs.msg import Marker, MarkerArray
 from neural_network_msgs.msg import NeuralNetworkDetectionArray
@@ -70,23 +71,30 @@ class NMPCTrackerNode(Node):
         """Initialize ROS2 parameters"""
         # Declare parameters with default values
         self.declare_parameter('control_frequency', 10.0)
-        self.declare_parameter('person_timeout', 2.0)
+        self.declare_parameter('person_timeout', 10.0)
         self.declare_parameter('enable_visualization', True)
         self.declare_parameter('drone_frame', 'X3/base_link')
         self.declare_parameter('world_frame', 'world')
-        self.declare_parameter('camera_frame', 'machine_1_camera_link')
+        self.declare_parameter('camera_frame', 'X3/camera_link')
+        self.declare_parameter('camera_optical_frame', 'X3/camera_rgb_optical_frame')
         # Align with projection_model output topic started in the integration script
         self.declare_parameter('projected_detection_topic', '/person_detections/world_frame')
-        self.declare_parameter('use_actor_groundtruth', True)
-        self.declare_parameter('actor_pose_topic', '/actor/walking_person/pose')
+        self.declare_parameter('detection_topic', '/person_detections')
+        self.declare_parameter('detection_score_threshold', 0.5)
+        self.declare_parameter('camera_image_width', 640)
+        self.declare_parameter('camera_image_height', 480)
+        self.declare_parameter('camera_fov_horizontal', math.radians(80.0))
+        self.declare_parameter('camera_fov_vertical', math.radians(60.0))
+        self.declare_parameter('person_anchor_height', 1.6)
         self.declare_parameter('takeoff_altitude', 2.5)
         self.declare_parameter('takeoff_ascent_rate', 1.0)
-        self.declare_parameter('takeoff_hold_duration', 10.0)
-        self.declare_parameter('lost_target_hold_duration', 10.0)
+        self.declare_parameter('takeoff_hold_duration', 20.0)
+        self.declare_parameter('lost_target_hold_duration', 20.0)
         self.declare_parameter('altitude_tolerance', 0.05)
-        self.declare_parameter('search_yaw_rate', 0.15)
+        self.declare_parameter('search_yaw_rate', 0.01)
         self.declare_parameter('tracking_phase_offset', 0.0)
         self.declare_parameter('tracking_height_offset', nmpc_config.TRACKING_HEIGHT_OFFSET)
+        self.declare_parameter('person_position_filter_alpha', nmpc_config.PERSON_POSITION_FILTER_ALPHA)
         # Get parameter values
         self.control_frequency = self.get_parameter('control_frequency').value
         self.person_timeout = self.get_parameter('person_timeout').value
@@ -94,9 +102,15 @@ class NMPCTrackerNode(Node):
         self.drone_frame = self.get_parameter('drone_frame').value
         self.world_frame = self.get_parameter('world_frame').value
         self.camera_frame = self.get_parameter('camera_frame').value
+        self.camera_optical_frame = self.get_parameter('camera_optical_frame').value
         self.projected_detection_topic = self.get_parameter('projected_detection_topic').value
-        self.use_actor_groundtruth = self.get_parameter('use_actor_groundtruth').value
-        self.actor_pose_topic = self.get_parameter('actor_pose_topic').value
+        self.detection_topic = self.get_parameter('detection_topic').value
+        self.detection_score_threshold = float(self.get_parameter('detection_score_threshold').value)
+        self.camera_image_width = int(self.get_parameter('camera_image_width').value)
+        self.camera_image_height = int(self.get_parameter('camera_image_height').value)
+        self.camera_fov_horizontal = float(self.get_parameter('camera_fov_horizontal').value)
+        self.camera_fov_vertical = float(self.get_parameter('camera_fov_vertical').value)
+        self.person_anchor_height = float(self.get_parameter('person_anchor_height').value)
         self.takeoff_altitude = self.get_parameter('takeoff_altitude').value
         self.takeoff_ascent_rate = self.get_parameter('takeoff_ascent_rate').value
         self.takeoff_hold_duration = self.get_parameter('takeoff_hold_duration').value
@@ -105,7 +119,13 @@ class NMPCTrackerNode(Node):
         self.search_yaw_rate = self.get_parameter('search_yaw_rate').value
         self.tracking_phase_offset = self.get_parameter('tracking_phase_offset').value
         self.tracking_height_offset = self.get_parameter('tracking_height_offset').value
+        self.person_position_filter_alpha = float(self.get_parameter('person_position_filter_alpha').value)
         self.controller.set_tracking_height_offset(self.tracking_height_offset)
+        self.fixed_tracking_altitude = nmpc_config.TRACKING_FIXED_ALTITUDE
+        self.controller.set_fixed_altitude(self.fixed_tracking_altitude)
+
+        self._filtered_person_position = None
+        self._pending_phase_init = None
 
         self.get_logger().info(f"Control frequency: {self.control_frequency} Hz")
         self.get_logger().info(f"Person timeout: {self.person_timeout} seconds")
@@ -166,7 +186,14 @@ class NMPCTrackerNode(Node):
             nmpc_config.TOPIC_STATUS,
             control_qos
         )
-        
+
+        self.person_estimate_pub = self.create_publisher(
+            PoseStamped,
+            '/nmpc/person_estimate',
+            control_qos
+        )
+        self.get_logger().info("Person estimate publisher initialized on /nmpc/person_estimate")
+
         # Visualization publishers
         if self.enable_visualization:
             self.trajectory_pub = self.create_publisher(
@@ -197,11 +224,24 @@ class NMPCTrackerNode(Node):
         )
         
         # Person detection subscriber (using projected detections from projection_model)
+        detection_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+
         self.detection_sub = self.create_subscription(
             PoseWithCovarianceStamped,
             self.projected_detection_topic,
             self.projected_detection_callback,
-            sensor_qos
+            detection_qos
+        )
+
+        self.detection_array_sub = self.create_subscription(
+            NeuralNetworkDetectionArray,
+            self.detection_topic,
+            self.detection_array_callback,
+            detection_qos
         )
 
         # Control enable/disable subscriber
@@ -211,17 +251,6 @@ class NMPCTrackerNode(Node):
             self.enable_callback,
             sensor_qos  # Use sensor_qos for consistency
         )
-
-        if self.use_actor_groundtruth:
-            self.actor_pose_sub = self.create_subscription(
-                PoseStamped,
-                self.actor_pose_topic,
-                self.actor_pose_callback,
-                sensor_qos
-            )
-            self.get_logger().info(
-                f"Actor ground-truth tracking enabled via {self.actor_pose_topic}"
-            )
 
         self.get_logger().info("Subscribers initialized")
     
@@ -287,45 +316,63 @@ class NMPCTrackerNode(Node):
             self.get_logger().error(f"Error processing drone state: {e}")
     
     def projected_detection_callback(self, msg: PoseWithCovarianceStamped):
-        """Process projected person detection messages from projection_model"""
+        """Process projected person detection messages from projection_model."""
         try:
             current_time = self.get_clock().now().nanoseconds / 1e9
-            
+
             # Extract person position from projected detection
             person_position = np.array([
                 msg.pose.pose.position.x,
                 msg.pose.pose.position.y,
                 msg.pose.pose.position.z
             ])
-            
+
             # Estimate velocity (simple finite difference)
-            person_velocity = self._estimate_person_velocity(person_position, current_time)
+            filtered_position = self._filter_person_position(person_position)
+            person_velocity = self._estimate_person_velocity(filtered_position, current_time)
 
             # Update controller
-            self.controller.set_person_detection(person_position, person_velocity)
-            self._handle_person_detection(person_position, person_velocity)
+            self.controller.set_person_detection(filtered_position, person_velocity)
+            self._handle_person_detection(filtered_position, person_velocity)
 
         except Exception as e:
             self.get_logger().error(f"Error processing projected person detection: {e}")
 
-    def actor_pose_callback(self, msg: PoseStamped):
-        """Use Gazebo actor ground-truth pose as person detection"""
-        try:
-            current_time = self.get_clock().now().nanoseconds / 1e9
-            person_position = np.array([
-                msg.pose.position.x,
-                msg.pose.position.y,
-                msg.pose.position.z
-            ])
+    def detection_array_callback(self, msg: NeuralNetworkDetectionArray):
+        """Fallback projection when world-frame detections are not available."""
+        detection_count = len(msg.detections)
+        if detection_count == 0:
+            return
+        self.get_logger().debug(f"Received {detection_count} raw detections")
 
-            person_velocity = self._estimate_person_velocity(person_position, current_time)
+        best_detection = max(msg.detections, key=lambda det: det.detection_score)
+        if best_detection.detection_score < self.detection_score_threshold:
+            self.get_logger().debug(
+                f"Detection score {best_detection.detection_score:.2f} below threshold {self.detection_score_threshold:.2f}"
+            )
+            return
 
-            self.controller.set_person_detection(person_position, person_velocity)
-            self._handle_person_detection(person_position, person_velocity)
+        person_position = self._project_detection_to_world(best_detection, msg.header)
+        if person_position is None:
+            self.get_logger().debug("Unable to project detection to world frame")
+            return
 
-        except Exception as e:
-            self.get_logger().error(f"Error processing actor pose: {e}")
+        timestamp = self._stamp_to_float(msg.header.stamp)
+        filtered_position = self._filter_person_position(person_position)
+        person_velocity = self._estimate_person_velocity(filtered_position, timestamp)
+
+        self.controller.set_person_detection(filtered_position, person_velocity)
+        self._handle_person_detection(filtered_position, person_velocity)
     
+    def _filter_person_position(self, position: np.ndarray) -> np.ndarray:
+        if self._filtered_person_position is None:
+            self._filtered_person_position = position.copy()
+        else:
+            alpha = float(np.clip(self.person_position_filter_alpha, 0.0, 1.0))
+            self._filtered_person_position = (alpha * position +
+                (1.0 - alpha) * self._filtered_person_position)
+        return self._filtered_person_position.copy()
+
     def _estimate_person_velocity(self, position: np.ndarray, timestamp: float) -> np.ndarray:
         """Estimate person velocity using finite differences"""
         # Simple velocity estimation - in practice, you might use a Kalman filter
@@ -348,6 +395,147 @@ class NMPCTrackerNode(Node):
         self._last_person_time = timestamp
         
         return velocity
+
+    def _project_detection_to_world(self, detection, header: Header) -> Optional[np.ndarray]:
+        """Transform a 2D detection into a 3D world point using TF and camera intrinsics."""
+        if not self.drone_state_received:
+            return None
+
+        try:
+            lookup_time = Time.from_msg(header.stamp)
+        except Exception:
+            lookup_time = self.get_clock().now()
+
+        frame_candidates = []
+        frame_id = header.frame_id or ""
+        if frame_id:
+            frame_candidates.append(frame_id)
+            if not frame_id.endswith('_optical_frame'):
+                frame_candidates.append(frame_id + '_optical_frame')
+
+        frame_candidates.extend([
+            self.camera_optical_frame,
+            self.camera_frame
+        ])
+
+        transform = None
+        last_error = None
+        for candidate in frame_candidates:
+            try:
+                transform = self.tf_buffer.lookup_transform(
+                    self.world_frame,
+                    candidate,
+                    lookup_time,
+                    timeout=Duration(seconds=0.2)
+                )
+                if transform:
+                    break
+            except TransformException as exc:
+                last_error = exc
+                continue
+
+        if transform is None:
+            if last_error is not None:
+                self.get_logger().warn(
+                    f"TF lookup failed for detection projection (frames={frame_candidates}): {last_error}"
+                )
+            else:
+                self.get_logger().warn(
+                    f"TF lookup failed for detection projection (frames={frame_candidates})"
+                )
+            return None
+
+        width = max(1, self.camera_image_width)
+        height = max(1, self.camera_image_height)
+        fx = width / (2.0 * math.tan(self.camera_fov_horizontal / 2.0))
+        fy = height / (2.0 * math.tan(self.camera_fov_vertical / 2.0))
+        cx = width / 2.0
+        cy = height / 2.0
+
+        xmin = detection.xmin
+        xmax = detection.xmax
+        ymin = detection.ymin
+        ymax = detection.ymax
+
+        # Support detectors that publish normalized bounding boxes in [0, 1]
+        if max(abs(xmin), abs(xmax), abs(ymin), abs(ymax)) <= 1.5:
+            xmin *= width
+            xmax *= width
+            ymin *= height
+            ymax *= height
+
+        center_x = 0.5 * (xmin + xmax)
+        center_y = 0.5 * (ymin + ymax)
+
+        x_norm = (center_x - cx) / fx
+        y_norm = (center_y - cy) / fy
+
+        ray_cam = np.array([x_norm, y_norm, 1.0], dtype=np.float64)
+        ray_cam_norm = np.linalg.norm(ray_cam)
+        if ray_cam_norm < 1e-6:
+            return None
+        ray_cam /= ray_cam_norm
+
+        rotation = self._quaternion_to_matrix(
+            transform.transform.rotation.x,
+            transform.transform.rotation.y,
+            transform.transform.rotation.z,
+            transform.transform.rotation.w
+        )
+        ray_world = rotation @ ray_cam
+        ray_world_norm = np.linalg.norm(ray_world)
+        if ray_world_norm < 1e-6:
+            self.get_logger().warn("Projected ray has near-zero norm after rotation")
+            return None
+        ray_world /= ray_world_norm
+
+        if abs(ray_world[2]) < 1e-6:
+            self.get_logger().warn('Detection ray parallel to ground plane')
+            return None
+
+        camera_position = np.array([
+            transform.transform.translation.x,
+            transform.transform.translation.y,
+            transform.transform.translation.z
+        ], dtype=np.float64)
+
+        anchor_height = self.person_anchor_height
+        t = (anchor_height - camera_position[2]) / ray_world[2]
+        if t <= 0.0:
+            self.get_logger().warn(f"Computed intersection parameter t={t:.3f} <= 0; skipping detection")
+            return None
+
+        world_point = camera_position + t * ray_world
+        world_point[2] = anchor_height
+        return world_point
+
+    def _stamp_to_float(self, stamp) -> float:
+        return float(stamp.sec) + float(stamp.nanosec) * 1e-9
+
+    def _quaternion_to_matrix(self, x: float, y: float, z: float, w: float) -> np.ndarray:
+        norm = math.sqrt(x * x + y * y + z * z + w * w)
+        if norm == 0.0:
+            return np.eye(3)
+        x /= norm
+        y /= norm
+        z /= norm
+        w /= norm
+
+        xx = x * x
+        yy = y * y
+        zz = z * z
+        xy = x * y
+        xz = x * z
+        yz = y * z
+        wx = w * x
+        wy = w * y
+        wz = w * z
+
+        return np.array([
+            [1 - 2 * (yy + zz), 2 * (xy - wz), 2 * (xz + wy)],
+            [2 * (xy + wz), 1 - 2 * (xx + zz), 2 * (yz - wx)],
+            [2 * (xz - wy), 2 * (yz + wx), 1 - 2 * (xx + yy)]
+        ], dtype=np.float64)
     
     def _handle_person_detection(self, person_position: np.ndarray, person_velocity: np.ndarray):
         """Common logic when a person detection is received"""
@@ -358,7 +546,29 @@ class NMPCTrackerNode(Node):
         if first_detection:
             self.get_logger().info(f"✅ Person detected at {person_position}")
         if self.state != 'TRACK':
+            current_pos = self._get_current_position()
+            rel = person_position[:2] - current_pos[:2]
+            if np.linalg.norm(rel) > 1e-3:
+                self._pending_phase_init = math.atan2(rel[1], rel[0])
+            else:
+                self._pending_phase_init = self._get_current_yaw()
+        self._publish_person_estimate(person_position)
+        if self.state != 'TRACK':
             self._switch_state('TRACK')
+
+    def _publish_person_estimate(self, position: np.ndarray) -> None:
+        """Publish NMPC-estimated person position for downstream consumers."""
+        msg = PoseStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self.world_frame
+        msg.pose.position.x = float(position[0])
+        msg.pose.position.y = float(position[1])
+        msg.pose.position.z = float(position[2])
+        msg.pose.orientation.w = 1.0
+        self.person_estimate_pub.publish(msg)
+        self.get_logger().info(
+            f"Published person estimate at {position.tolist()}"
+        )
 
     def enable_callback(self, msg: Bool):
         """Handle control enable/disable commands"""
@@ -393,6 +603,8 @@ class NMPCTrackerNode(Node):
 
         if self.person_detected and current_time - self.last_person_detection_time > self.person_timeout:
             self.person_detected = False
+            self.controller.clear_detection()
+            self._filtered_person_position = None
             self.get_logger().warn("Person detection timeout - entering hold state")
             if self.state == 'TRACK':
                 self._enter_lost_hold()
@@ -426,7 +638,46 @@ class NMPCTrackerNode(Node):
 
         # Fallback: ensure we always have a valid control mode
         self._switch_state('SEARCH')
-    
+
+    def _perform_tracking(self):
+        """Run NMPC optimization and push the resulting commands downstream."""
+        if not self.person_detected:
+            # 在TRACK模式下若丢失目标，立即切换由上层逻辑处理
+            self.get_logger().warn('TRACK模式下未检测到目标，忽略跟踪命令')
+            return
+
+        try:
+            control, info = self.controller.optimize()
+        except Exception as exc:  # 捕捉优化失败，避免节点崩溃
+            self.get_logger().error(f'NMPC优化失败: {exc}')
+            self._enter_lost_hold()
+            return
+
+        self._send_tracking_commands(control)
+
+        if self.enable_visualization and info:
+            self._publish_visualization(info)
+
+    def _send_lost_hold_command(self):
+        """在目标丢失时保持当前位置并维持最后的航向。"""
+        if self.last_known_position is None:
+            hold_position = self._get_current_position().copy()
+        else:
+            hold_position = self.last_known_position.copy()
+
+        if np.isnan(hold_position).any():
+            hold_position = self._get_current_position().copy()
+
+        # 确保高度至少保持在起飞高度附近，防止意外下降
+        target_altitude = self.takeoff_target_altitude or self.takeoff_altitude
+        if target_altitude is not None:
+            hold_position[2] = float(target_altitude)
+
+        yaw = self.last_tracking_yaw if self.last_tracking_yaw is not None else self._get_current_yaw()
+
+        self._publish_waypoint(hold_position, source='LOST_HOLD', yaw=yaw)
+        self._publish_attitude(yaw)
+
     def _send_tracking_commands(self, control: np.ndarray):
         """Send tracking commands to low-level controllers"""
         # Extract target position from controller
@@ -609,11 +860,21 @@ class NMPCTrackerNode(Node):
         if new_state == 'SEARCH':
             current_position = self._get_current_position()
             self.search_reference_position = current_position.copy()
+            self.person_detected = False
+            self.controller.clear_detection()
+            self._filtered_person_position = None
         else:
             self.search_reference_position = None
         if new_state == 'TRACK':
-            self.controller.reset_phase(self.tracking_phase_offset)
+            if self._pending_phase_init is not None:
+                phase = self._pending_phase_init + self.tracking_phase_offset
+                self._pending_phase_init = None
+            else:
+                phase = self.tracking_phase_offset
+            self.controller.reset_phase(phase)
             self.controller.set_tracking_height_offset(self.tracking_height_offset)
+            self.fixed_tracking_altitude = nmpc_config.TRACKING_FIXED_ALTITUDE
+            self.controller.set_fixed_altitude(self.fixed_tracking_altitude)
             self.last_tracking_yaw = self._get_current_yaw()
         if new_state == 'LOST_HOLD' and self.last_known_position is None:
             self.last_known_position = self._get_current_position().copy()

@@ -80,7 +80,11 @@ class DroneNMPCController:
         self.optimization_time = 0.0
         self.iterations_used = 0
         self.cost_value = 0.0
-        
+
+        # Internal smoothing state
+        self._last_target_position = None
+        self._last_target_velocity = None
+
         # Initialize solver parameters
         self._init_solver_parameters()
     
@@ -136,8 +140,11 @@ class DroneNMPCController:
         
         # Desired phase evolution - slowly orbit around the person
         person_speed = np.linalg.norm(self.person_velocity[:2])
-        base_angular_velocity = 0.5  # rad/s
-        adaptive_angular_velocity = base_angular_velocity + 0.3 * person_speed
+        base_angular_velocity = self.config.BASE_TRACKING_ANGULAR_VELOCITY
+        adaptive_angular_velocity = base_angular_velocity + \
+            self.config.TRACKING_SPEED_GAIN * person_speed
+        adaptive_angular_velocity = min(adaptive_angular_velocity,
+                                        self.config.MAX_TRACKING_ANGULAR_VELOCITY)
 
         dt = self.config.TIMESTEP
         self._desired_phase += adaptive_angular_velocity * dt
@@ -146,9 +153,14 @@ class DroneNMPCController:
         radius = self.config.OPTIMAL_TRACKING_DISTANCE
         target_x = person_pos[0] + radius * math.cos(self._desired_phase)
         target_y = person_pos[1] + radius * math.sin(self._desired_phase)
-        target_z = person_pos[2] + self.tracking_height_offset
-        
-        self.target_position = np.array([target_x, target_y, target_z])
+        target_z = self.config.TRACKING_FIXED_ALTITUDE
+
+        new_target = np.array([target_x, target_y, target_z])
+        if self._last_target_position is not None:
+            smoothing = np.clip(self.config.TARGET_POSITION_SMOOTHING, 0.0, 0.99)
+            new_target = smoothing * new_target + (1.0 - smoothing) * self._last_target_position
+        self.target_position = new_target
+        self._last_target_position = new_target.copy()
         
         # Calculate target velocity for smooth circular motion
         # Tangential velocity = radius * angular_velocity
@@ -156,11 +168,17 @@ class DroneNMPCController:
         tangent_x = -math.sin(self._desired_phase) * tangential_speed
         tangent_y = math.cos(self._desired_phase) * tangential_speed
         
-        # Add person's velocity to follow the moving center
-        self.target_velocity = self.person_velocity.copy()
-        self.target_velocity[0] += tangent_x
-        self.target_velocity[1] += tangent_y
-        self.target_velocity[2] = 0.0  # No vertical tracking velocity
+        # Add person's velocity to follow the moving center (disabled for now)
+        new_velocity = np.zeros(3)
+        new_velocity[0] += tangent_x
+        new_velocity[1] += tangent_y
+        new_velocity[2] = 0.0  # No vertical tracking velocity
+
+        if self._last_target_velocity is not None:
+            smoothing = np.clip(self.config.TARGET_POSITION_SMOOTHING, 0.0, 0.99)
+            new_velocity = smoothing * new_velocity + (1.0 - smoothing) * self._last_target_velocity
+        self.target_velocity = new_velocity
+        self._last_target_velocity = new_velocity.copy()
         
         # Ensure drone always faces the person (yaw control)
         to_person = person_pos - np.array([target_x, target_y, target_z])
@@ -172,8 +190,17 @@ class DroneNMPCController:
     def reset_phase(self, phase: float):
         self._desired_phase = phase
 
+    def clear_detection(self):
+        self.person_detected = False
+        self._last_target_position = None
+        self._last_target_velocity = None
+        self.person_velocity = np.zeros(3)
+
     def set_tracking_height_offset(self, offset: float):
         self.tracking_height_offset = offset
+    
+    def set_fixed_altitude(self, altitude: float):
+        self.config.TRACKING_FIXED_ALTITUDE = altitude
     
     def drone_dynamics(self, state: State, control: np.ndarray) -> State:
         """Quadrotor dynamics model"""
