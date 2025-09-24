@@ -1,18 +1,30 @@
 #!/usr/bin/env python3
-"""
-Velocity Controller Plugin for Drone Low-Level Control
+"""Velocity Controller Plugin for Drone Low-Level Control"""
 
-This controller accepts velocity and angular velocity commands from other controllers
-and publishes final control commands to /X3/cmd_vel for Gazebo execution.
-"""
-
-import rclpy
-from rclpy.node import Node
-import numpy as np
+import logging
+from logging.handlers import RotatingFileHandler
 import math
+
+import numpy as np
+import rclpy
 from geometry_msgs.msg import Twist, TwistStamped, Vector3Stamped
 from nav_msgs.msg import Odometry
+from rclpy.node import Node
 from std_msgs.msg import Bool
+
+
+LOG_PATH = '/tmp/drone_low_level_controllers.log'
+
+
+def _init_file_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = RotatingFileHandler(LOG_PATH, maxBytes=5 * 1024 * 1024, backupCount=2)
+        handler.setFormatter(logging.Formatter('%(asctime)s [%(name)s] %(message)s'))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
 
 class VelocityController(Node):
     def __init__(self):
@@ -71,7 +83,11 @@ class VelocityController(Node):
         self.angular_velocity_command_active = False
         self.last_velocity_command_time = None
         self.last_angular_velocity_command_time = None
-        self.command_timeout = 0.5  # seconds
+        self.command_timeout = 2.0  # seconds - increased for stability
+
+        # File logger for external monitoring
+        self.file_logger = _init_file_logger('velocity_controller')
+        self._log_counter = 0
 
         # Publishers
         self.cmd_vel_pub = self.create_publisher(Twist, '/X3/cmd_vel', 10)
@@ -186,15 +202,26 @@ class VelocityController(Node):
         self.controller_active = msg.data
         if self.controller_active:
             self.get_logger().info('Velocity controller ENABLED')
+            self.file_logger.info('controller_enabled')
         else:
             self.get_logger().info('Velocity controller DISABLED')
             # Send zero command when disabled
             self._send_zero_command()
+            self.file_logger.info('controller_disabled -> zero cmd_vel')
 
     def _send_zero_command(self):
-        """Send zero velocity command to stop the drone"""
+        """Send zero velocity command while maintaining hover capability"""
         cmd = Twist()
+        # Keep XY velocities at zero for position hold
+        cmd.linear.x = 0.0
+        cmd.linear.y = 0.0
+        cmd.linear.z = 0.0  # Let Gazebo's internal hover control handle altitude
+        # Keep angular velocities at zero for attitude hold
+        cmd.angular.x = 0.0
+        cmd.angular.y = 0.0
+        cmd.angular.z = 0.0
         self.cmd_vel_pub.publish(cmd)
+        self.get_logger().debug("Sent zero velocity command (hover mode)")
 
     def _check_command_timeouts(self):
         """Check if commands have timed out and reset them if necessary"""
@@ -209,6 +236,7 @@ class VelocityController(Node):
                 self.target_velocity = np.zeros(3)
                 self.smoothed_velocity = np.zeros(3)
                 self.get_logger().debug('Velocity command timed out')
+                self.file_logger.info('velocity_cmd_timeout -> fail_safe_zero')
 
         # Check angular velocity command timeout
         if (self.angular_velocity_command_active and
@@ -219,6 +247,7 @@ class VelocityController(Node):
                 self.target_angular_velocity = np.zeros(3)
                 self.smoothed_angular_velocity = np.zeros(3)
                 self.get_logger().debug('Angular velocity command timed out')
+                self.file_logger.info('angular_velocity_cmd_timeout -> fail_safe_zero')
 
     def control_loop(self):
         """Main control loop for velocity control"""
@@ -283,6 +312,17 @@ class VelocityController(Node):
         cmd.angular.z = np.clip(cmd.angular.z, -self.max_angular_velocity_z, self.max_angular_velocity_z)
 
         self.cmd_vel_pub.publish(cmd)
+
+        self._log_counter += 1
+        if self._log_counter >= 5:
+            self.file_logger.info(
+                'velocity_ctrl cmd=[%.3f, %.3f, %.3f | %.3f, %.3f, %.3f] target_world=[%.3f, %.3f, %.3f] target_ang=[%.3f, %.3f, %.3f]',
+                cmd.linear.x, cmd.linear.y, cmd.linear.z,
+                cmd.angular.x, cmd.angular.y, cmd.angular.z,
+                self.smoothed_velocity[0], self.smoothed_velocity[1], self.smoothed_velocity[2],
+                self.smoothed_angular_velocity[0], self.smoothed_angular_velocity[1], self.smoothed_angular_velocity[2]
+            )
+            self._log_counter = 0
 
         # Debug logging (reduce frequency to avoid spam)
         if hasattr(self, '_debug_counter'):

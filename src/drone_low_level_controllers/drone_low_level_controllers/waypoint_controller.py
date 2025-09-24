@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
-"""
-Waypoint Controller Plugin for Drone Low-Level Control
+"""Waypoint Controller Plugin for Drone Low-Level Control"""
 
-This controller accepts waypoint commands from high-level controllers (like NMPC)
-and publishes position setpoints for the attitude controller.
-"""
+import logging
+from logging.handlers import RotatingFileHandler
 
-import rclpy
-from rclpy.node import Node
 import numpy as np
+import rclpy
 from geometry_msgs.msg import PoseStamped, TwistStamped, Vector3Stamped
 from nav_msgs.msg import Odometry
+from rclpy.node import Node
 from std_msgs.msg import Bool
+
+
+LOG_PATH = '/tmp/drone_low_level_controllers.log'
+
+
+def _init_file_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = RotatingFileHandler(LOG_PATH, maxBytes=5 * 1024 * 1024, backupCount=2)
+        handler.setFormatter(logging.Formatter('%(asctime)s [%(name)s] %(message)s'))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
 
 class WaypointController(Node):
     def __init__(self):
@@ -21,7 +33,7 @@ class WaypointController(Node):
         self.declare_parameter('control_frequency', 50.0)
         self.declare_parameter('position_tolerance', 0.2)  # meters
         self.declare_parameter('velocity_tolerance', 0.1)  # m/s
-        self.declare_parameter('waypoint_timeout', 0.5)    # seconds
+        self.declare_parameter('waypoint_timeout', 2.0)    # seconds - increased for stability
 
         # PID gains for position control (similar to PX4 v1.16.0)
         self.declare_parameter('kp_xy', 1.0)
@@ -57,12 +69,17 @@ class WaypointController(Node):
         self.current_velocity = None
         self.target_waypoint = None
         self.controller_active = False
+        self._last_waypoint_command = None
+        self._waypoint_reached = False
 
         # PID state
         self.position_error_integral = np.zeros(3)
         self.position_error_previous = np.zeros(3)
         self.last_control_time = None
         self.last_waypoint_time = None
+
+        # File logger for external monitoring
+        self.file_logger = _init_file_logger('waypoint_controller')
 
         # Publishers
         self.velocity_setpoint_pub = self.create_publisher(
@@ -88,18 +105,31 @@ class WaypointController(Node):
 
     def waypoint_callback(self, msg: PoseStamped):
         """Receive waypoint command from high-level controller"""
-        self.target_waypoint = np.array([
+        new_waypoint = np.array([
             msg.pose.position.x,
             msg.pose.position.y,
             msg.pose.position.z
         ])
+
+        is_new_target = True
+        if self._last_waypoint_command is not None:
+            # Treat very small numerical differences as the same waypoint
+            if np.linalg.norm(new_waypoint - self._last_waypoint_command) < 1e-3:
+                is_new_target = False
+
+        self.target_waypoint = new_waypoint
         self.last_waypoint_time = self.get_clock().now()
 
-        # Reset PID state for new waypoint
-        self.position_error_integral = np.zeros(3)
-        self.position_error_previous = np.zeros(3)
+        if is_new_target:
+            # Reset PID state only when the target actually changes
+            self.position_error_integral = np.zeros(3)
+            self.position_error_previous = np.zeros(3)
+            self.get_logger().info(f'New waypoint received: {self.target_waypoint}')
+            self._waypoint_reached = False
+        else:
+            self.get_logger().debug('Waypoint refreshed (no change)')
 
-        self.get_logger().info(f'New waypoint received: {self.target_waypoint}')
+        self._last_waypoint_command = new_waypoint.copy()
 
     def odometry_callback(self, msg: Odometry):
         """Update current drone state"""
@@ -120,6 +150,7 @@ class WaypointController(Node):
         self.controller_active = msg.data
         if self.controller_active:
             self.get_logger().info('Waypoint controller ENABLED')
+            self.file_logger.info('controller_enabled')
         else:
             self.get_logger().info('Waypoint controller DISABLED')
             self.target_waypoint = None
@@ -127,6 +158,8 @@ class WaypointController(Node):
             self.position_error_integral = np.zeros(3)
             self.position_error_previous = np.zeros(3)
             self.last_control_time = None
+            self._waypoint_reached = False
+            self.file_logger.info('controller_disabled -> hover command issued')
 
     def control_loop(self):
         """Main control loop for waypoint following"""
@@ -152,6 +185,8 @@ class WaypointController(Node):
             self.position_error_integral = np.zeros(3)
             self.position_error_previous = np.zeros(3)
             self.last_control_time = None
+            self.file_logger.info('fail_safe_hover -> no waypoint refresh for %.2fs', self.waypoint_timeout)
+            self._waypoint_reached = False
             return
 
         if self.current_velocity is None:
@@ -171,32 +206,52 @@ class WaypointController(Node):
         position_magnitude = np.linalg.norm(position_error)
         velocity_magnitude = np.linalg.norm(self.current_velocity) if self.current_velocity is not None else 0.0
 
-        if (position_magnitude < self.position_tolerance and
-            velocity_magnitude < self.velocity_tolerance):
-            # Waypoint reached
+        reached_now = (
+            position_magnitude < self.position_tolerance and
+            velocity_magnitude < self.velocity_tolerance
+        )
+
+        if reached_now and not self._waypoint_reached:
             waypoint_reached_msg = Bool()
             waypoint_reached_msg.data = True
             self.waypoint_reached_pub.publish(waypoint_reached_msg)
+        self._waypoint_reached = reached_now
 
-            # Stop motion
-            velocity_cmd = TwistStamped()
-            velocity_cmd.header.stamp = current_time.to_msg()
-            velocity_cmd.header.frame_id = 'world'
-            self.velocity_setpoint_pub.publish(velocity_cmd)
-            return
+        if reached_now:
+            position_error = np.clip(
+                position_error,
+                -self.position_tolerance,
+                self.position_tolerance
+            )
 
         # PID control
         # Integral term (with windup prevention)
         self.position_error_integral += position_error * dt
-        integral_deadband = np.array([0.01, 0.01, 0.01])
+
+        # Different integral management for XY vs Z
+        integral_deadband = np.array([0.01, 0.01, 0.005])  # Small deadband for Z
+        decay_factor_xy = 0.2
+        decay_factor_z = 0.1  # More conservative for Z direction
+
         for i in range(3):
-            if abs(position_error[i]) < integral_deadband[i]:
-                self.position_error_integral[i] = 0.0
+            if i < 2:  # XY directions - aggressive integral management
+                if abs(position_error[i]) < integral_deadband[i]:
+                    self.position_error_integral[i] *= decay_factor_xy
+            else:  # Z direction - conservative integral management
+                # Only apply deadband decay for very small errors (hovering precision)
+                if abs(position_error[i]) < integral_deadband[i]:
+                    self.position_error_integral[i] *= decay_factor_z
+
         # Anti-windup: reset integral if error flips sign
         for i in range(3):
-            if position_error[i] * self.position_error_previous[i] <= 0.0:
-                self.position_error_integral[i] = 0.0
-        max_integral = 5.0  # Prevent windup
+            if i < 2:  # XY directions - aggressive reset
+                if position_error[i] * self.position_error_previous[i] <= 0.0:
+                    self.position_error_integral[i] *= decay_factor_xy
+            else:  # Z direction - conservative reset to maintain altitude stability
+                # Only reset for significant error changes (>5cm) to avoid hover instability
+                if position_error[i] * self.position_error_previous[i] <= 0.0 and abs(position_error[i]) > 0.05:
+                    self.position_error_integral[i] *= decay_factor_z
+        max_integral = np.array([5.0, 5.0, 2.0])  # Prevent windup
         self.position_error_integral = np.clip(
             self.position_error_integral, -max_integral, max_integral)
 
@@ -228,6 +283,13 @@ class WaypointController(Node):
         velocity_cmd.twist.linear.z = velocity_command[2]
 
         self.velocity_setpoint_pub.publish(velocity_cmd)
+
+        self.file_logger.info(
+            'waypoint_ctrl vel_cmd=[%.3f, %.3f, %.3f] error=[%.3f, %.3f, %.3f] reached=%s',
+            velocity_command[0], velocity_command[1], velocity_command[2],
+            position_error[0], position_error[1], position_error[2],
+            reached_now
+        )
 
         # Update previous error
         self.position_error_previous = position_error.copy()

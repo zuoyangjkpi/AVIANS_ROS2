@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-"""
-Attitude Controller Plugin for Drone Low-Level Control
+"""Attitude Controller Plugin for Drone Low-Level Control"""
 
-This controller accepts attitude commands from high-level controllers
-and publishes attitude setpoints for the velocity controller.
-"""
-
-import rclpy
-from rclpy.node import Node
-import numpy as np
+import logging
+from logging.handlers import RotatingFileHandler
 import math
+
+import numpy as np
+import rclpy
 from geometry_msgs.msg import Vector3Stamped, TwistStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool
+from rclpy.node import Node
 from scipy.spatial.transform import Rotation
+from std_msgs.msg import Bool
+
+
+LOG_PATH = '/tmp/drone_low_level_controllers.log'
+
+
+def _init_file_logger(name: str) -> logging.Logger:
+    logger = logging.getLogger(name)
+    if not logger.handlers:
+        handler = RotatingFileHandler(LOG_PATH, maxBytes=5 * 1024 * 1024, backupCount=2)
+        handler.setFormatter(logging.Formatter('%(asctime)s [%(name)s] %(message)s'))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
 
 class AttitudeController(Node):
     def __init__(self):
@@ -74,6 +86,10 @@ class AttitudeController(Node):
         self.attitude_error_integral = np.zeros(3)
         self.attitude_error_previous = np.zeros(3)
         self.last_control_time = None
+
+        # File logger for external monitoring
+        self.file_logger = _init_file_logger('attitude_controller')
+        self._log_counter = 0
 
         # Publishers
         self.angular_velocity_setpoint_pub = self.create_publisher(
@@ -162,8 +178,10 @@ class AttitudeController(Node):
         self.controller_active = msg.data
         if self.controller_active:
             self.get_logger().info('Attitude controller ENABLED')
+            self.file_logger.info('controller_enabled')
         else:
             self.get_logger().info('Attitude controller DISABLED')
+            self.file_logger.info('controller_disabled -> zero angular rate')
 
     def normalize_angle(self, angle):
         """Normalize angle to [-pi, pi]"""
@@ -246,6 +264,15 @@ class AttitudeController(Node):
         angular_velocity_cmd.vector.z = angular_velocity_command[2]  # yaw rate
 
         self.angular_velocity_setpoint_pub.publish(angular_velocity_cmd)
+
+        self._log_counter += 1
+        if self._log_counter >= 5:
+            self.file_logger.info(
+                'attitude_ctrl ang_cmd=[%.3f, %.3f, %.3f] err=[%.3f, %.3f, %.3f]',
+                angular_velocity_command[0], angular_velocity_command[1], angular_velocity_command[2],
+                attitude_error[0], attitude_error[1], attitude_error[2]
+            )
+            self._log_counter = 0
 
         # Update previous error
         self.attitude_error_previous = attitude_error.copy()

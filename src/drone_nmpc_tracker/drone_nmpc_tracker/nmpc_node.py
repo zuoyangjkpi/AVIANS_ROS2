@@ -363,7 +363,11 @@ class NMPCTrackerNode(Node):
     def enable_callback(self, msg: Bool):
         """Handle control enable/disable commands"""
         self.control_enabled = msg.data
-        self.get_logger().info(f"Control {'enabled' if self.control_enabled else 'disabled'}")
+        current_mode = self.state if self.state is not None else "UNKNOWN"
+        if self.control_enabled:
+            self.get_logger().info(f"Control enabled, mode: {current_mode}")
+        else:
+            self.get_logger().info(f"Control disabled, mode: {current_mode}")
         
         # Enable/disable low-level controllers
         enable_msg = Bool()
@@ -438,7 +442,7 @@ class NMPCTrackerNode(Node):
         waypoint_msg.pose.orientation.w = 1.0
         
         self.waypoint_pub.publish(waypoint_msg)
-        
+
         # Calculate desired attitude (face the person)
         current_pos = self.controller.current_state.data[nmpc_config.STATE_X:nmpc_config.STATE_Z+1]
         person_pos = self.controller.person_position
@@ -457,6 +461,13 @@ class NMPCTrackerNode(Node):
         self.attitude_pub.publish(attitude_msg)
 
         self.last_tracking_yaw = desired_yaw
+        self._log_waypoint_command(
+            source="NMPC",
+            position=target_position,
+            velocity=self.controller.target_velocity,
+            yaw=desired_yaw,
+            control=control
+        )
 
     def _send_search_commands(self, current_time: float):
         if self.search_reference_position is None:
@@ -467,16 +478,17 @@ class NMPCTrackerNode(Node):
         else:
             target_altitude = self.takeoff_altitude
 
+        base_yaw = self.home_yaw if self.home_position is not None else 0.0
+        elapsed = max(0.0, current_time - self.state_enter_time)
+        yaw_command = base_yaw + self.search_yaw_rate * elapsed
+
         waypoint = np.array([
             self.search_reference_position[0],
             self.search_reference_position[1],
             target_altitude
         ])
-        self._publish_waypoint(waypoint)
+        self._publish_waypoint(waypoint, source="SEARCH", yaw=yaw_command)
 
-        base_yaw = self.home_yaw if self.home_position is not None else 0.0
-        elapsed = max(0.0, current_time - self.state_enter_time)
-        yaw_command = base_yaw + self.search_yaw_rate * elapsed
         self._publish_attitude(yaw_command)
 
     def _get_current_position(self) -> np.ndarray:
@@ -489,7 +501,15 @@ class NMPCTrackerNode(Node):
     def _now(self) -> float:
         return self.get_clock().now().nanoseconds / 1e9
 
-    def _publish_waypoint(self, position: np.ndarray):
+    def _publish_waypoint(
+        self,
+        position: np.ndarray,
+        *,
+        source: Optional[str] = None,
+        yaw: Optional[float] = None,
+        velocity: Optional[np.ndarray] = None,
+        control: Optional[np.ndarray] = None,
+    ) -> None:
         waypoint_msg = PoseStamped()
         waypoint_msg.header.stamp = self.get_clock().now().to_msg()
         waypoint_msg.header.frame_id = self.world_frame
@@ -498,6 +518,14 @@ class NMPCTrackerNode(Node):
         waypoint_msg.pose.position.z = float(position[2])
         waypoint_msg.pose.orientation.w = 1.0
         self.waypoint_pub.publish(waypoint_msg)
+        if source is not None:
+            self._log_waypoint_command(
+                source=source,
+                position=position,
+                velocity=velocity,
+                yaw=yaw,
+                control=control,
+            )
 
     def _publish_attitude(self, yaw: float, roll: float = 0.0, pitch: float = 0.0):
         attitude_msg = Vector3Stamped()
@@ -507,6 +535,33 @@ class NMPCTrackerNode(Node):
         attitude_msg.vector.y = float(pitch)
         attitude_msg.vector.z = float(yaw)
         self.attitude_pub.publish(attitude_msg)
+        if self.state is not None:
+            att_vector = [round(float(roll), 3), round(float(pitch), 3), round(float(yaw), 3)]
+            self.get_logger().info(
+                f"Attitude command [{self.state}]: rpy={att_vector}"
+            )
+
+    def _log_waypoint_command(
+        self,
+        *,
+        source: str,
+        position: np.ndarray,
+        velocity: Optional[np.ndarray] = None,
+        yaw: Optional[float] = None,
+        control: Optional[np.ndarray] = None,
+    ) -> None:
+        """Emit a structured log for outbound waypoint commands."""
+        pos_fmt = np.round(np.asarray(position), 3).tolist()
+        details = [f"pos={pos_fmt}"]
+
+        if velocity is not None:
+            vel_fmt = np.round(np.asarray(velocity), 3).tolist()
+            details.append(f"vel={vel_fmt}")
+        if control is not None:
+            control_fmt = np.round(np.asarray(control), 3).tolist()
+            details.append(f"control={control_fmt}")
+
+        self.get_logger().info(f"Waypoint command [{source}]: " + "; ".join(details))
 
     def _step_takeoff(self, current_time: float):
         if self.home_position is None or self.takeoff_target_altitude is None:
@@ -522,7 +577,7 @@ class NMPCTrackerNode(Node):
             self.home_position[1],
             target_altitude
         ])
-        self._publish_waypoint(waypoint)
+        self._publish_waypoint(waypoint, source="TAKEOFF")
         self._publish_attitude(self.home_yaw)
 
         current_altitude = self._get_current_position()[2]
