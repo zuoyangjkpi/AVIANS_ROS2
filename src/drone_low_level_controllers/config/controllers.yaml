@@ -9,12 +9,12 @@ waypoint_controller:
     waypoint_timeout: 1.0         # seconds before fail-safe hover engages
 
     # PID gains for position control (sharper response for search hold)
-    kp_xy: 3.4                   # Proportional gain for X,Y
+    kp_xy: 3.5                   # Proportional gain for X,Y
     ki_xy: 0.05                  # Integral gain for X,Y
-    kd_xy: 0.55                  # Derivative gain for X,Y
-    kp_z: 2.0                    # Proportional gain for Z
+    kd_xy: 0.5                  # Derivative gain for X,Y
+    kp_z: 2.5                    # Proportional gain for Z
     ki_z: 0.06                   # Integral gain for Z
-    kd_z: 0.95                   # Derivative gain for Z
+    kd_z: 1.0                   # Derivative gain for Z
 
     # Velocity limits
     max_velocity_xy: 4.0         # m/s for X,Y
@@ -55,9 +55,9 @@ velocity_controller:
     max_angular_velocity_z: 1.2  # rad/s (yaw rate)
 
     # Velocity PID gains (world frame)
-    kp_vx: 0.55
-    kp_vy: 0.55
-    kp_vz: 0.55
+    kp_vx: 0.7
+    kp_vy: 0.7
+    kp_vz: 0.7
 
     # Angular velocity proportional gains (body frame)
     kp_wx: 0.6

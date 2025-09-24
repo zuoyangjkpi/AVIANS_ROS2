@@ -71,7 +71,6 @@ class WaypointController(Node):
         self.controller_active = False
         self._last_waypoint_command = None
         self._waypoint_reached = False
-        self._needs_derivative_reset = True
 
         # PID state
         self.position_error_integral = np.zeros(3)
@@ -127,7 +126,6 @@ class WaypointController(Node):
             self.position_error_previous = np.zeros(3)
             self.get_logger().info(f'New waypoint received: {self.target_waypoint}')
             self._waypoint_reached = False
-            self._needs_derivative_reset = True
         else:
             self.get_logger().debug('Waypoint refreshed (no change)')
 
@@ -153,7 +151,6 @@ class WaypointController(Node):
         if self.controller_active:
             self.get_logger().info('Waypoint controller ENABLED')
             self.file_logger.info('controller_enabled')
-            self._needs_derivative_reset = True
         else:
             self.get_logger().info('Waypoint controller DISABLED')
             self.target_waypoint = None
@@ -162,7 +159,6 @@ class WaypointController(Node):
             self.position_error_previous = np.zeros(3)
             self.last_control_time = None
             self._waypoint_reached = False
-            self._needs_derivative_reset = True
             self.file_logger.info('controller_disabled -> hover command issued')
 
     def control_loop(self):
@@ -191,7 +187,6 @@ class WaypointController(Node):
             self.last_control_time = None
             self.file_logger.info('fail_safe_hover -> no waypoint refresh for %.2fs', self.waypoint_timeout)
             self._waypoint_reached = False
-            self._needs_derivative_reset = True
             return
 
         if self.current_velocity is None:
@@ -206,9 +201,6 @@ class WaypointController(Node):
 
         # Position error
         position_error = self.target_waypoint - self.current_pose
-
-        if self._needs_derivative_reset:
-            self.position_error_previous = position_error.copy()
 
         # Check if waypoint is reached
         position_magnitude = np.linalg.norm(position_error)
@@ -265,10 +257,7 @@ class WaypointController(Node):
 
         # Derivative term
         error_derivative = np.zeros(3)
-        if self._needs_derivative_reset:
-            error_derivative = np.zeros(3)
-            self._needs_derivative_reset = False
-        elif dt > 0:
+        if dt > 0:
             error_derivative = (position_error - self.position_error_previous) / dt
 
         # PID gains (different for xy and z)
