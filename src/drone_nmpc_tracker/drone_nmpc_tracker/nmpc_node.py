@@ -95,6 +95,7 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('tracking_phase_offset', 0.0)
         self.declare_parameter('tracking_height_offset', nmpc_config.TRACKING_HEIGHT_OFFSET)
         self.declare_parameter('person_position_filter_alpha', nmpc_config.PERSON_POSITION_FILTER_ALPHA)
+        self.declare_parameter('track_detection_confirmations', 3)
         # Get parameter values
         self.control_frequency = self.get_parameter('control_frequency').value
         self.person_timeout = self.get_parameter('person_timeout').value
@@ -123,8 +124,10 @@ class NMPCTrackerNode(Node):
         self.controller.set_tracking_height_offset(self.tracking_height_offset)
         self.fixed_tracking_altitude = nmpc_config.TRACKING_FIXED_ALTITUDE
         self.controller.set_fixed_altitude(self.fixed_tracking_altitude)
+        self.required_detection_confirmations = max(1, int(self.get_parameter('track_detection_confirmations').value))
 
         self._filtered_person_position = None
+        self._detection_streak = 0
         self._pending_phase_init = None
 
         self.get_logger().info(f"Control frequency: {self.control_frequency} Hz")
@@ -309,8 +312,14 @@ class NMPCTrackerNode(Node):
                 self.takeoff_target_altitude = max(self.takeoff_altitude, self.home_position[2])
                 self.last_tracking_yaw = self.home_yaw
             
-            # ✅ 添加调试信息
-            self.get_logger().info(f"Drone state updated: pos={position}, vel={velocity}")
+            # ✅ 添加调试信息 - 降低频率
+            if hasattr(self, '_debug_counter'):
+                self._debug_counter += 1
+            else:
+                self._debug_counter = 1
+
+            if self._debug_counter % 50 == 0:  # 每50次更新才打印一次
+                self.get_logger().info(f"Drone state: pos=[{position[0]:.2f}, {position[1]:.2f}, {position[2]:.2f}], vel=[{velocity[0]:.2f}, {velocity[1]:.2f}, {velocity[2]:.2f}]")
             
         except Exception as e:
             self.get_logger().error(f"Error processing drone state: {e}")
@@ -333,6 +342,7 @@ class NMPCTrackerNode(Node):
 
             # Update controller
             self.controller.set_person_detection(filtered_position, person_velocity)
+            self._detection_streak += 1
             self._handle_person_detection(filtered_position, person_velocity)
 
         except Exception as e:
@@ -362,6 +372,7 @@ class NMPCTrackerNode(Node):
         person_velocity = self._estimate_person_velocity(filtered_position, timestamp)
 
         self.controller.set_person_detection(filtered_position, person_velocity)
+        self._detection_streak += 1
         self._handle_person_detection(filtered_position, person_velocity)
     
     def _filter_person_position(self, position: np.ndarray) -> np.ndarray:
@@ -545,6 +556,7 @@ class NMPCTrackerNode(Node):
         self.last_person_detection_time = current_time
         if first_detection:
             self.get_logger().info(f"✅ Person detected at {person_position}")
+        # 计算并存储用于初始化的期望相位角
         if self.state != 'TRACK':
             current_pos = self._get_current_position()
             rel = person_position[:2] - current_pos[:2]
@@ -552,7 +564,15 @@ class NMPCTrackerNode(Node):
                 self._pending_phase_init = math.atan2(rel[1], rel[0])
             else:
                 self._pending_phase_init = self._get_current_yaw()
+        # 检查是否已确认足够次数的检测
+        if self._detection_streak < self.required_detection_confirmations:
+            self._publish_person_estimate(person_position)
+            self.person_detected = False
+            return
+
+        self.person_detected = True
         self._publish_person_estimate(person_position)
+        # 如果尚未处于跟踪状态，则切换到TRACK状态
         if self.state != 'TRACK':
             self._switch_state('TRACK')
 
@@ -605,6 +625,7 @@ class NMPCTrackerNode(Node):
             self.person_detected = False
             self.controller.clear_detection()
             self._filtered_person_position = None
+            self._detection_streak = 0
             self.get_logger().warn("Person detection timeout - entering hold state")
             if self.state == 'TRACK':
                 self._enter_lost_hold()
@@ -835,17 +856,23 @@ class NMPCTrackerNode(Node):
         if abs(current_altitude - self.takeoff_target_altitude) < self.altitude_tolerance:
             if self.takeoff_alt_reached_time is None:
                 self.takeoff_alt_reached_time = current_time
+            if self.person_detected and self._detection_streak >= self.required_detection_confirmations:
+                self._switch_state('TRACK')
+                return
             if not self.person_detected and (current_time - self.takeoff_alt_reached_time) >= self.takeoff_hold_duration:
                 self._switch_state('SEARCH')
         else:
             self.takeoff_alt_reached_time = None
 
-        if self.person_detected:
+        if self.person_detected and self._detection_streak >= self.required_detection_confirmations:
             self._switch_state('TRACK')
 
     def _enter_lost_hold(self):
         self.last_known_position = self._get_current_position().copy()
         self.last_tracking_yaw = self._get_current_yaw()
+        self._detection_streak = 0
+        self.controller.clear_detection()
+        self._filtered_person_position = None
         self._switch_state('LOST_HOLD')
 
     def _switch_state(self, new_state: str):
@@ -867,15 +894,28 @@ class NMPCTrackerNode(Node):
             self.search_reference_position = None
         if new_state == 'TRACK':
             if self._pending_phase_init is not None:
+                # 使用预先计算的方向作为初始相位
                 phase = self._pending_phase_init + self.tracking_phase_offset
                 self._pending_phase_init = None
             else:
-                phase = self.tracking_phase_offset
+                # 动态计算一个合理的初始相位
+                person_pos = self.controller.person_position
+                current_pos = self._get_current_position()
+                rel = person_pos[:2] - current_pos[:2]
+                if np.linalg.norm(rel) > 1e-3:
+                    # 设置为从无人机指向人的方向的反方向 (即从后方跟随)
+                    phase = math.atan2(rel[1], rel[0]) + math.pi
+                else:
+                    # 如果距离很近，则使用当前航向
+                    phase = self._get_current_yaw()
+            # 重置控制器的相位
             self.controller.reset_phase(phase)
+            # 应用高度偏移和固定高度设置
             self.controller.set_tracking_height_offset(self.tracking_height_offset)
             self.fixed_tracking_altitude = nmpc_config.TRACKING_FIXED_ALTITUDE
             self.controller.set_fixed_altitude(self.fixed_tracking_altitude)
-            self.last_tracking_yaw = self._get_current_yaw()
+            # 更新最后的跟踪航向
+            self.last_tracking_yaw = phase
         if new_state == 'LOST_HOLD' and self.last_known_position is None:
             self.last_known_position = self._get_current_position().copy()
         if new_state != 'LOST_HOLD':

@@ -25,7 +25,12 @@ class NMPCConfig:
         self.DRONE_MASS = 1.5  # kg
         self.DRONE_MAX_VELOCITY = 3.0  # m/s
         self.DRONE_MAX_ACCELERATION = 2.0  # m/s^2
-        self.DRONE_MAX_ANGULAR_VELOCITY = 1.0  # rad/s
+        self.DRONE_MAX_ANGULAR_VELOCITY = 1.5  # rad/s
+        
+        # Drone moment of inertia
+        self.DRONE_INERTIA_XX = 0.02  # kg*m^2
+        self.DRONE_INERTIA_YY = 0.02  # kg*m^2
+        self.DRONE_INERTIA_ZZ = 0.04  # kg*m^2
         
         # ========== State Vector Definition ==========
         # State: [x, y, z, vx, vy, vz, roll, pitch, yaw, wx, wy, wz]
@@ -47,19 +52,19 @@ class NMPCConfig:
         self.STATE_WZ = 11
         
         # ========== Cost Function Weights ==========
-        # Position tracking weights
-        self.W_POSITION = np.array([10.0, 10.0, 8.0])  # [x, y, z]
-        self.W_VELOCITY = np.array([2.0, 2.0, 2.0])    # [vx, vy, vz]
-        self.W_ATTITUDE = np.array([1.0, 1.0, 3.0])    # [roll, pitch, yaw]
-        self.W_ANGULAR_RATE = np.array([0.5, 0.5, 1.0]) # [wx, wy, wz]
-        
-        # Control effort weights
-        self.W_CONTROL = np.array([0.1, 0.5, 0.5, 0.3])  # [thrust, roll, pitch, yaw_rate]
-        
-        # Person tracking specific weights
-        self.W_TRACKING_DISTANCE = 5.0  # Weight for maintaining optimal tracking distance
-        self.W_CAMERA_ANGLE = 3.0       # Weight for keeping person in camera view
-        self.W_SMOOTH_TRACKING = 2.0    # Weight for smooth tracking motion
+        # Position tracking weights - reduced to prevent oscillation
+        self.W_POSITION = np.array([8.0, 8.0, 6.0])  # [x, y, z] - reduced to prevent aggressive tracking
+        self.W_VELOCITY = np.array([5.0, 5.0, 4.0])    # [vx, vy, vz] - increased for smoother velocity tracking
+        self.W_ATTITUDE = np.array([1.0, 1.0, 3.0])    # [roll, pitch, yaw] - reduced roll/pitch, moderate yaw
+        self.W_ANGULAR_RATE = np.array([2.0, 2.0, 1.5]) # [wx, wy, wz] - increased for stability
+
+        # Control effort weights - increased to penalize aggressive control
+        self.W_CONTROL = np.array([0.5, 2.0, 2.0, 1.0])  # [thrust, roll, pitch, yaw_rate] - higher penalty for attitude commands
+
+        # Person tracking specific weights - reduced to prevent oscillation
+        self.W_TRACKING_DISTANCE = 4.0  # Weight for maintaining optimal tracking distance - reduced for smoother tracking
+        self.W_CAMERA_ANGLE = 2.0       # Weight for keeping person in camera view - reduced to prevent aggressive yaw corrections
+        self.W_SMOOTH_TRACKING = 8.0    # Weight for smooth tracking motion - increased for much smoother tracking
         
         # ========== Constraints ==========
         # State constraints
@@ -93,21 +98,23 @@ class NMPCConfig:
         ])
         
         # ========== Person Tracking Parameters ==========
-        self.OPTIMAL_TRACKING_DISTANCE = 3.0  # Optimal distance to person (meters)
-        self.MIN_TRACKING_DISTANCE = 2.0      # Minimum safe distance
-        self.MAX_TRACKING_DISTANCE = 8.0      # Maximum tracking distance
-        self.TRACKING_HEIGHT_OFFSET = 1.5     # Height above person for tracking
-        self.TRACKING_FIXED_ALTITUDE = 2.5      # Fixed tracking altitude (m)
-        self.BASE_TRACKING_ANGULAR_VELOCITY = 0.25  # Base orbit rate (rad/s)
-        self.TRACKING_SPEED_GAIN = 0.15              # Gain from person speed to orbit rate
-        self.MAX_TRACKING_ANGULAR_VELOCITY = 0.6     # Cap orbit rate
-        self.TARGET_POSITION_SMOOTHING = 0.6         # 0=no smoothing, 1=full smoothing
-        self.PERSON_POSITION_FILTER_ALPHA = 0.6      # Smoothing for detected person position
+        # Optimized for X3 drone with 30° downward camera tilt
+        self.OPTIMAL_TRACKING_DISTANCE = 5.0  # Optimal distance for 30° tilt (meters)
+        self.MIN_TRACKING_DISTANCE = 3.0      # Minimum safe distance for tilted camera
+        self.MAX_TRACKING_DISTANCE = 12.0     # Extended max distance due to better visibility with tilt
+        self.TRACKING_HEIGHT_OFFSET = 1.5     # Increased height offset for better downward view
+        self.TRACKING_FIXED_ALTITUDE = 3.5    # Higher altitude to maximize 30° tilt coverage (m)
+        self.BASE_TRACKING_ANGULAR_VELOCITY = 0.08  # Base orbit rate (rad/s) - much reduced for stability
+        self.TRACKING_SPEED_GAIN = 0.05       # Gain from person speed to orbit rate - reduced for stability
+        self.MAX_TRACKING_ANGULAR_VELOCITY = 0.2    # Cap orbit rate - reduced for stability
+        self.TARGET_POSITION_SMOOTHING = 0.85       # 0=no smoothing, 1=full smoothing - increased for smoother tracking
+        self.PERSON_POSITION_FILTER_ALPHA = 0.8     # Smoothing for detected person position - increased for smoother tracking
         
-        # Camera parameters
-        self.CAMERA_FOV_HORIZONTAL = math.pi/3  # 60 degrees horizontal FOV
-        self.CAMERA_FOV_VERTICAL = math.pi/4    # 45 degrees vertical FOV
-        self.CAMERA_TILT_ANGLE = -math.pi/6     # Camera tilt down angle
+        # Camera parameters - updated for X3 drone configuration
+        self.CAMERA_FOV_HORIZONTAL = 1.2        # 68.75 degrees horizontal FOV (from model.sdf)
+        self.CAMERA_FOV_VERTICAL = 0.9          # Estimated 51.6 degrees vertical FOV
+        self.CAMERA_TILT_ANGLE = -0.5236        # 30 degrees down tilt (from model.sdf)
+        self.CAMERA_FORWARD_OFFSET = 0.2        # Camera 0.2m forward from drone center
         
         # ========== Environmental Parameters ==========
         self.GRAVITY = 9.81  # m/s^2
@@ -118,10 +125,10 @@ class NMPCConfig:
         self.WIND_TURBULENCE = 0.1  # Wind turbulence factor
         
         # ========== Solver Parameters ==========
-        self.MAX_ITERATIONS = 50
-        self.CONVERGENCE_TOLERANCE = 1e-4
-        self.STEP_SIZE = 0.01
-        self.REGULARIZATION = 1e-6
+        self.MAX_ITERATIONS = 20  # Reduced further for real-time performance
+        self.CONVERGENCE_TOLERANCE = 5e-3  # Relaxed for faster convergence and stability
+        self.STEP_SIZE = 0.02  # Reduced to prevent oscillations in optimization
+        self.REGULARIZATION = 1e-4  # Increased for better numerical stability
         
         # ========== ROS2 Topic Names ==========
         self.TOPIC_DRONE_STATE = '/X3/odometry'

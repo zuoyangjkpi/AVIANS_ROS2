@@ -136,9 +136,9 @@ class DroneNMPCController:
         if np.linalg.norm(relative_pos) > 0.1:  # Avoid singularity
             current_phase = math.atan2(relative_pos[1], relative_pos[0])
         else:
-            current_phase = 0.0
+            current_phase = self._desired_phase if hasattr(self, '_desired_phase') else 0.0
         
-        # Desired phase evolution - slowly orbit around the person
+        # Desired phase evolution - slowly orbit around the person with damping
         person_speed = np.linalg.norm(self.person_velocity[:2])
         base_angular_velocity = self.config.BASE_TRACKING_ANGULAR_VELOCITY
         adaptive_angular_velocity = base_angular_velocity + \
@@ -146,8 +146,27 @@ class DroneNMPCController:
         adaptive_angular_velocity = min(adaptive_angular_velocity,
                                         self.config.MAX_TRACKING_ANGULAR_VELOCITY)
 
+        # Add damping based on distance to target position to prevent oscillations
+        target_distance = np.linalg.norm(drone_pos[:2] - person_pos[:2])
+
+        # Enhanced damping for tilted camera tracking
+        if target_distance > self.config.OPTIMAL_TRACKING_DISTANCE:
+            # Stronger damping for X3's optimal tracking distance (5.0m)
+            damping_factor = max(0.2, 1.0 - (target_distance - self.config.OPTIMAL_TRACKING_DISTANCE) / 3.0)
+            adaptive_angular_velocity *= damping_factor
+
+        # Additional damping based on camera tilt compensation
+        # For 30° tilt, reduce angular velocity when person is very close to prevent oscillation
+        if target_distance < 4.0:  # Within close range for tilted camera
+            tilt_damping = 0.7 + 0.3 * (target_distance / 4.0)  # 70%-100% depending on distance
+            adaptive_angular_velocity *= tilt_damping
+
         dt = self.config.TIMESTEP
-        self._desired_phase += adaptive_angular_velocity * dt
+        if not hasattr(self, '_desired_phase'):
+            # Initialize phase when first detected
+            self._desired_phase = current_phase
+        else:
+            self._desired_phase += adaptive_angular_velocity * dt
 
         # Calculate target position on the circle
         radius = self.config.OPTIMAL_TRACKING_DISTANCE
@@ -240,16 +259,44 @@ class DroneNMPCController:
         
         state_dot[self.config.STATE_VX:self.config.STATE_VZ+1] = acc
         
-        # Attitude dynamics (simplified)
-        state_dot[self.config.STATE_ROLL] = omega[0]
-        state_dot[self.config.STATE_PITCH] = omega[1]
-        state_dot[self.config.STATE_YAW] = omega[2]
+        # Attitude dynamics (using proper rotational kinematics)
+        # Convert body rates to Euler angle rates
+        phi, theta, psi = att[0], att[1], att[2]
         
-        # Angular velocity dynamics (simplified PD control)
-        # 这里我们简化处理，直接使用控制输入作为角速度指令
-        state_dot[self.config.STATE_WX] = 5.0 * (roll_cmd - att[0])   # P控制系数5.0
-        state_dot[self.config.STATE_WY] = 5.0 * (pitch_cmd - att[1])  # P控制系数5.0
-        state_dot[self.config.STATE_WZ] = yaw_rate_cmd
+        # Avoid singularity at 90 degrees pitch
+        cos_theta = math.cos(theta)
+        tan_theta = math.tan(theta) if abs(cos_theta) > 1e-6 else 0.0
+        
+        p, q, r = omega[0], omega[1], omega[2]
+        
+        # Euler angle rates
+        phi_dot = p + q * math.sin(phi) * tan_theta + r * math.cos(phi) * tan_theta
+        theta_dot = q * math.cos(phi) - r * math.sin(phi)
+        psi_dot = q * math.sin(phi) / cos_theta + r * math.cos(phi) / cos_theta
+        
+        state_dot[self.config.STATE_ROLL] = phi_dot
+        state_dot[self.config.STATE_PITCH] = theta_dot
+        state_dot[self.config.STATE_YAW] = psi_dot
+        
+        # Angular velocity dynamics (PD control for angular rates)
+        # Simplified model with damping
+        Ixx = self.config.DRONE_INERTIA_XX  # kg*m^2 (approximate moment of inertia)
+        Iyy = self.config.DRONE_INERTIA_YY
+        Izz = self.config.DRONE_INERTIA_ZZ
+        
+        # Control inputs to moments (simplified)
+        tau_roll = 0.1 * (roll_cmd - att[0]) - 0.05 * omega[0]   # PD control
+        tau_pitch = 0.1 * (pitch_cmd - att[1]) - 0.05 * omega[1]  # PD control
+        tau_yaw = 0.1 * yaw_rate_cmd - 0.02 * omega[2]  # PD control for yaw rate
+        
+        # Euler's rotation equations
+        omega_dot = np.array([
+            (Iyy - Izz) / Ixx * omega[1] * omega[2] + tau_roll / Ixx,
+            (Izz - Ixx) / Iyy * omega[0] * omega[2] + tau_pitch / Iyy,
+            (Ixx - Iyy) / Izz * omega[0] * omega[1] + tau_yaw / Izz
+        ])
+        
+        state_dot[self.config.STATE_WX:self.config.STATE_WZ+1] = omega_dot
         
         return state_dot
     
@@ -341,6 +388,11 @@ class DroneNMPCController:
                 dot_product = np.dot(drone_facing, to_person_dir)
                 angle_error = math.acos(np.clip(dot_product, -1.0, 1.0))
                 cost += self.config.W_CAMERA_ANGLE * angle_error**2
+            
+            # Smooth tracking cost - penalize large changes in target position
+            if self._last_target_position is not None:
+                target_change = np.linalg.norm(self.target_position - self._last_target_position)
+                cost += self.config.W_SMOOTH_TRACKING * target_change**2
         
         return cost
     

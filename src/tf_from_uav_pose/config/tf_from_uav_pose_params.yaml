@@ -29,8 +29,11 @@ tf_from_uav_pose_ros2:
     throttleRate: 10.0
     
     # Camera static publishing configuration
+    # Updated to match X3 drone model: camera at [0.2, 0.0, 0.0] with 30° downward tilt
     cameraStaticPublish:
       publish: true
       topic: "/machine_1/camera/pose"
       pose_optical_topic: "/machine_1/camera/pose_optical"
-      TFParameters: [0.18, 0.0, -0.07, 0.0, -0.38, 0.0, 0.924]  # [x, y, z, qx, qy, qz, qw]
+      # Corrected parameters for X3: [x, y, z, qx, qy, qz, qw]
+      # Position: 0.2m forward from center, 30° downward tilt (q = [0, sin(15°), 0, cos(15°)])
+      TFParameters: [0.2, 0.0, 0.0, 0.0, 0.2588, 0.0, 0.9659]  # 30° pitch down = [0, sin(15°), 0, cos(15°)]
