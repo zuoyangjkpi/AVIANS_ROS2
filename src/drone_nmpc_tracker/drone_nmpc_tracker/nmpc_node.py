@@ -457,6 +457,24 @@ class NMPCTrackerNode(Node):
                     break
             except TransformException as exc:
                 last_error = exc
+                # 若因为时间外推失败，尝试使用最近可用的TF
+                if 'future' in str(exc).lower() or 'extrapolation' in str(exc).lower():
+                    try:
+                        transform = self.tf_buffer.lookup_transform(
+                            self.world_frame,
+                            candidate,
+                            Time(),  # 最新可用 TF
+                            timeout=Duration(seconds=0.2)
+                        )
+                        if transform:
+                            used_frame = candidate
+                            self.get_logger().warn(
+                                f"TF extrapolation for {candidate} (requested {lookup_time.nanoseconds * 1e-9:.3f}s);"
+                                " 改用最新可用的 TF 数据"
+                            )
+                            break
+                    except TransformException as exc_latest:
+                        last_error = exc_latest
                 continue
 
         if transform is None:
