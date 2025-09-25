@@ -259,6 +259,7 @@ test_yolo_detector() {
     
     ros2 run neural_network_detector yolo12_detector_node \
         --ros-args \
+        -p "use_sim_time:=true" \
         -p "model_path:=$model_path" \
         -p "labels_path:=$labels_path" \
         -p "use_gpu:=false" \
