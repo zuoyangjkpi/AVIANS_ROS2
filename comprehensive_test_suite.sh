@@ -357,12 +357,13 @@ full_integration_test() {
     print_status $YELLOW "   3. Detection visualizer"
     print_status $YELLOW "   4. Drone TF publisher"
     print_status $YELLOW "   5. RViz visualization with trajectory display"
-    print_status $YELLOW "   6. tf_from_uav_pose node"
-    print_status $YELLOW "   7. projection_model node"
-    print_status $YELLOW "   8. pose_cov_ops_interface node"
-    print_status $YELLOW "   9. NMPC tracker (tracking real Gazebo walking_person)"
-    print_status $YELLOW "   10. Low-level controllers (waypoint, attitude, velocity)"
-    print_status $YELLOW "   11. Enable tracking"
+    print_status $YELLOW "   6. drone_state_publisher bridge"
+    print_status $YELLOW "   7. tf_from_uav_pose node"
+    print_status $YELLOW "   8. projection_model node"
+    print_status $YELLOW "   9. pose_cov_ops_interface node"
+    print_status $YELLOW "   10. NMPC tracker (tracking real Gazebo walking_person)"
+    print_status $YELLOW "   11. Low-level controllers (waypoint, attitude, velocity)"
+    print_status $YELLOW "   12. Enable tracking"
     
     # Clean up existing processes
     print_status $YELLOW "🧹 Cleaning up existing processes..."
@@ -370,20 +371,20 @@ full_integration_test() {
     sleep 3
     
     # Step 1: Launch Gazebo
-    print_status $YELLOW "Step 1/11: Starting Gazebo simulation..."
+    print_status $YELLOW "Step 1/12: Starting Gazebo simulation..."
     if ! launch_gazebo; then
         print_status $RED "❌ Gazebo startup failed, cannot continue"
         return 1
     fi
     
     # Step 2: Start YOLO detector
-    print_status $YELLOW "Step 2/11: Starting YOLO detector..."
+    print_status $YELLOW "Step 2/12: Starting YOLO detector..."
     if ! test_yolo_detector; then
         print_status $YELLOW "⚠️  YOLO detector had issues, but continuing..."
     fi
     
     # Start C++ detection visualizer node
-    print_status $YELLOW "Step 3/11: Starting detection visualizer..."
+    print_status $YELLOW "Step 3/12: Starting detection visualizer..."
     
     ros2 run neural_network_detector detection_visualizer_node > /tmp/detection_visualizer.log 2>&1 &
     local viz_pid=$!
@@ -396,13 +397,13 @@ full_integration_test() {
     fi
     
     # Step 4: Start drone TF publisher for proper RViz display
-    print_status $YELLOW "Step 4/11: Starting drone TF publisher..."
+    print_status $YELLOW "Step 4/12: Starting drone TF publisher..."
     python3 drone_tf_publisher.py > /tmp/drone_tf.log 2>&1 &
     local tf_pid=$!
     sleep 1
     
     # Step 5: Start RViz visualization with trajectory display
-    print_status $YELLOW "Step 5/11: Starting RViz visualization..."
+    print_status $YELLOW "Step 5/12: Starting RViz visualization..."
     python3 visualization_node.py > /tmp/visualization.log 2>&1 &
     local viz_node_pid=$!
     sleep 2
@@ -419,50 +420,73 @@ full_integration_test() {
         print_status $YELLOW "⚠️  RViz visualization node failed to start (continuing anyway)"
     fi
     
-    # Step 6: Start tf_from_uav_pose node
-    print_status $YELLOW "Step 6/11: Starting tf_from_uav_pose node..."
+    # Step 6: Start drone_state_publisher bridge
+    print_status $YELLOW "Step 6/12: Starting drone_state_publisher bridge..."
+    ros2 run drone_state_publisher drone_state_publisher_node \
+        --ros-args \
+        -p use_sim_time:=True \
+        > /tmp/drone_state_publisher.log 2>&1 &
+    local drone_state_pub_pid=$!
+    sleep 2
+
+    if check_process "drone_state_publisher_node"; then
+        print_status $GREEN "✅ drone_state_publisher bridge started successfully"
+    else
+        print_status $RED "❌ drone_state_publisher bridge failed to start"
+        return 1
+    fi
+
+    # Step 7: Start tf_from_uav_pose node
+    print_status $YELLOW "Step 7/12: Starting tf_from_uav_pose node..."
     ros2 run tf_from_uav_pose tf_from_uav_pose_node \
         --ros-args \
-        -p machineFrameID:="X3" \
+        -p use_sim_time:=True \
+        -p poseTopicName:="/machine_1/pose" \
+        -p rawPoseTopicName:="/machine_1/pose/raw" \
+        -p stdPoseTopicName:="/machine_1/pose/corr/std" \
+        -p stdRawPoseTopicName:="/machine_1/pose/raww/std" \
+        -p machineFrameID:="machine_1" \
         -p worldFrameID:="world" \
-        -p cameraFrameID:="X3/camera_link" \
-        -p cameraRGBOpticalFrameID:="X3/camera_rgb_optical_frame" \
+        -p cameraFrameID:="machine_1_camera_link" \
+        -p cameraRGBOpticalFrameID:="machine_1_camera_rgb_optical_link" \
         -p dontPublishTFs:=False \
         -p cameraStaticPublish.publish:=True \
+        -p cameraStaticPublish.topic:="/machine_1/camera/pose" \
+        -p cameraStaticPublish.pose_optical_topic:="/machine_1/camera/pose_optical" \
         > /tmp/tf_from_uav_pose.log 2>&1 &
     local tf_uav_pid=$!
     sleep 3
-    
+
     if check_process "tf_from_uav_pose_node"; then
         print_status $GREEN "✅ tf_from_uav_pose node started successfully"
     else
         print_status $RED "❌ tf_from_uav_pose node failed to start"
         return 1
     fi
-    
-    # Step 7: Start projection_model node
-    print_status $YELLOW "Step 7/11: Starting projection_model node..."
+
+    # Step 8: Start projection_model node
+    print_status $YELLOW "Step 8/12: Starting projection_model node..."
     ros2 run projection_model projection_model_node \
         --ros-args \
         -p topics.robot:="/X3/pose_with_covariance" \
-        -p topics.camera:="X3/camera_link" \
-        -p topics.optical:="X3/camera_rgb_optical_frame" \
+        -p topics.camera:="/machine_1/camera/pose" \
+        -p topics.optical:="/machine_1/camera/pose_optical" \
         -p camera.info_topic:="/camera/camera_info" \
         -p projected_object_topic:="/person_detections/world_frame" \
         -p detections_topic:="/person_detections" \
         > /tmp/projection_model.log 2>&1 &
     local projection_pid=$!
     sleep 3
-    
+
     if check_process "projection_model_node"; then
         print_status $GREEN "✅ projection_model node started successfully"
     else
         print_status $RED "❌ projection_model node failed to start"
         return 1
     fi
-    
-    # Step 8: Start pose_cov_ops_interface node
-    print_status $YELLOW "Step 8/11: Starting pose_cov_ops_interface node..."
+
+    # Step 9: Start pose_cov_ops_interface node
+    print_status $YELLOW "Step 9/12: Starting pose_cov_ops_interface node..."
     ros2 run pose_cov_ops_interface pose_cov_ops_interface_node \
         --ros-args \
         -p input_pose_topic:="/X3/odometry" \
@@ -479,8 +503,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 9: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
-    print_status $YELLOW "Step 9/11: Starting NMPC tracker..."
+    # Step 10: Start NMPC tracker (removed test_node - using real Gazebo walking_person instead)
+    print_status $YELLOW "Step 10/12: Starting NMPC tracker..."
     ros2 run drone_nmpc_tracker nmpc_tracker_node > /tmp/nmpc_tracker_fixed.log 2>&1 &
     local tracker_pid=$!
     sleep 3
@@ -492,14 +516,14 @@ full_integration_test() {
         return 1
     fi
 
-    # Step 10: Start low-level controllers that bridge NMPC to Gazebo
+    # Step 11: Start low-level controllers that bridge NMPC to Gazebo
     local controller_params="$PWD/src/drone_low_level_controllers/config/controllers.yaml"
     if [ ! -f "$controller_params" ]; then
         print_status $RED "❌ Controller parameter file not found at $controller_params"
         return 1
     fi
 
-    print_status $YELLOW "Step 10/11: Starting waypoint controller..."
+    print_status $YELLOW "Step 11/12: Starting waypoint controller..."
     ros2 run drone_low_level_controllers waypoint_controller.py \
         --ros-args --params-file "$controller_params" \
         > /tmp/waypoint_controller.log 2>&1 &
@@ -513,7 +537,7 @@ full_integration_test() {
         return 1
     fi
 
-    print_status $YELLOW "Step 10/11: Starting attitude controller..."
+    print_status $YELLOW "Step 11/12: Starting attitude controller..."
     ros2 run drone_low_level_controllers attitude_controller.py \
         --ros-args --params-file "$controller_params" \
         > /tmp/attitude_controller.log 2>&1 &
@@ -527,7 +551,7 @@ full_integration_test() {
         return 1
     fi
 
-    print_status $YELLOW "Step 10/11: Starting velocity controller..."
+    print_status $YELLOW "Step 11/12: Starting velocity controller..."
     ros2 run drone_low_level_controllers velocity_controller.py \
         --ros-args --params-file "$controller_params" \
         > /tmp/velocity_controller.log 2>&1 &
@@ -541,8 +565,8 @@ full_integration_test() {
         return 1
     fi
     
-    # Step 11: Enable drone and tracking
-    print_status $YELLOW "Step 11/11: Enabling drone control and tracking..."
+    # Step 12: Enable drone and tracking
+    print_status $YELLOW "Step 12/12: Enabling drone control and tracking..."
     
     # 启用无人机控制
     print_status $YELLOW "  - 启用无人机控制..."
@@ -944,6 +968,7 @@ kill_all_processes() {
     pkill -f "projection_model_node" 2>/dev/null
     pkill -f "tf_from_uav_pose_node" 2>/dev/null
     pkill -f "pose_cov_ops_interface_node" 2>/dev/null
+    pkill -f "drone_state_publisher_node" 2>/dev/null
     pkill -f "velocity_controller.py" 2>/dev/null
     pkill -f "waypoint_controller.py" 2>/dev/null
     pkill -f "attitude_controller.py" 2>/dev/null

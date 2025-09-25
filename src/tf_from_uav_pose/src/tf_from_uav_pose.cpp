@@ -67,7 +67,7 @@ void TfFromUAVPose::initializeParameters() {
         RCLCPP_INFO(this->get_logger(), "Using system time");
     }
     
-    // Declare topic name parameters 
+    // Declare topic name parameters
     this->declare_parameter("poseTopicName", pose_topic_name_);
     this->declare_parameter("rawPoseTopicName", raw_pose_topic_name_);
     this->declare_parameter("stdPoseTopicName", std_pose_topic_name_);

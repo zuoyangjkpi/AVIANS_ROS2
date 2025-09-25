@@ -103,7 +103,7 @@ class NMPCConfig:
         self.MIN_TRACKING_DISTANCE = 3.0      # Minimum safe distance for tilted camera
         self.MAX_TRACKING_DISTANCE = 12.0     # Extended max distance due to better visibility with tilt
         self.TRACKING_HEIGHT_OFFSET = 1.5     # Increased height offset for better downward view
-        self.TRACKING_FIXED_ALTITUDE = 3.5    # Higher altitude to maximize 30° tilt coverage (m)
+        self.TRACKING_FIXED_ALTITUDE = 2.5    # Consistent with takeoff altitude for unified flight height (m)
         self.BASE_TRACKING_ANGULAR_VELOCITY = 0.08  # Base orbit rate (rad/s) - much reduced for stability
         self.TRACKING_SPEED_GAIN = 0.05       # Gain from person speed to orbit rate - reduced for stability
         self.MAX_TRACKING_ANGULAR_VELOCITY = 0.2    # Cap orbit rate - reduced for stability

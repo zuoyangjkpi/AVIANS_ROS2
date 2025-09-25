@@ -68,7 +68,7 @@ class DroneTfPublisher(Node):
             base_transform.transform.translation.z = msg.pose.pose.position.z
             base_transform.transform.rotation = msg.pose.pose.orientation
 
-            # X3/base_link -> X3/camera_link (match SDF pose: 0.2 forward, 30 deg pitch down)
+            # X3/base_link -> X3/camera_link (match SDF pose: 0.2 forward, 30° pitch down)
             cam_link = TransformStamped()
             cam_link.header.stamp = stamp
             cam_link.header.frame_id = child_frame
@@ -76,7 +76,8 @@ class DroneTfPublisher(Node):
             cam_link.transform.translation.x = 0.2
             cam_link.transform.translation.y = 0.0
             cam_link.transform.translation.z = 0.0
-            qx, qy, qz, qw = quaternion_from_euler(0.0, 0.5236, 0.0)
+            # 采用正的俯仰角（30°）保持与SDF一致，配合光学坐标系旋转后指向地面
+            qx, qy, qz, qw = quaternion_from_euler(0.0, math.pi / 6, 0.0)
             cam_link.transform.rotation.x = qx
             cam_link.transform.rotation.y = qy
             cam_link.transform.rotation.z = qz
@@ -109,8 +110,21 @@ class DroneTfPublisher(Node):
             cam_sensor.transform.rotation.z = 0.0
             cam_sensor.transform.rotation.w = 1.0
 
+            # Provide an explicit optical frame for the front camera so detectors can consume REP103 frames
+            cam_sensor_optical = TransformStamped()
+            cam_sensor_optical.header.stamp = stamp
+            cam_sensor_optical.header.frame_id = 'X3/camera_link/camera_front'
+            cam_sensor_optical.child_frame_id = 'X3/camera_link/camera_front_optical_frame'
+            cam_sensor_optical.transform.translation.x = 0.0
+            cam_sensor_optical.transform.translation.y = 0.0
+            cam_sensor_optical.transform.translation.z = 0.0
+            cam_sensor_optical.transform.rotation.x = qx_opt
+            cam_sensor_optical.transform.rotation.y = qy_opt
+            cam_sensor_optical.transform.rotation.z = qz_opt
+            cam_sensor_optical.transform.rotation.w = qw_opt
+
             self.tf_broadcaster.sendTransform(
-                [base_transform, cam_link, cam_optical, cam_sensor]
+                [base_transform, cam_link, cam_optical, cam_sensor, cam_sensor_optical]
             )
 
         except Exception as e:

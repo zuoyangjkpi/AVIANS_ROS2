@@ -1,12 +1,12 @@
 tf_from_uav_pose_ros2:
   ros__parameters:
     # Topic names
-    poseTopicName: "/machine_1/pose"
-    rawPoseTopicName: "/machine_1/pose/raw"
-    stdPoseTopicName: "/machine_1/pose/corr/std"
-    stdRawPoseTopicName: "/machine_1/pose/raww/std"
-    throttledPoseTopicName: "/machine_1/throttledPose"
-    throttledUAVPoseTopicName: "/machine_1/throttledUAVPose"
+    poseTopicName: "/X3/odometry"
+    rawPoseTopicName: "/unused/raw"
+    stdPoseTopicName: "/unused/std"
+    stdRawPoseTopicName: "/unused/std_raw"
+    throttledPoseTopicName: "/unused/throttled"
+    throttledUAVPoseTopicName: "/unused/throttled_uav"
     
     # Frame IDs
     machineFrameID: "machine_1"
@@ -35,5 +35,6 @@ tf_from_uav_pose_ros2:
       topic: "/machine_1/camera/pose"
       pose_optical_topic: "/machine_1/camera/pose_optical"
       # Corrected parameters for X3: [x, y, z, qx, qy, qz, qw]
-      # Position: 0.2m forward from center, 30° downward tilt (q = [0, sin(15°), 0, cos(15°)])
-      TFParameters: [0.2, 0.0, 0.0, 0.0, 0.2588, 0.0, 0.9659]  # 30° pitch down = [0, sin(15°), 0, cos(15°)]
+      # Position: 0.2m forward from center, 30° downward tilt (rotation about Y;
+      # quaternion = [0, sin(15°), 0, cos(15°)])
+      TFParameters: [0.2, 0.0, 0.0, 0.0, 0.2588, 0.0, 0.9659]  # 30° pitch down keeps optical axis toward ground
