@@ -128,74 +128,89 @@ class DroneNMPCController:
         
         person_pos = self.person_position
         
-        # Circular tracking behavior - drone orbits around the person
+        # Circular tracking behavior - drone maintains fixed phase relative to person
         # Calculate current phase angle relative to person
         drone_pos = self.current_state.data[self.config.STATE_X:self.config.STATE_Z+1]
         relative_pos = drone_pos[:2] - person_pos[:2]
-        
+
         if np.linalg.norm(relative_pos) > 0.1:  # Avoid singularity
             current_phase = math.atan2(relative_pos[1], relative_pos[0])
         else:
             current_phase = self._desired_phase if hasattr(self, '_desired_phase') else 0.0
-        
-        # Desired phase evolution - slowly orbit around the person with damping
-        person_speed = np.linalg.norm(self.person_velocity[:2])
-        base_angular_velocity = self.config.BASE_TRACKING_ANGULAR_VELOCITY
-        adaptive_angular_velocity = base_angular_velocity + \
-            self.config.TRACKING_SPEED_GAIN * person_speed
-        adaptive_angular_velocity = min(adaptive_angular_velocity,
-                                        self.config.MAX_TRACKING_ANGULAR_VELOCITY)
-
-        # Add damping based on distance to target position to prevent oscillations
-        target_distance = np.linalg.norm(drone_pos[:2] - person_pos[:2])
-
-        # Enhanced damping for tilted camera tracking
-        if target_distance > self.config.OPTIMAL_TRACKING_DISTANCE:
-            # Stronger damping for X3's optimal tracking distance (5.0m)
-            damping_factor = max(0.2, 1.0 - (target_distance - self.config.OPTIMAL_TRACKING_DISTANCE) / 3.0)
-            adaptive_angular_velocity *= damping_factor
-
-        # Additional damping based on camera tilt compensation
-        # For 30° tilt, reduce angular velocity when person is very close to prevent oscillation
-        if target_distance < 4.0:  # Within close range for tilted camera
-            tilt_damping = 0.7 + 0.3 * (target_distance / 4.0)  # 70%-100% depending on distance
-            adaptive_angular_velocity *= tilt_damping
 
         dt = self.config.TIMESTEP
-        if not hasattr(self, '_desired_phase'):
-            # Initialize phase when first detected
-            self._desired_phase = current_phase
-        else:
-            self._desired_phase += adaptive_angular_velocity * dt
 
-        # Calculate target position on the circle
-        radius = self.config.OPTIMAL_TRACKING_DISTANCE
+        # Calculate current distance to person
+        current_distance = np.linalg.norm(relative_pos)
+
+        if not hasattr(self, '_desired_phase'):
+            # Initialize phase to current position (no unnecessary movement)
+            self._desired_phase = current_phase
+            self._phase_initialized = True
+        else:
+            # Slow clockwise rotation: 0.01 rad/s
+            # Clockwise means decreasing phase angle
+            self._desired_phase -= 0.01 * dt
+
+        # Adaptive radius based on current distance
+        # When person is too close (< MIN), allow drone to move outward beyond optimal
+        # When person is too far (> MAX), allow drone to move inward toward optimal
+        optimal_distance = self.config.OPTIMAL_TRACKING_DISTANCE
+        min_distance = self.config.MIN_TRACKING_DISTANCE
+        max_distance = self.config.MAX_TRACKING_DISTANCE
+
+        distance_error = current_distance - optimal_distance
+
+        if current_distance < min_distance:
+            # Person too close! URGENT: move away aggressively
+            # Use a much larger radius to push drone outward quickly
+            error_magnitude = min_distance - current_distance
+            radius = optimal_distance + error_magnitude * 1.5  # Aggressive: 1.5x multiplier
+            radius = min(radius, max_distance)  # Cap at max distance
+        elif current_distance > max_distance:
+            # Person too far! Priority: move closer
+            error_magnitude = current_distance - max_distance
+            radius = optimal_distance - error_magnitude * 1.0
+            radius = max(radius, min_distance)  # Don't go below min
+        else:
+            # Within acceptable range, use optimal distance
+            radius = optimal_distance
+
         target_x = person_pos[0] + radius * math.cos(self._desired_phase)
         target_y = person_pos[1] + radius * math.sin(self._desired_phase)
         target_z = self.config.TRACKING_FIXED_ALTITUDE
 
         new_target = np.array([target_x, target_y, target_z])
+        # Apply exponential smoothing with adaptive alpha based on distance error
         if self._last_target_position is not None:
-            smoothing = np.clip(self.config.TARGET_POSITION_SMOOTHING, 0.0, 0.99)
-            new_target = smoothing * new_target + (1.0 - smoothing) * self._last_target_position
+            # When person is very close, use faster response (higher alpha)
+            if abs(distance_error) > 0.7:
+                alpha = 0.9  # Emergency: 90% new, 10% old
+            elif abs(distance_error) > 0.4:
+                alpha = 0.8  # Urgent: 80% new, 20% old
+            else:
+                alpha = 0.7  # Normal: 70% new, 30% old
+            new_target = alpha * new_target + (1.0 - alpha) * self._last_target_position
         self.target_position = new_target
         self._last_target_position = new_target.copy()
-        
+
         # Calculate target velocity for smooth circular motion
-        # Tangential velocity = radius * angular_velocity
-        tangential_speed = radius * adaptive_angular_velocity
+        # Angular velocity is fixed at 0.01 rad/s for slow clockwise rotation
+        angular_velocity = 0.01
+        tangential_speed = radius * angular_velocity
         tangent_x = -math.sin(self._desired_phase) * tangential_speed
         tangent_y = math.cos(self._desired_phase) * tangential_speed
-        
-        # Add person's velocity to follow the moving center (disabled for now)
+
+        # Add person's velocity to follow the moving center
+        person_speed = self.person_velocity[:2]
         new_velocity = np.zeros(3)
-        new_velocity[0] += tangent_x
-        new_velocity[1] += tangent_y
+        new_velocity[0] = tangent_x + person_speed[0]
+        new_velocity[1] = tangent_y + person_speed[1]
         new_velocity[2] = 0.0  # No vertical tracking velocity
 
         if self._last_target_velocity is not None:
-            smoothing = np.clip(self.config.TARGET_POSITION_SMOOTHING, 0.0, 0.99)
-            new_velocity = smoothing * new_velocity + (1.0 - smoothing) * self._last_target_velocity
+            alpha_vel = 0.7  # Fast velocity response
+            new_velocity = alpha_vel * new_velocity + (1.0 - alpha_vel) * self._last_target_velocity
         self.target_velocity = new_velocity
         self._last_target_velocity = new_velocity.copy()
         
@@ -368,31 +383,49 @@ class DroneNMPCController:
         
         # Person tracking specific costs
         if self.person_detected:
-            # Distance to person cost
+            # Distance to person cost - with adaptive weight based on error magnitude
             drone_pos = state.data[self.config.STATE_X:self.config.STATE_Z+1]
             distance_to_person = np.linalg.norm(drone_pos - self.person_position)
             distance_error = abs(distance_to_person - self.config.OPTIMAL_TRACKING_DISTANCE)
-            cost += self.config.W_TRACKING_DISTANCE * distance_error**2
-            
+
+            # Adaptive weight: increase penalty when far from optimal distance
+            # This helps prevent person from leaving camera view
+            base_weight = self.config.W_TRACKING_DISTANCE
+            if distance_error > 1.0:
+                # Double the weight if more than 1m off
+                adaptive_weight = base_weight * 2.0
+            elif distance_error > 0.5:
+                # 1.5x weight if more than 0.5m off
+                adaptive_weight = base_weight * 1.5
+            else:
+                adaptive_weight = base_weight
+
+            cost += adaptive_weight * distance_error**2
+
             # Camera angle cost (keep person in view)
             to_person = self.person_position - drone_pos
             if np.linalg.norm(to_person) > 0.1:
                 # 计算无人机朝向
                 yaw = state[self.config.STATE_YAW]
                 drone_facing = np.array([math.cos(yaw), math.sin(yaw)])
-                
+
                 # 计算到人的方向
                 to_person_dir = to_person[:2] / np.linalg.norm(to_person[:2])
-                
+
                 # 计算夹角
                 dot_product = np.dot(drone_facing, to_person_dir)
                 angle_error = math.acos(np.clip(dot_product, -1.0, 1.0))
                 cost += self.config.W_CAMERA_ANGLE * angle_error**2
-            
+
             # Smooth tracking cost - penalize large changes in target position
+            # But reduce weight when distance error is large (prioritize catching up)
             if self._last_target_position is not None:
                 target_change = np.linalg.norm(self.target_position - self._last_target_position)
-                cost += self.config.W_SMOOTH_TRACKING * target_change**2
+                smooth_weight = self.config.W_SMOOTH_TRACKING
+                if distance_error > 0.8:
+                    # Reduce smoothing penalty when we need to catch up
+                    smooth_weight *= 0.5
+                cost += smooth_weight * target_change**2
         
         return cost
     

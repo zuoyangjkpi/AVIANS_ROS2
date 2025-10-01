@@ -39,7 +39,7 @@
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
-    <!-- 草绿色地面 -->
+    <!-- 真实草坪地面 -->
     <model name="ground_plane">
       <static>true</static>
       <link name="link">
@@ -47,7 +47,7 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>100 100</size>
+              <size>150 150</size>
             </plane>
           </geometry>
         </collision>
@@ -55,158 +55,372 @@
           <geometry>
             <plane>
               <normal>0 0 1</normal>
-              <size>100 100</size>
+              <size>150 150</size>
             </plane>
           </geometry>
           <material>
-            <ambient>0.5 0.7 0.3 1</ambient>
-            <diffuse>0.5 0.7 0.3 1</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
+            <ambient>0.3 0.5 0.2 1</ambient>
+            <diffuse>0.4 0.6 0.25 1</diffuse>
+            <specular>0.05 0.05 0.05 1</specular>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- 网格纹理 -->
-    <model name="grid_ground">
+    <!-- 树木 1 - 橡树 -->
+    <model name="tree_oak_1">
       <static>true</static>
-      <pose>0 0 0.001 0 0 0</pose>
-      <link name="link">
-        <visual name="visual">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>20 20</size>
-            </plane>
-          </geometry>
-          <material>
-            <ambient>0.8 0.8 0.8 0.8</ambient>
-            <diffuse>0.8 0.8 0.8 0.8</diffuse>
-            <specular>0.1 0.1 0.1 1</specular>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <!-- 视觉标记物 -->
-    <model name="marker_red">
-      <static>true</static>
-      <pose>3 3 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>1.0 0.0 0.0 1</ambient>
-            <diffuse>1.0 0.0 0.0 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="marker_green">
-      <static>true</static>
-      <pose>-3 3 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.0 1.0 0.0 1</ambient>
-            <diffuse>0.0 1.0 0.0 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="marker_blue">
-      <static>true</static>
-      <pose>-3 -3 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>0.0 0.0 1.0 1</ambient>
-            <diffuse>0.0 0.0 1.0 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <model name="marker_yellow">
-      <static>true</static>
-      <pose>3 -3 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-        </collision>
-        <visual name="visual">
-          <geometry>
-            <box><size>0.5 0.5 0.5</size></box>
-          </geometry>
-          <material>
-            <ambient>1.0 1.0 0.0 1</ambient>
-            <diffuse>1.0 1.0 0.0 1</diffuse>
-            <specular>0.2 0.2 0.2 1</specular>
-          </material>
-        </visual>
-      </link>
-    </model>
-
-    <!-- 中心标记 -->
-    <model name="center_marker">
-      <static>true</static>
-      <pose>0 0 0.1 0 0 0</pose>
-      <link name="link">
-        <collision name="collision">
+      <pose>-8 5 0 0 0 0</pose>
+      <link name="trunk">
+        <visual name="trunk_visual">
           <geometry>
             <cylinder>
-              <radius>0.2</radius>
-              <length>0.2</length>
+              <radius>0.4</radius>
+              <length>4.0</length>
             </cylinder>
           </geometry>
-        </collision>
-        <visual name="visual">
+          <pose>0 0 2.0 0 0 0</pose>
+          <material>
+            <ambient>0.4 0.25 0.1 1</ambient>
+            <diffuse>0.5 0.3 0.15 1</diffuse>
+          </material>
+        </visual>
+        <collision name="trunk_collision">
           <geometry>
             <cylinder>
-              <radius>0.2</radius>
-              <length>0.2</length>
+              <radius>0.4</radius>
+              <length>4.0</length>
             </cylinder>
           </geometry>
+          <pose>0 0 2.0 0 0 0</pose>
+        </collision>
+        <visual name="foliage_visual">
+          <geometry>
+            <sphere>
+              <radius>2.5</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 5.5 0 0 0</pose>
           <material>
-            <ambient>0.8 0.4 0.0 1</ambient>
-            <diffuse>0.8 0.4 0.0 1</diffuse>
-            <specular>0.3 0.3 0.3 1</specular>
+            <ambient>0.1 0.4 0.1 1</ambient>
+            <diffuse>0.15 0.5 0.15 1</diffuse>
           </material>
         </visual>
       </link>
     </model>
 
-    <!-- 行走人员 - 缩短延迟，更快开始 -->
+    <!-- 树木 2 -->
+    <model name="tree_oak_2">
+      <static>true</static>
+      <pose>10 -6 0 0 0 0.5</pose>
+      <link name="trunk">
+        <visual name="trunk_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.35</radius>
+              <length>3.5</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 1.75 0 0 0</pose>
+          <material>
+            <ambient>0.4 0.25 0.1 1</ambient>
+            <diffuse>0.5 0.3 0.15 1</diffuse>
+          </material>
+        </visual>
+        <collision name="trunk_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.35</radius>
+              <length>3.5</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 1.75 0 0 0</pose>
+        </collision>
+        <visual name="foliage_visual">
+          <geometry>
+            <sphere>
+              <radius>2.2</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 4.8 0 0 0</pose>
+          <material>
+            <ambient>0.1 0.45 0.1 1</ambient>
+            <diffuse>0.15 0.55 0.15 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 树木 3 -->
+    <model name="tree_pine_1">
+      <static>true</static>
+      <pose>-12 -8 0 0 0 1.2</pose>
+      <link name="trunk">
+        <visual name="trunk_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.3</radius>
+              <length>5.0</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 2.5 0 0 0</pose>
+          <material>
+            <ambient>0.35 0.22 0.08 1</ambient>
+            <diffuse>0.45 0.28 0.12 1</diffuse>
+          </material>
+        </visual>
+        <collision name="trunk_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.3</radius>
+              <length>5.0</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 2.5 0 0 0</pose>
+        </collision>
+        <visual name="foliage_visual">
+          <geometry>
+            <cone>
+              <radius>1.8</radius>
+              <length>4.5</length>
+            </cone>
+          </geometry>
+          <pose>0 0 6.25 0 0 0</pose>
+          <material>
+            <ambient>0.05 0.35 0.05 1</ambient>
+            <diffuse>0.1 0.45 0.1 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 树木 4 -->
+    <model name="tree_oak_3">
+      <static>true</static>
+      <pose>8 10 0 0 0 2.1</pose>
+      <link name="trunk">
+        <visual name="trunk_visual">
+          <geometry>
+            <cylinder>
+              <radius>0.38</radius>
+              <length>3.8</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 1.9 0 0 0</pose>
+          <material>
+            <ambient>0.42 0.27 0.12 1</ambient>
+            <diffuse>0.52 0.32 0.17 1</diffuse>
+          </material>
+        </visual>
+        <collision name="trunk_collision">
+          <geometry>
+            <cylinder>
+              <radius>0.38</radius>
+              <length>3.8</length>
+            </cylinder>
+          </geometry>
+          <pose>0 0 1.9 0 0 0</pose>
+        </collision>
+        <visual name="foliage_visual">
+          <geometry>
+            <sphere>
+              <radius>2.3</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 5.0 0 0 0</pose>
+          <material>
+            <ambient>0.12 0.42 0.12 1</ambient>
+            <diffuse>0.17 0.52 0.17 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 灌木丛 1 -->
+    <model name="bush_1">
+      <static>true</static>
+      <pose>-5 2 0 0 0 0</pose>
+      <link name="foliage">
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>0.8</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.6 0 0 0</pose>
+          <material>
+            <ambient>0.15 0.45 0.15 1</ambient>
+            <diffuse>0.2 0.55 0.2 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <sphere>
+              <radius>0.8</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.6 0 0 0</pose>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 灌木丛 2 -->
+    <model name="bush_2">
+      <static>true</static>
+      <pose>4 7 0 0 0 0.8</pose>
+      <link name="foliage">
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>0.7</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.5 0 0 0</pose>
+          <material>
+            <ambient>0.12 0.4 0.12 1</ambient>
+            <diffuse>0.17 0.5 0.17 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 灌木丛 3 -->
+    <model name="bush_3">
+      <static>true</static>
+      <pose>-3 -4 0 0 0 1.5</pose>
+      <link name="foliage">
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>0.6</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.45 0 0 0</pose>
+          <material>
+            <ambient>0.18 0.48 0.18 1</ambient>
+            <diffuse>0.23 0.58 0.23 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 花丛 1 - 红色花朵 -->
+    <model name="flowers_red">
+      <static>true</static>
+      <pose>2 3 0 0 0 0</pose>
+      <link name="flowers">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.2 1.2 0.3</size>
+            </box>
+          </geometry>
+          <pose>0 0 0.15 0 0 0</pose>
+          <material>
+            <ambient>0.8 0.2 0.2 1</ambient>
+            <diffuse>0.9 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 花丛 2 - 黄色花朵 -->
+    <model name="flowers_yellow">
+      <static>true</static>
+      <pose>-2 5 0 0 0 0.5</pose>
+      <link name="flowers">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>1.0 1.0 0.25</size>
+            </box>
+          </geometry>
+          <pose>0 0 0.125 0 0 0</pose>
+          <material>
+            <ambient>0.9 0.8 0.2 1</ambient>
+            <diffuse>1.0 0.9 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 花丛 3 - 紫色花朵 -->
+    <model name="flowers_purple">
+      <static>true</static>
+      <pose>6 -2 0 0 0 1.8</pose>
+      <link name="flowers">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.9 0.9 0.28</size>
+            </box>
+          </geometry>
+          <pose>0 0 0.14 0 0 0</pose>
+          <material>
+            <ambient>0.6 0.2 0.7 1</ambient>
+            <diffuse>0.7 0.3 0.8 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 石头装饰 1 -->
+    <model name="rock_1">
+      <static>true</static>
+      <pose>-6 -2 0 0 0 0.3</pose>
+      <link name="rock">
+        <visual name="visual">
+          <geometry>
+            <sphere>
+              <radius>0.5</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.3 0 0 0</pose>
+          <material>
+            <ambient>0.5 0.5 0.5 1</ambient>
+            <diffuse>0.6 0.6 0.6 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <sphere>
+              <radius>0.5</radius>
+            </sphere>
+          </geometry>
+          <pose>0 0 0.3 0 0 0</pose>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 石头装饰 2 -->
+    <model name="rock_2">
+      <static>true</static>
+      <pose>7 4 0 0 0 1.2</pose>
+      <link name="rock">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.8 0.6 0.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 0.25 0.1 0.2 0</pose>
+          <material>
+            <ambient>0.55 0.55 0.55 1</ambient>
+            <diffuse>0.65 0.65 0.65 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.8 0.6 0.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 0.25 0.1 0.2 0</pose>
+        </collision>
+      </link>
+    </model>
+
+    <!-- 行走人员 - 不规则样条曲线路径 -->
     <actor name="walking_person">
       <skin>
         <filename>model://actor/meshes/walk.dae</filename>
@@ -220,46 +434,65 @@
         <loop>true</loop>
         <delay_start>3.0</delay_start>
         <auto_start>true</auto_start>
-        <trajectory id="0" type="walking" tension="0.6">
+        <!-- 使用更高的tension值创建平滑的样条曲线路径 -->
+        <trajectory id="0" type="walking" tension="0.8">
+            <!-- 起点 -->
             <waypoint>
                 <time>0</time>
                 <pose>0 0 1.0 0 0 0</pose>
             </waypoint>
+            <!-- 向东北方向 -->
             <waypoint>
-                <time>8</time>
-                <pose>-2.0 0 1.0 0 0 0</pose>
+                <time>5</time>
+                <pose>2.5 2 1.0 0 0 0.6</pose>
+            </waypoint>
+            <!-- 转向东南 -->
+            <waypoint>
+                <time>10</time>
+                <pose>4 0 1.0 0 0 -0.8</pose>
+            </waypoint>
+            <!-- 向南移动 -->
+            <waypoint>
+                <time>15</time>
+                <pose>3 -3 1.0 0 0 -2.2</pose>
+            </waypoint>
+            <!-- 转向西南 -->
+            <waypoint>
+                <time>20</time>
+                <pose>0 -4 1.0 0 0 3.0</pose>
+            </waypoint>
+            <!-- 向西北方向 -->
+            <waypoint>
+                <time>25</time>
+                <pose>-3 -3 1.0 0 0 2.4</pose>
+            </waypoint>
+            <!-- 转向北方 -->
+            <waypoint>
+                <time>30</time>
+                <pose>-4 0 1.0 0 0 1.6</pose>
+            </waypoint>
+            <!-- 向东北返回 -->
+            <waypoint>
+                <time>35</time>
+                <pose>-2.5 2.5 1.0 0 0 0.8</pose>
+            </waypoint>
+            <!-- 转向东方 -->
+            <waypoint>
+                <time>40</time>
+                <pose>0 3.5 1.0 0 0 0.2</pose>
+            </waypoint>
+            <!-- 曲线返回起点 -->
+            <waypoint>
+                <time>45</time>
+                <pose>2 2 1.0 0 0 -0.6</pose>
             </waypoint>
             <waypoint>
-                <time>8.5</time>
-                <pose>-2 0 1.0 0 0 1.57</pose>
-            </waypoint>
-            <waypoint>
-                <time>16</time>
-                <pose>-2 -2 1.0 0 0 1.57</pose>
-            </waypoint>
-            <waypoint>
-                <time>16.5</time>
-                <pose>-2 -2 1.0 0 0 3.142</pose>
-            </waypoint>
-            <waypoint>
-                <time>24</time>
-                <pose>0 -2 1 0 0 3.142</pose>
-            </waypoint>
-            <waypoint>
-                <time>24.5</time>
-                <pose>0 -2 1 0 0 -1.57</pose>
-            </waypoint>
-            <waypoint>
-                <time>32</time>
-                <pose>0 0 1.0 0 0 -1.57</pose>
-            </waypoint>
-            <waypoint>
-                <time>32.5</time>
+                <time>50</time>
                 <pose>0 0 1.0 0 0 0</pose>
             </waypoint>
         </trajectory>
       </script>
-      
+
       <!-- Actor pose publisher plugin -->
       <plugin filename="gz-sim8-pose-publisher-system" name="gz::sim::systems::PosePublisher">
         <publish_nested_model_pose>true</publish_nested_model_pose>

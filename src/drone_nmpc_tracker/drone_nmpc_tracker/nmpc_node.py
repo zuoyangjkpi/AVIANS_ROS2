@@ -91,12 +91,12 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('camera_fov_horizontal', math.radians(80.0))
         self.declare_parameter('camera_fov_vertical', math.radians(60.0))
         self.declare_parameter('person_anchor_height', 1.7)
-        self.declare_parameter('takeoff_altitude', 2.5)
-        self.declare_parameter('takeoff_ascent_rate', 1.0)
-        self.declare_parameter('takeoff_hold_duration', 20.0)
-        self.declare_parameter('lost_target_hold_duration', 20.0)
+        self.declare_parameter('takeoff_altitude', 3.0)
+        self.declare_parameter('takeoff_ascent_rate', 2.0)
+        self.declare_parameter('takeoff_hold_duration', 10.0)
+        self.declare_parameter('lost_target_hold_duration', 10.0)
         self.declare_parameter('altitude_tolerance', 0.05)
-        self.declare_parameter('search_yaw_rate', 0.01)
+        self.declare_parameter('search_yaw_rate', 0.05)
         self.declare_parameter('tracking_phase_offset', 0.0)
         self.declare_parameter('tracking_height_offset', nmpc_config.TRACKING_HEIGHT_OFFSET)
         self.declare_parameter('person_position_filter_alpha', nmpc_config.PERSON_POSITION_FILTER_ALPHA)
@@ -1033,23 +1033,19 @@ class NMPCTrackerNode(Node):
             if self.lost_count > 0:
                 self.get_logger().info(f"📊 开始跟踪 (历史丢失次数: {self.lost_count})")
 
-            if self._pending_phase_init is not None:
-                # 使用预先计算的方向作为初始相位
-                phase = self._pending_phase_init + self.tracking_phase_offset
-                self._pending_phase_init = None
+            # 初始相位使用当前位置，避免不必要的移动
+            person_pos = self.controller.person_position
+            current_pos = self._get_current_position()
+            rel = current_pos[:2] - person_pos[:2]  # 从人指向无人机
+            if np.linalg.norm(rel) > 1e-3:
+                # 设置为当前位置的相位角度，保持在原地不动
+                phase = math.atan2(rel[1], rel[0])
             else:
-                # 动态计算一个合理的初始相位
-                person_pos = self.controller.person_position
-                current_pos = self._get_current_position()
-                rel = person_pos[:2] - current_pos[:2]
-                if np.linalg.norm(rel) > 1e-3:
-                    # 设置为从无人机指向人的方向的反方向 (即从后方跟随)
-                    phase = math.atan2(rel[1], rel[0]) + math.pi
-                else:
-                    # 如果距离很近，则使用当前航向
-                    phase = self._get_current_yaw()
+                # 如果距离很近，则使用当前航向
+                phase = self._get_current_yaw()
             # 重置控制器的相位
             self.controller.reset_phase(phase)
+            self.get_logger().info(f"✅ 初始化跟踪相位: {phase:.2f} rad ({math.degrees(phase):.1f}°)")
             # 应用高度偏移和固定高度设置
             self.controller.set_tracking_height_offset(self.tracking_height_offset)
             self.fixed_tracking_altitude = nmpc_config.TRACKING_FIXED_ALTITUDE
@@ -1148,18 +1144,19 @@ class NMPCTrackerNode(Node):
         """Publish controller status"""
         try:
             status = self.controller.get_status()
-            
+
             msg = Float64MultiArray()
             msg.data = [
                 float(status['person_detected']),
                 status['tracking_distance'],
+                self.fixed_tracking_altitude,  # Add tracking altitude
                 status['optimization_time'],
                 float(status['iterations_used']),
                 status['cost_value']
             ]
-            
+
             self.status_pub.publish(msg)
-            
+
         except Exception as e:
             self.get_logger().error(f"Error publishing status: {e}")
     

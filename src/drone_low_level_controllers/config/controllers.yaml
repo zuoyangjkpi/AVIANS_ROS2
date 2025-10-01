@@ -8,13 +8,13 @@ waypoint_controller:
     velocity_tolerance: 0.1      # m/s
     waypoint_timeout: 1.5         # seconds before fail-safe hover engages
 
-    # PID gains for position control (smoother response to prevent oscillations)
-    kp_xy: 1.2                   # Proportional gain for X,Y - reduced to prevent oscillations
-    ki_xy: 0.02                  # Integral gain for X,Y - reduced to prevent wind-up
-    kd_xy: 0.4                   # Derivative gain for X,Y - increased for better damping
-    kp_z: 1.0                    # Proportional gain for Z - reduced for smoother altitude control
-    ki_z: 0.03                   # Integral gain for Z
-    kd_z: 0.5                    # Derivative gain for Z - reduced for smoother response
+    # PID gains for position control (optimized for stable tracking)
+    kp_xy: 0.8                   # Proportional gain for X,Y - further reduced for stability
+    ki_xy: 0.01                  # Integral gain for X,Y - minimal to prevent wind-up
+    kd_xy: 0.6                   # Derivative gain for X,Y - increased for better damping
+    kp_z: 0.8                    # Proportional gain for Z - reduced for smoother altitude control
+    ki_z: 0.02                   # Integral gain for Z - reduced
+    kd_z: 0.7                    # Derivative gain for Z - increased for better damping
 
     # Velocity limits
     max_velocity_xy: 3.0         # m/s for X,Y
@@ -26,16 +26,16 @@ attitude_controller:
     control_frequency: 100.0     # Higher frequency for attitude
     attitude_tolerance: 0.05      # radians (约2.9°容差)
 
-    # PID gains for attitude control (reduced to prevent oscillations)
-    kp_roll: 1.8                 # Proportional gain for roll - reduced for stability
-    ki_roll: 0.05                # Integral gain for roll - reduced to prevent wind-up
-    kd_roll: 0.3                # Derivative gain for roll - increased for better damping
-    kp_pitch: 1.8                # Proportional gain for pitch - reduced for stability
-    ki_pitch: 0.05               # Integral gain for pitch - reduced to prevent wind-up
-    kd_pitch: 0.3               # Derivative gain for pitch - increased for better damping
-    kp_yaw: 1.5                  # Proportional gain for yaw - reduced for smoother yaw control
-    ki_yaw: 0.04                 # Integral gain for yaw - reduced
-    kd_yaw: 0.2                  # Derivative gain for yaw - increased for better damping
+    # PID gains for attitude control (optimized for stable tracking)
+    kp_roll: 1.2                 # Proportional gain for roll - further reduced for stability
+    ki_roll: 0.02                # Integral gain for roll - minimal to prevent wind-up
+    kd_roll: 0.5                 # Derivative gain for roll - increased for better damping
+    kp_pitch: 1.2                # Proportional gain for pitch - further reduced for stability
+    ki_pitch: 0.02               # Integral gain for pitch - minimal to prevent wind-up
+    kd_pitch: 0.5                # Derivative gain for pitch - increased for better damping
+    kp_yaw: 1.0                  # Proportional gain for yaw - reduced for smoother yaw control
+    ki_yaw: 0.02                 # Integral gain for yaw - minimal
+    kd_yaw: 0.4                  # Derivative gain for yaw - increased for better damping
 
     # Angular velocity limits
     max_angular_velocity_roll: 1.8   # rad/s
