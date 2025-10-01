@@ -46,11 +46,11 @@ AVIANS ROS2 (Orin NX)                    Pixhawk 6X (PX4 v1.16.0)
 
 ## Setup
 
-### 1. Install px4_msgs
+### 1. Build bundled px4_msgs
+
+`px4_msgs` 已经包含在工作区的 `src/custom_msgs/px4_msgs` 目录下，无需额外克隆。第一次使用时只需编译该包：
 
 ```bash
-cd ~/AVIANS_ROS2_PORT1/src
-git clone https://github.com/PX4/px4_msgs.git -b release/1.16
 cd ~/AVIANS_ROS2_PORT1
 colcon build --packages-select px4_msgs
 ```

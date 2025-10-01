@@ -16,7 +16,7 @@
   <depend>nav_msgs</depend>
   <depend>sensor_msgs</depend>
 
-  <!-- PX4 messages - need to install px4_msgs package -->
+  <!-- PX4 messages (bundled under custom_msgs/px4_msgs) -->
   <depend>px4_msgs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
