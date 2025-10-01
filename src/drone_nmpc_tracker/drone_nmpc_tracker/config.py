@@ -52,19 +52,19 @@ class NMPCConfig:
         self.STATE_WZ = 11
         
         # ========== Cost Function Weights ==========
-        # Position tracking weights - optimized for responsive tracking
-        self.W_POSITION = np.array([10.0, 10.0, 8.0])  # [x, y, z] - reduced slightly to allow distance adjustment
-        self.W_VELOCITY = np.array([3.0, 3.0, 2.5])    # [vx, vy, vz] - further reduced for agility
-        self.W_ATTITUDE = np.array([1.0, 1.0, 5.0])    # [roll, pitch, yaw] - increased yaw weight for facing person
-        self.W_ANGULAR_RATE = np.array([2.0, 2.0, 1.0]) # [wx, wy, wz] - reduced yaw rate penalty
+        # Position tracking weights - optimized for aggressive distance maintenance
+        self.W_POSITION = np.array([15.0, 15.0, 10.0])  # [x, y, z] - high for fast position tracking
+        self.W_VELOCITY = np.array([2.0, 2.0, 2.0])    # [vx, vy, vz] - low to allow fast movement
+        self.W_ATTITUDE = np.array([1.0, 1.0, 6.0])    # [roll, pitch, yaw] - very high yaw weight for facing person
+        self.W_ANGULAR_RATE = np.array([1.5, 1.5, 0.8]) # [wx, wy, wz] - low yaw rate penalty for fast turning
 
-        # Control effort weights - reduced to allow more aggressive tracking
-        self.W_CONTROL = np.array([0.3, 0.8, 0.8, 0.5])  # [thrust, roll, pitch, yaw_rate] - further reduced for agility
+        # Control effort weights - minimal to allow aggressive control
+        self.W_CONTROL = np.array([0.2, 0.5, 0.5, 0.3])  # [thrust, roll, pitch, yaw_rate] - very low for maximum agility
 
-        # Person tracking specific weights - optimized for keeping person in view
-        self.W_TRACKING_DISTANCE = 12.0  # Weight for maintaining optimal tracking distance - significantly increased
-        self.W_CAMERA_ANGLE = 8.0        # Weight for keeping person in camera view - greatly increased to prevent side escape
-        self.W_SMOOTH_TRACKING = 2.0     # Weight for smooth tracking motion - reduced to prioritize keeping person in view
+        # Person tracking specific weights - prioritize distance over everything
+        self.W_TRACKING_DISTANCE = 30.0  # Weight for maintaining optimal tracking distance - VERY HIGH priority
+        self.W_CAMERA_ANGLE = 10.0       # Weight for keeping person in camera view - very high to prevent escape
+        self.W_SMOOTH_TRACKING = 0.8     # Slightly lower smoothing penalty to react quicker
         
         # ========== Constraints ==========
         # State constraints
@@ -107,8 +107,14 @@ class NMPCConfig:
         self.BASE_TRACKING_ANGULAR_VELOCITY = 0.01  # Base orbit rate (rad/s) - very slow for stable tracking
         self.TRACKING_SPEED_GAIN = 0.0       # No speed-dependent orbit adjustment
         self.MAX_TRACKING_ANGULAR_VELOCITY = 0.01    # Cap orbit rate to 0.01 rad/s
-        self.TARGET_POSITION_SMOOTHING = 0.3       # 0=no smoothing, 1=full smoothing - reduced for faster response
-        self.PERSON_POSITION_FILTER_ALPHA = 0.5     # Smoothing for detected person position - reduced for faster response
+        self.TARGET_POSITION_SMOOTHING = 0.2       # 0=no smoothing, 1=full smoothing - further reduced for faster response
+        self.PERSON_POSITION_FILTER_ALPHA = 0.35    # Less filtering for quicker person updates
+        self.RADIAL_VELOCITY_GAIN = 1.9            # Gain for radial correction toward desired orbit radius
+        self.RADIAL_INTEGRAL_GAIN = 0.4            # Integral gain to remove steady-state distance error
+        self.MAX_RADIAL_INTEGRAL = 4.0             # Clamp integral term to avoid windup
+        self.MAX_RADIAL_VELOCITY = 3.2             # Limit radial correction speed (m/s)
+        self.MIN_PHASE_STEP_TIME = 0.04            # Lower bound on phase integration step (s)
+        self.MAX_PHASE_STEP_TIME = 0.3             # Upper bound on phase integration step (s)
         
         # Camera parameters - updated for X3 drone configuration
         self.CAMERA_FOV_HORIZONTAL = 1.2        # 68.75 degrees horizontal FOV (from model.sdf)

@@ -92,8 +92,9 @@ class NMPCTrackerNode(Node):
         self.declare_parameter('camera_fov_vertical', math.radians(60.0))
         self.declare_parameter('person_anchor_height', 1.7)
         self.declare_parameter('takeoff_altitude', 3.0)
-        self.declare_parameter('takeoff_ascent_rate', 2.0)
+        self.declare_parameter('takeoff_ascent_rate', 4.0)
         self.declare_parameter('takeoff_hold_duration', 10.0)
+        self.declare_parameter('takeoff_min_stable_time', 1.2)
         self.declare_parameter('lost_target_hold_duration', 10.0)
         self.declare_parameter('altitude_tolerance', 0.05)
         self.declare_parameter('search_yaw_rate', 0.05)
@@ -118,8 +119,9 @@ class NMPCTrackerNode(Node):
         self.camera_fov_vertical = float(self.get_parameter('camera_fov_vertical').value)
         self.person_anchor_height = float(self.get_parameter('person_anchor_height').value)
         self.takeoff_altitude = self.get_parameter('takeoff_altitude').value
-        self.takeoff_ascent_rate = self.get_parameter('takeoff_ascent_rate').value
+        self.takeoff_ascent_rate = float(self.get_parameter('takeoff_ascent_rate').value)
         self.takeoff_hold_duration = self.get_parameter('takeoff_hold_duration').value
+        self.takeoff_min_stable_time = float(self.get_parameter('takeoff_min_stable_time').value)
         self.lost_target_hold_duration = self.get_parameter('lost_target_hold_duration').value
         self.altitude_tolerance = max(0.01, self.get_parameter('altitude_tolerance').value)
         self.search_yaw_rate = self.get_parameter('search_yaw_rate').value
@@ -353,7 +355,12 @@ class NMPCTrackerNode(Node):
             person_velocity = self._estimate_person_velocity(filtered_position, current_time)
 
             # Update controller
-            self.controller.set_person_detection(filtered_position, person_velocity)
+            self.controller.set_person_detection(
+                filtered_position,
+                person_velocity,
+                detection_time=current_time,
+                allow_phase_change=(self.state == 'TRACK'),
+            )
             self._detection_streak += 1
             self._handle_person_detection(filtered_position, person_velocity)
 
@@ -383,7 +390,12 @@ class NMPCTrackerNode(Node):
         filtered_position = self._filter_person_position(person_position)
         person_velocity = self._estimate_person_velocity(filtered_position, timestamp)
 
-        self.controller.set_person_detection(filtered_position, person_velocity)
+        self.controller.set_person_detection(
+            filtered_position,
+            person_velocity,
+            detection_time=timestamp,
+            allow_phase_change=(self.state == 'TRACK'),
+        )
         self._detection_streak += 1
         self._handle_person_detection(filtered_position, person_velocity)
     
@@ -762,6 +774,12 @@ class NMPCTrackerNode(Node):
             self.get_logger().warn('TRACK模式下未检测到目标，忽略跟踪命令')
             return
 
+        # Advance orbit target only during active tracking
+        self.controller.advance_tracking_target(
+            self._now(),
+            allow_phase_change=True,
+        )
+
         try:
             control, info = self.controller.optimize()
         except Exception as exc:  # 捕捉优化失败，避免节点崩溃
@@ -957,7 +975,7 @@ class NMPCTrackerNode(Node):
 
             # 只有在高度稳定达到后才允许切换到跟踪模式
             altitude_stable_duration = current_time - self.takeoff_alt_reached_time
-            min_stable_time = 2.0  # 至少稳定2秒钟
+            min_stable_time = max(0.5, self.takeoff_min_stable_time)
 
             if altitude_stable_duration >= min_stable_time:
                 if self.person_detected and self._detection_streak >= self.required_detection_confirmations:

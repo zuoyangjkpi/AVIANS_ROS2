@@ -67,10 +67,13 @@ class DroneNMPCController:
         self.person_position = np.array([0.0, 0.0, 0.0])
         self.person_velocity = np.array([0.0, 0.0, 0.0])
         self.person_detected = False
-        self.last_detection_time = 0.0
+        self.last_detection_time: float = 0.0
         self.tracking_height_offset = nmpc_config.TRACKING_HEIGHT_OFFSET
         self._desired_phase = 0.0
-        
+        self._phase_initialized = False
+        self._last_target_update_time: Optional[float] = None
+        self._distance_error_integral = 0.0
+
         # Control history for warm start
         self.control_history = []
         for _ in range(self.config.N):
@@ -107,27 +110,62 @@ class DroneNMPCController:
         self.current_state[self.config.STATE_ROLL:self.config.STATE_YAW+1] = orientation
         self.current_state[self.config.STATE_WX:self.config.STATE_WZ+1] = angular_velocity
     
-    def set_person_detection(self, position: np.ndarray, velocity: np.ndarray = None):
+    def set_person_detection(
+        self,
+        position: np.ndarray,
+        velocity: np.ndarray = None,
+        detection_time: Optional[float] = None,
+        allow_phase_change: bool = True,
+    ):
         """Set detected person position and velocity"""
         self.person_position = position.copy()
         if velocity is not None:
             self.person_velocity = velocity.copy()
         else:
             self.person_velocity = np.array([0.0, 0.0, 0.0])
-        
-        self.person_detected = True
-        self.last_detection_time = time.time()
-        
-        # Update target position for tracking
-        self._update_tracking_target()
 
-    def _update_tracking_target(self):
+        self.person_detected = True
+        current_time = detection_time if detection_time is not None else time.time()
+        self.last_detection_time = current_time
+
+        # Update tracking target using the most recent observation
+        self.advance_tracking_target(
+            current_time,
+            allow_phase_change=allow_phase_change,
+        )
+
+    def advance_tracking_target(
+        self,
+        current_time: Optional[float] = None,
+        *,
+        allow_phase_change: bool = True,
+    ):
+        """Advance desired tracking target using elapsed time"""
+        if not self.person_detected:
+            return
+
+        now = current_time if current_time is not None else time.time()
+        if self._last_target_update_time is None:
+            dt = self.dt if allow_phase_change else 0.0
+        else:
+            dt = now - self._last_target_update_time if allow_phase_change else 0.0
+            if dt <= 0.0 and allow_phase_change:
+                dt = self.dt
+
+        if allow_phase_change:
+            # Clamp integration step to avoid very small or very large jumps
+            dt = float(np.clip(dt, self.config.MIN_PHASE_STEP_TIME, self.config.MAX_PHASE_STEP_TIME))
+
+        self._update_tracking_target(dt, allow_phase_change)
+        self._last_target_update_time = now
+
+    def _update_tracking_target(self, dt: float, allow_phase_change: bool):
         """Update target position based on person location with circular tracking behavior"""
         if not self.person_detected:
             return
-        
+
         person_pos = self.person_position
-        
+
         # Circular tracking behavior - drone maintains fixed phase relative to person
         # Calculate current phase angle relative to person
         drone_pos = self.current_state.data[self.config.STATE_X:self.config.STATE_Z+1]
@@ -138,19 +176,21 @@ class DroneNMPCController:
         else:
             current_phase = self._desired_phase if hasattr(self, '_desired_phase') else 0.0
 
-        dt = self.config.TIMESTEP
-
         # Calculate current distance to person
         current_distance = np.linalg.norm(relative_pos)
 
-        if not hasattr(self, '_desired_phase'):
+        if not self._phase_initialized:
             # Initialize phase to current position (no unnecessary movement)
             self._desired_phase = current_phase
             self._phase_initialized = True
-        else:
-            # Slow clockwise rotation: 0.01 rad/s
+        elif allow_phase_change:
+            # Slow clockwise rotation using configured angular velocity
+            angular_speed = min(
+                self.config.MAX_TRACKING_ANGULAR_VELOCITY,
+                self.config.BASE_TRACKING_ANGULAR_VELOCITY,
+            )
             # Clockwise means decreasing phase angle
-            self._desired_phase -= 0.01 * dt
+            self._desired_phase = self._wrap_angle(self._desired_phase - angular_speed * dt)
 
         # Adaptive radius based on current distance
         # When person is too close (< MIN), allow drone to move outward beyond optimal
@@ -158,8 +198,6 @@ class DroneNMPCController:
         optimal_distance = self.config.OPTIMAL_TRACKING_DISTANCE
         min_distance = self.config.MIN_TRACKING_DISTANCE
         max_distance = self.config.MAX_TRACKING_DISTANCE
-
-        distance_error = current_distance - optimal_distance
 
         if current_distance < min_distance:
             # Person too close! URGENT: move away aggressively
@@ -175,6 +213,18 @@ class DroneNMPCController:
         else:
             # Within acceptable range, use optimal distance
             radius = optimal_distance
+
+        # Distance error relative to desired radius
+        distance_error = current_distance - radius
+
+        if allow_phase_change:
+            # Integrate distance error to remove steady-state bias in radius
+            self._distance_error_integral += distance_error * dt
+            self._distance_error_integral = float(np.clip(
+                self._distance_error_integral,
+                -self.config.MAX_RADIAL_INTEGRAL,
+                self.config.MAX_RADIAL_INTEGRAL,
+            ))
 
         target_x = person_pos[0] + radius * math.cos(self._desired_phase)
         target_y = person_pos[1] + radius * math.sin(self._desired_phase)
@@ -196,24 +246,52 @@ class DroneNMPCController:
 
         # Calculate target velocity for smooth circular motion
         # Angular velocity is fixed at 0.01 rad/s for slow clockwise rotation
-        angular_velocity = 0.01
+        angular_velocity = min(
+            self.config.MAX_TRACKING_ANGULAR_VELOCITY,
+            self.config.BASE_TRACKING_ANGULAR_VELOCITY,
+        )
+        if not allow_phase_change:
+            angular_velocity = 0.0
         tangential_speed = radius * angular_velocity
         tangent_x = -math.sin(self._desired_phase) * tangential_speed
         tangent_y = math.cos(self._desired_phase) * tangential_speed
 
         # Add person's velocity to follow the moving center
         person_speed = self.person_velocity[:2]
+        radial_direction = np.zeros(2)
+        radial_speed_cmd = 0.0
+        if current_distance > 1e-3:
+            radial_direction = relative_pos[:2] / current_distance
+            radial_speed_cmd = -self.config.RADIAL_VELOCITY_GAIN * distance_error
+            radial_speed_cmd = float(np.clip(
+                radial_speed_cmd,
+                -self.config.MAX_RADIAL_VELOCITY,
+                self.config.MAX_RADIAL_VELOCITY,
+            ))
+            if allow_phase_change:
+                radial_speed_cmd += self.config.RADIAL_INTEGRAL_GAIN * self._distance_error_integral
+                radial_speed_cmd = float(np.clip(
+                    radial_speed_cmd,
+                    -self.config.MAX_RADIAL_VELOCITY,
+                    self.config.MAX_RADIAL_VELOCITY,
+                ))
+
         new_velocity = np.zeros(3)
-        new_velocity[0] = tangent_x + person_speed[0]
-        new_velocity[1] = tangent_y + person_speed[1]
+        new_velocity[0] = tangent_x + radial_direction[0] * radial_speed_cmd + person_speed[0]
+        new_velocity[1] = tangent_y + radial_direction[1] * radial_speed_cmd + person_speed[1]
         new_velocity[2] = 0.0  # No vertical tracking velocity
 
-        if self._last_target_velocity is not None:
-            alpha_vel = 0.7  # Fast velocity response
+        if self._last_target_velocity is not None and allow_phase_change:
+            # Increase responsiveness when radius error is large
+            if abs(distance_error) > 0.5:
+                alpha_vel = 0.85
+            else:
+                alpha_vel = 0.7
             new_velocity = alpha_vel * new_velocity + (1.0 - alpha_vel) * self._last_target_velocity
         self.target_velocity = new_velocity
-        self._last_target_velocity = new_velocity.copy()
-        
+        if allow_phase_change:
+            self._last_target_velocity = new_velocity.copy()
+
         # Ensure drone always faces the person (yaw control)
         to_person = person_pos - np.array([target_x, target_y, target_z])
         desired_yaw = math.atan2(to_person[1], to_person[0]) + math.pi  # 加上pi确保面向人
@@ -223,12 +301,18 @@ class DroneNMPCController:
 
     def reset_phase(self, phase: float):
         self._desired_phase = phase
+        self._phase_initialized = True
+        self._last_target_update_time = None
+        self._distance_error_integral = 0.0
 
     def clear_detection(self):
         self.person_detected = False
         self._last_target_position = None
         self._last_target_velocity = None
         self.person_velocity = np.zeros(3)
+        self._phase_initialized = False
+        self._last_target_update_time = None
+        self._distance_error_integral = 0.0
 
     def set_tracking_height_offset(self, offset: float):
         self.tracking_height_offset = offset
